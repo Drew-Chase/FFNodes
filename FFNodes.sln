@@ -5,6 +5,10 @@ VisualStudioVersion = 17.7.34003.232
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FFNodes.Client", "FFNodes.Client\FFNodes.Client.csproj", "{FAA60AF0-4681-4559-92D0-32CE136610B6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FFNodes.Server", "FFNodes.Server\FFNodes.Server.csproj", "{732E40C8-765B-43C4-80D3-C9CD99EEB6AE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FFNodes.Core", "FFNodes.Core\FFNodes.Core.csproj", "{EF831A0F-B6BB-42A1-8729-AE1F110A61CF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -17,6 +21,14 @@ Global
 		{FAA60AF0-4681-4559-92D0-32CE136610B6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FAA60AF0-4681-4559-92D0-32CE136610B6}.Release|Any CPU.Build.0 = Release|Any CPU
 		{FAA60AF0-4681-4559-92D0-32CE136610B6}.Release|Any CPU.Deploy.0 = Release|Any CPU
+		{732E40C8-765B-43C4-80D3-C9CD99EEB6AE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{732E40C8-765B-43C4-80D3-C9CD99EEB6AE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{732E40C8-765B-43C4-80D3-C9CD99EEB6AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{732E40C8-765B-43C4-80D3-C9CD99EEB6AE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EF831A0F-B6BB-42A1-8729-AE1F110A61CF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EF831A0F-B6BB-42A1-8729-AE1F110A61CF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EF831A0F-B6BB-42A1-8729-AE1F110A61CF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EF831A0F-B6BB-42A1-8729-AE1F110A61CF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
