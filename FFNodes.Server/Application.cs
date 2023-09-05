@@ -9,11 +9,10 @@ namespace FFNodes.Server
     {
         private static void Main()
         {
-            Directory.CreateDirectory("logs");
             Log.Logger = new LoggerConfiguration()
                 .WriteTo.Console(LogEventLevel.Verbose)
-                .WriteTo.File(Path.Combine("logs", "debug.log"), LogEventLevel.Verbose, buffered: true, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000)
-                .WriteTo.File(Path.Combine("logs", "latest.log"), LogEventLevel.Information, buffered: true, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000)
+                .WriteTo.File(Files.DebugLog, LogEventLevel.Verbose, buffered: true, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000)
+                .WriteTo.File(Files.LatestLog, LogEventLevel.Information, buffered: true, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000)
                 .CreateLogger();
 
             AppDomain.CurrentDomain.ProcessExit += (s, e) =>
@@ -39,6 +38,7 @@ namespace FFNodes.Server
                     builder.UseStartup<Startup>();
 
                     Log.Information("Server running at {SERVER}", $"http://127.0.0.1:{Configuration.Instance.Port}");
+                    Log.Information("Connection url is {CONNECTION}", $"ffn://127.0.0.1:{Configuration.Instance.Port}/{Data.Data.ConnectionString}");
                 }).Build().Run();
         }
     }
