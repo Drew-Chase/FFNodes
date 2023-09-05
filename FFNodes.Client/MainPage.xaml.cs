@@ -1,10 +1,11 @@
-﻿namespace FFNodes.Client
+﻿// LFInteractive LLC. 2021-2024﻿
+
+namespace FFNodes.Client;
+
+public partial class MainPage : ContentPage
 {
-    public partial class MainPage : ContentPage
+    public MainPage()
     {
-        public MainPage()
-        {
-            InitializeComponent();
-        }
+        InitializeComponent();
     }
 }
