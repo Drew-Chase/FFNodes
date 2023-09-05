@@ -28,12 +28,12 @@
 
   <ItemGroup>
     <!-- App Icon -->
+    <MauiIcon Include="Resources\AppIcon\icon.svg" />
 
     <!-- Splash Screen -->
 
     <!-- Images -->
     <MauiImage Include="Resources\Images\*" />
-    <MauiImage Update="Resources\Images\dotnet_bot.svg" BaseSize="168,208" />
 
     <!-- Custom Fonts -->
     <MauiFont Include="Resources\Fonts\*" />
@@ -43,11 +43,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Remove="Resources\AppIcon\Icon.svg" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Content Include="Resources\AppIcon\Icon.svg">
+    <Content Include="Platforms\Windows\icon.svg">
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="Resources\AppIcon\icon.svg">
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
@@ -55,6 +55,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="7.0.0" />
+    <PackageReference Include="PInvoke.User32" Version="0.7.124" />
   </ItemGroup>
 
   <ItemGroup>
@@ -62,6 +63,10 @@
     <Folder Include="Resources\Fonts\" />
     <Folder Include="Resources\Raw\" />
     <Folder Include="Resources\Splash\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FFNodes.Core\FFNodes.Core.csproj" />
   </ItemGroup>
 
 </Project>
