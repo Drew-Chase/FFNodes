@@ -1,7 +1,7 @@
 ﻿// LFInteractive LLC. 2021-2024﻿
 namespace FFNodes.Server.Model;
 
-public struct ProcessedFileModel
+public struct ProcessedFile
 {
     public string Name { get; set; }
     public long OriginalSize { get; set; }
