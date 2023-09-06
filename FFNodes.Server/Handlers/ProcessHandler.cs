@@ -26,6 +26,11 @@ public sealed class ProcessHandler
     private readonly List<ProcessedFile> processedFiles;
     private readonly Dictionary<User, List<ProcessedFile>> checkedOutFiles;
 
+    /// <summary>
+    /// If the processed files have finished loading.
+    /// </summary>
+    public bool FinishedLoading { get; set; } = false;
+
     private ProcessHandler()
     {
         processedFiles = new();
@@ -92,6 +97,8 @@ public sealed class ProcessHandler
             return;
         }
         Log.Information("Loading processed files...");
+        processedFiles.Clear();
+        FinishedLoading = false;
         Parallel.ForEach(Configuration.Instance.Directories, directory =>
         {
             Log.Debug("Scanning {Directory}...", directory);
@@ -145,5 +152,6 @@ public sealed class ProcessHandler
                 }
             };
         });
+        FinishedLoading = true;
     }
 }
