@@ -8,7 +8,6 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Serilog;
-using System.Reflection;
 
 namespace FFNodes.Server.Data;
 
@@ -16,8 +15,6 @@ public sealed class Configuration
 {
     [JsonIgnore]
     public static Configuration Instance = Instance ??= new();
-
-    private string configFile = Path.Combine(Assembly.GetExecutingAssembly().Location, "config.json");
 
     [JsonProperty("port")]
     public int Port { get; set; } = 1818;
@@ -34,21 +31,21 @@ public sealed class Configuration
 
     public void Save()
     {
-        Log.Debug("Saving config file: {CONFIG}", configFile);
-        using StreamWriter writer = File.CreateText(configFile);
+        Log.Debug("Saving config file: {CONFIG}", Files.Config);
+        using StreamWriter writer = File.CreateText(Files.Config);
         writer.Write(JsonConvert.SerializeObject(this, Formatting.Indented));
     }
 
     public void Load()
     {
-        if (!File.Exists(configFile))
+        if (!File.Exists(Files.Config))
         {
             Save();
         }
         else
         {
-            Log.Debug("Loading config file: {CONFIG}", configFile);
-            Instance = JObject.Parse(File.ReadAllText(configFile))?.ToObject<Configuration>() ?? Instance;
+            Log.Debug("Loading config file: {CONFIG}", Files.Config);
+            Instance = JObject.Parse(File.ReadAllText(Files.Config))?.ToObject<Configuration>() ?? Instance;
         }
     }
 }
