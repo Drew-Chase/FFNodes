@@ -5,6 +5,7 @@
     https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
 */
 
+using Chase.CLIParser;
 using FFNodes.Server.Data;
 using FFNodes.Server.Handlers;
 using FFNodes.Server.Middleware;
@@ -17,6 +18,35 @@ namespace FFNodes.Server
     {
         private static void Main()
         {
+            OptionsManager optionsManager = new("FFNodes");
+            optionsManager.Add(new() { ShortName = "p", LongName = "port", Required = false, HasArgument = true, Description = "runs the server on and sets the port" });
+            optionsManager.Add(new() { ShortName = "c", LongName = "host", Required = false, HasArgument = true, Description = "runs the server on and sets the host" });
+
+            OptionsParser parser = optionsManager.Parse();
+            if (parser != null)
+            {
+                if (parser.IsPresent("port", out string portString))
+                {
+                    if (int.TryParse(portString, out int port))
+                    {
+                        Configuration.Instance.Port = port;
+                    }
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.Error.WriteLine($"Invalid port number: {portString}");
+                        Console.ResetColor();
+                        return;
+                    }
+                }
+
+                if (parser.IsPresent("host", out string host))
+                {
+                    Configuration.Instance.Host = host;
+                }
+                Configuration.Instance.Save();
+            }
+
             TimeSpan flushTime = TimeSpan.FromSeconds(30);
             Log.Logger = new LoggerConfiguration()
                 .WriteTo.Console(LogEventLevel.Verbose)
@@ -41,7 +71,7 @@ namespace FFNodes.Server
             // Creates a new task to load the process handler
             Task.Run(() =>
             {
-                ProcessHandler.Instance.Load();
+                FileSystemHandler.Instance.Load();
             });
 
             Host.CreateDefaultBuilder()
