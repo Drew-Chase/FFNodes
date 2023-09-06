@@ -28,5 +28,18 @@ public class AuthenticationController : ControllerBase
 
     [HttpGet("users")]
     [Produces("application/json")]
-    public IActionResult GetUsers() => Ok(UserHandler.Instance.GetUsers());
+    public IActionResult GetUsers() => Ok(UserHandler.Instance.GetUsers()
+        .Select(user =>
+        {
+            // Removing the list of processed files from the response to improve performance.
+            return new
+            {
+                user.Id,
+                user.Username,
+                user.Saved,
+                user.Joined,
+                user.LastOnline,
+                user.ActiveTime,
+            };
+        }));
 }
