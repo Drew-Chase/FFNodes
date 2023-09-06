@@ -15,6 +15,7 @@ public sealed class User
     public string Username { get; set; }
     public TimeSpan ActiveTime { get; set; } = TimeSpan.Zero;
     public DateTime Join { get; set; } = DateTime.Now;
+    public DateTime LastOnline { get; set; } = DateTime.Now;
     public long Saved { get; set; } = 0;
     public bool IsAdmin { get; set; } = false;
     public ProcessedFile[] Files { get; set; } = Array.Empty<ProcessedFile>();
