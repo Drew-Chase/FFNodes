@@ -1,0 +1,27 @@
+FFNodes Terms of Service
+1. Acceptance of Terms
+
+By using FFNodes, you agree to comply with and be bound by these Terms of Service.
+2. License
+
+FFNodes is licensed under the GNU General Public License, version 3.0. You are free to use, modify, and distribute FFNodes in accordance with the terms of this license.
+3. Description of Services
+
+FFNodes consists of two applications: the server and the client. The server runs on the owner's server computer, and the client is used to connect to the server and download media files for batch compression using FFmpeg.
+4. User Responsibilities
+
+Users of FFNodes are responsible for their actions while using the software. This includes compliance with all applicable laws and regulations, as well as respecting the intellectual property rights of others.
+5. Disclaimer of Warranty
+
+FFNodes is provided "as is" and without warranty of any kind, whether express or implied. The developers make no warranties regarding the accuracy, reliability, or availability of the software.
+6. Limitation of Liability
+
+The developers of FFNodes shall not be liable for any direct, indirect, incidental, special, or consequential damages resulting from the use or inability to use the software, including but not limited to damages for loss of profits, data, or other intangible losses.
+7. Modifications to Terms
+
+The developers of FFNodes reserve the right to modify these Terms of Service at any time. Users will be notified of changes, and continued use of the software implies acceptance of the modified terms.
+8. Governing Law
+
+These Terms of Service shall be governed by and construed in accordance with the laws of United States of America.
+
+This document was last updated on September 4th, 2023.
