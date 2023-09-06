@@ -1,40 +1,31 @@
-﻿// hardcodet.net NotifyIcon for WPF
-// Copyright (c) 2009 - 2020 Philipp Sumi
-// Contact and Information: http://www.hardcodet.net
-//
-// This library is free software; you can redistribute it and/or
-// modify it under the terms of the Code Project Open License (CPOL);
-// either version 1.0 of the License, or (at your option) any later
-// version.
-//
-// The above copyright notice and this permission notice shall be
-// included in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-// OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-// HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-// OTHER DEALINGS IN THE SOFTWARE.
-//
-// THIS COPYRIGHT NOTICE MAY NOT BE REMOVED FROM THIS FILE
+﻿/*
+    FFNodes - LFInteractive LLC. 2021-2024
+    FFNodes is a client/server solution for batch processing ffmpeg operations from multiple systems accross the internet.
+    Licensed under GPL-3.0
+    https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
+*/
+        /// <summary>
+        /// The custom tooltip should be closed or hidden.
+        /// </summary>
+        public event Action<bool> ChangeToolTipStateRequest;
 
+        /// <summary>
+        /// Fired in case the user clicked or moved within
+        /// the taskbar icon area.
+        /// </summary>
+        public event Action<MouseEvent> MouseEventReceived;
 
-using System;
-using System.ComponentModel;
-using System.Diagnostics;
+        /// <summary>
+        /// Fired if a balloon ToolTip was either displayed
+        /// or closed (indicated by the boolean flag).
+        /// </summary>
+        public event Action<bool> BalloonToolTipChanged;
 
-namespace FFNodes.Client.TaskbarNotification.Interop
-{
-    /// <summary>
-    /// Receives messages from the taskbar icon through
-    /// window messages of an underlying helper window.
-    /// </summary>
-    public class WindowMessageSink : IDisposable
-    {
-        #region members
+        /// <summary>
+        /// Fired if the taskbar was created or restarted. Requires the taskbar
+        /// icon to be reset.
+        /// </summary>
+        public event Action TaskbarCreated;
 
         /// <summary>
         /// The ID of messages that are received from the the
@@ -64,6 +55,17 @@ namespace FFNodes.Client.TaskbarNotification.Interop
         private WindowProcedureHandler messageHandler;
 
         /// <summary>
+        /// The version of the underlying icon. Defines how
+        /// incoming messages are interpreted.
+        /// </summary>
+        public byte Version => 0x4;
+
+        /// <summary>
+        /// Set to true as soon as <c>Dispose</c> has been invoked.
+        /// </summary>
+        public bool IsDisposed { get; private set; }
+
+        /// <summary>
         /// Window class ID.
         /// </summary>
         internal string WindowId { get; private set; }
@@ -72,44 +74,6 @@ namespace FFNodes.Client.TaskbarNotification.Interop
         /// Handle for the message window.
         /// </summary>
         internal IntPtr MessageWindowHandle { get; private set; }
-
-        /// <summary>
-        /// The version of the underlying icon. Defines how
-        /// incoming messages are interpreted.
-        /// </summary>
-        public byte Version => 0x4;
-
-        #endregion
-
-        #region events
-
-        /// <summary>
-        /// The custom tooltip should be closed or hidden.
-        /// </summary>
-        public event Action<bool> ChangeToolTipStateRequest;
-
-        /// <summary>
-        /// Fired in case the user clicked or moved within
-        /// the taskbar icon area.
-        /// </summary>
-        public event Action<MouseEvent> MouseEventReceived;
-
-        /// <summary>
-        /// Fired if a balloon ToolTip was either displayed
-        /// or closed (indicated by the boolean flag).
-        /// </summary>
-        public event Action<bool> BalloonToolTipChanged;
-
-        /// <summary>
-        /// Fired if the taskbar was created or restarted. Requires the taskbar
-        /// icon to be reset.
-        /// </summary>
-        public event Action TaskbarCreated;
-
-        #endregion
-
-        #region construction
-
         /// <summary>
         /// Creates a new message sink that receives message from
         /// a given taskbar icon.
@@ -120,6 +84,37 @@ namespace FFNodes.Client.TaskbarNotification.Interop
             CreateMessageWindow();
         }
 
+        /// <summary>
+        /// This destructor will run only if the <see cref="Dispose()"/>
+        /// method does not get called. This gives this base class the
+        /// opportunity to finalize.
+        /// <para>
+        /// Important: Do not provide destructor in types derived from
+        /// this class.
+        /// </para>
+        /// </summary>
+        ~WindowMessageSink()
+        {
+            Dispose(false);
+        }
+
+        /// <summary>
+        /// Disposes the object.
+        /// </summary>
+        /// <remarks>This method is not virtual by design. Derived classes
+        /// should override <see cref="Dispose(bool)"/>.
+        /// </remarks>
+        public void Dispose()
+        {
+            Dispose(true);
+
+            // This object will be cleaned up by the Dispose method.
+            // Therefore, you should call GC.SuppressFinalize to
+            // take this object off the finalization queue
+            // and prevent finalization code for this object
+            // from executing a second time.
+            GC.SuppressFinalize(this);
+        }
 
         /// <summary>
         /// Creates a dummy instance that provides an empty
@@ -134,10 +129,6 @@ namespace FFNodes.Client.TaskbarNotification.Interop
                 MessageWindowHandle = IntPtr.Zero
             };
         }
-
-        #endregion
-
-        #region CreateMessageWindow
 
         /// <summary>
         /// Creates the helper message window that is used
@@ -183,10 +174,6 @@ namespace FFNodes.Client.TaskbarNotification.Interop
             }
         }
 
-        #endregion
-
-        #region Handle Window Messages
-
         /// <summary>
         /// Callback method that receives messages from the taskbar area.
         /// </summary>
@@ -205,7 +192,6 @@ namespace FFNodes.Client.TaskbarNotification.Interop
             // Pass the message to the default window procedure
             return WinApi.DefWindowProc(hWnd, messageId, wParam, lParam);
         }
-
 
         /// <summary>
         /// Processes incoming system messages.
@@ -321,49 +307,6 @@ namespace FFNodes.Client.TaskbarNotification.Interop
                     break;
             }
         }
-
-        #endregion
-
-        #region Dispose
-
-        /// <summary>
-        /// Set to true as soon as <c>Dispose</c> has been invoked.
-        /// </summary>
-        public bool IsDisposed { get; private set; }
-
-
-        /// <summary>
-        /// Disposes the object.
-        /// </summary>
-        /// <remarks>This method is not virtual by design. Derived classes
-        /// should override <see cref="Dispose(bool)"/>.
-        /// </remarks>
-        public void Dispose()
-        {
-            Dispose(true);
-
-            // This object will be cleaned up by the Dispose method.
-            // Therefore, you should call GC.SuppressFinalize to
-            // take this object off the finalization queue
-            // and prevent finalization code for this object
-            // from executing a second time.
-            GC.SuppressFinalize(this);
-        }
-
-        /// <summary>
-        /// This destructor will run only if the <see cref="Dispose()"/>
-        /// method does not get called. This gives this base class the
-        /// opportunity to finalize.
-        /// <para>
-        /// Important: Do not provide destructor in types derived from
-        /// this class.
-        /// </para>
-        /// </summary>
-        ~WindowMessageSink()
-        {
-            Dispose(false);
-        }
-
         /// <summary>
         /// Removes the windows hook that receives window
         /// messages and closes the underlying helper window.
@@ -378,7 +321,5 @@ namespace FFNodes.Client.TaskbarNotification.Interop
             WinApi.DestroyWindow(MessageWindowHandle);
             messageHandler = null;
         }
-
-        #endregion
     }
 }

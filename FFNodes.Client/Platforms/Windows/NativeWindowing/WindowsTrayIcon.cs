@@ -1,32 +1,32 @@
-﻿using System;
-using System.Collections.Generic;
+﻿/*
+    FFNodes - LFInteractive LLC. 2021-2024
+    FFNodes is a client/server solution for batch processing ffmpeg operations from multiple systems accross the internet.
+    Licensed under GPL-3.0
+    https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
+*/
+
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace FFNodes.Client.TaskbarNotification.Interop
 {
-	public class WindowsTrayIcon
-	{
+    public class WindowsTrayIcon
+    {
+        public static readonly object SyncRoot = new object();
         private readonly object lockObject = new object();
-
-
-        private NotifyIconData iconData;
 
         /// <summary>
         /// Receives messages from the taskbar icon.
         /// </summary>
         private readonly WindowMessageSink messageSink;
 
+        private NotifyIconData iconData;
         public Action LeftClick { get; set; }
         public Action RightClick { get; set; }
-
 
         public bool IsTaskbarIconCreated { get; private set; }
 
         public WindowsTrayIcon(string iconFile)
-		{
+        {
             messageSink = new WindowMessageSink();
 
             // init icon data structure
@@ -40,30 +40,62 @@ namespace FFNodes.Client.TaskbarNotification.Interop
             // create the taskbar icon
             CreateTaskbarIcon();
 
-			// register event listeners
-			messageSink.MouseEventReceived += MessageSink_MouseEventReceived;
-			messageSink.TaskbarCreated += MessageSink_TaskbarCreated;
+            // register event listeners
+            messageSink.MouseEventReceived += MessageSink_MouseEventReceived;
+            messageSink.TaskbarCreated += MessageSink_TaskbarCreated;
             //messageSink.ChangeToolTipStateRequest += OnToolTipChange;
         }
 
-		private void MessageSink_TaskbarCreated()
-		{
+        /// <summary>
+        /// Updates the taskbar icons with data provided by a given <see cref="NotifyIconData"/> instance.
+        /// </summary>
+        /// <param name="data">Configuration settings for the NotifyIcon.</param>
+        /// <param name="command">Operation on the icon (e.g. delete the icon).</param>
+        /// <returns>True if the data was successfully written.</returns>
+        /// <remarks>See Shell_NotifyIcon documentation on MSDN for details.</remarks>
+        public static bool WriteIconData(ref NotifyIconData data, NotifyCommand command)
+        {
+            return WriteIconData(ref data, command, data.ValidMembers);
+        }
+
+        /// <summary>
+        /// Updates the taskbar icons with data provided by a given <see cref="NotifyIconData"/> instance.
+        /// </summary>
+        /// <param name="data">Configuration settings for the NotifyIcon.</param>
+        /// <param name="command">Operation on the icon (e.g. delete the icon).</param>
+        /// <param name="flags">
+        /// Defines which members of the <paramref name="data"/> structure are set.
+        /// </param>
+        /// <returns>True if the data was successfully written.</returns>
+        /// <remarks>See Shell_NotifyIcon documentation on MSDN for details.</remarks>
+        public static bool WriteIconData(ref NotifyIconData data, NotifyCommand command, IconDataMembers flags)
+        {
+            data.ValidMembers = flags;
+            lock (SyncRoot)
+            {
+                return WinApi.Shell_NotifyIcon(command, ref data);
+            }
+        }
+
+        private void MessageSink_TaskbarCreated()
+        {
             RemoveTaskbarIcon();
             CreateTaskbarIcon();
         }
 
-		private void MessageSink_MouseEventReceived(MouseEvent obj)
-		{
-			if (obj == MouseEvent.IconLeftMouseUp)
-			{
+        private void MessageSink_MouseEventReceived(MouseEvent obj)
+        {
+            if (obj == MouseEvent.IconLeftMouseUp)
+            {
                 LeftClick?.Invoke();
-			} else if (obj == MouseEvent.IconRightMouseUp)
-			{
+            }
+            else if (obj == MouseEvent.IconRightMouseUp)
+            {
                 RightClick?.Invoke();
-			}
-		}
+            }
+        }
 
-		private void CreateTaskbarIcon()
+        private void CreateTaskbarIcon()
         {
             lock (lockObject)
             {
@@ -80,10 +112,11 @@ namespace FFNodes.Client.TaskbarNotification.Interop
                 var status = WriteIconData(ref iconData, NotifyCommand.Add, members);
                 if (!status)
                 {
-                    // couldn't create the icon - we can assume this is because explorer is not running (yet!)
+                    // couldn't create the icon - we can assume this is because explorer is not
+                    // running (yet!)
                     // -> try a bit later again rather than throwing an exception. Typically, if the windows
-                    // shell is being loaded later, this method is being re-invoked from OnTaskbarCreated
-                    // (we could also retry after a delay, but that's currently YAGNI)
+                    // shell is being loaded later, this method is being re-invoked from
+                    // OnTaskbarCreated (we could also retry after a delay, but that's currently YAGNI)
                     return;
                 }
 
@@ -111,7 +144,6 @@ namespace FFNodes.Client.TaskbarNotification.Interop
             }
         }
 
-
         private void SetVersion()
         {
             iconData.VersionOrTimeout = (uint)0x4;
@@ -120,43 +152,6 @@ namespace FFNodes.Client.TaskbarNotification.Interop
             if (!status)
             {
                 Debug.Fail("Could not set version");
-            }
-        }
-
-        public static readonly object SyncRoot = new object();
-
-
-        /// <summary>
-        /// Updates the taskbar icons with data provided by a given
-        /// <see cref="NotifyIconData"/> instance.
-        /// </summary>
-        /// <param name="data">Configuration settings for the NotifyIcon.</param>
-        /// <param name="command">Operation on the icon (e.g. delete the icon).</param>
-        /// <returns>True if the data was successfully written.</returns>
-        /// <remarks>See Shell_NotifyIcon documentation on MSDN for details.</remarks>
-        public static bool WriteIconData(ref NotifyIconData data, NotifyCommand command)
-        {
-            return WriteIconData(ref data, command, data.ValidMembers);
-        }
-
-
-        /// <summary>
-        /// Updates the taskbar icons with data provided by a given
-        /// <see cref="NotifyIconData"/> instance.
-        /// </summary>
-        /// <param name="data">Configuration settings for the NotifyIcon.</param>
-        /// <param name="command">Operation on the icon (e.g. delete the icon).</param>
-        /// <param name="flags">Defines which members of the <paramref name="data"/>
-        /// structure are set.</param>
-        /// <returns>True if the data was successfully written.</returns>
-        /// <remarks>See Shell_NotifyIcon documentation on MSDN for details.</remarks>
-        public static bool WriteIconData(ref NotifyIconData data, NotifyCommand command, IconDataMembers flags)
-        {
-
-            data.ValidMembers = flags;
-            lock (SyncRoot)
-            {
-                return WinApi.Shell_NotifyIcon(command, ref data);
             }
         }
     }
