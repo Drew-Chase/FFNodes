@@ -9,6 +9,7 @@ using Chase.FFmpeg.Extra;
 using FFNodes.Core.Model;
 using FFNodes.Server.Data;
 using FFNodes.Server.Model;
+using Serilog;
 
 namespace FFNodes.Server.Handlers;
 
@@ -85,8 +86,15 @@ public sealed class ProcessHandler
     /// </summary>
     public void Load()
     {
+        if (!Configuration.Instance.Directories.Any())
+        {
+            Log.Warning("Please fill out the directories in the configuration file.");
+            return;
+        }
+        Log.Information("Loading processed files...");
         Parallel.ForEach(Configuration.Instance.Directories, directory =>
         {
+            Log.Debug("Scanning {Directory}...", directory);
             processedFiles.AddRange(FFVideoUtility.GetFilesAsync(directory, Configuration.Instance.ScanRecursively).Select(i => new ProcessedFile(i)));
             FileSystemWatcher watcher = new()
             {
