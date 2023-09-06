@@ -7,6 +7,7 @@
 
 using FFNodes.Server.Data;
 using FFNodes.Server.Handlers;
+using FFNodes.Server.Middleware;
 using Serilog;
 using Serilog.Events;
 
@@ -65,6 +66,7 @@ namespace FFNodes.Server
     {
         public void Configure(IApplicationBuilder app, IWebHostEnvironment evn)
         {
+            app.UseMiddleware<AuthenticationHeaderValidationMiddleware>();
             app.UseForwardedHeaders();
             app.UseMvc();
             app.UseRouting();

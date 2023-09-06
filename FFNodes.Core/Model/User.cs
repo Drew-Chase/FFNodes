@@ -6,18 +6,34 @@
 */
 
 using FFNodes.Server.Model;
+using Newtonsoft.Json;
 
 namespace FFNodes.Core.Model;
 
 public sealed class User
 {
+    [JsonProperty("id")]
     public Guid Id { get; set; } = Guid.NewGuid();
+
+    [JsonProperty("username")]
     public string Username { get; set; }
+
+    [JsonProperty("active_time")]
     public TimeSpan ActiveTime { get; set; } = TimeSpan.Zero;
-    public DateTime Join { get; set; } = DateTime.Now;
+
+    [JsonProperty("joined")]
+    public DateTime Joined { get; set; } = DateTime.Now;
+
+    [JsonProperty("last_online")]
     public DateTime LastOnline { get; set; } = DateTime.Now;
+
+    [JsonProperty("saved")]
     public long Saved { get; set; } = 0;
+
+    [JsonProperty("admin")]
     public bool IsAdmin { get; set; } = false;
+
+    [JsonProperty("processed_files")]
     public ProcessedFile[] Files { get; set; } = Array.Empty<ProcessedFile>();
 
     public User(string username)

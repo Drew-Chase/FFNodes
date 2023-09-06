@@ -8,7 +8,6 @@
 using FFNodes.Server.Data;
 using FFNodes.Server.Handlers;
 using Microsoft.AspNetCore.Mvc;
-using static FFNodes.Server.Data.Data;
 
 namespace FFNodes.Server.Controllers
 {
@@ -18,12 +17,8 @@ namespace FFNodes.Server.Controllers
     {
         [HttpGet()]
         [Produces("application/json")]
-        public IActionResult GetStatus([FromHeader] string code)
+        public IActionResult GetStatus()
         {
-            if (!ValidConnection(code))
-            {
-                return Unauthorized();
-            }
             return Ok(new
             {
                 uptime = (DateTime.Now - Configuration.Instance.StartDate),

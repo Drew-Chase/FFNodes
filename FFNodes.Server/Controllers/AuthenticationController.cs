@@ -8,7 +8,6 @@
 using FFNodes.Core.Model;
 using FFNodes.Server.Handlers;
 using Microsoft.AspNetCore.Mvc;
-using static FFNodes.Server.Data.Data;
 
 namespace FFNodes.Server.Controllers;
 
@@ -17,14 +16,17 @@ namespace FFNodes.Server.Controllers;
 public class AuthenticationController : ControllerBase
 {
     [HttpPost("connect")]
-    public IActionResult HandleConnectionRequest([FromHeader] string code)
-    {
-        return ValidConnection(code) ? Ok() : Unauthorized();
-    }
+    public IActionResult HandleConnectionRequest() => Ok();
 
     [HttpGet("user")]
     [Produces("application/json")]
-    public IActionResult GetUser([FromQuery] Guid id, [FromHeader] string code) => ValidConnection(code) ? Ok(UserHandler.Instance.GetUser(id)) : Unauthorized(new { error = "Invalid or missing connection code." });
+    public IActionResult GetUser([FromQuery] Guid id) => Ok(UserHandler.Instance.GetUser(id));
 
-    public IActionResult CreateUser([FromHeader] string code, [FromBody] User user) => !ValidConnection(code) ? Unauthorized(new { error = "Invalid or missing connection code." }) : UserHandler.Instance.CreateUser(user) ? Ok(user) : BadRequest(new { error = "User already exists!" });
+    [HttpPost("user")]
+    [Produces("application/json")]
+    public IActionResult CreateUser([FromBody] User user) => UserHandler.Instance.CreateUser(user) ? Ok(user) : BadRequest(new { error = "User already exists!" });
+
+    [HttpGet("users")]
+    [Produces("application/json")]
+    public IActionResult GetUsers() => Ok(UserHandler.Instance.GetUsers());
 }

@@ -40,6 +40,7 @@ public class UserHandler
             }
             // If not, add them.
             users.Add(user);
+            Save(user);
             return true;
         }
         return false;
@@ -89,6 +90,15 @@ public class UserHandler
     /// <returns></returns>
     public User[] GetConnectedUsers() => connectedUsers.Keys.ToArray();
 
+    /// <summary>
+    /// Gets a list of all the users.
+    /// </summary>
+    /// <returns></returns>
+    public User[] GetUsers() => users.ToArray();
+
+    /// <summary>
+    /// Loads all the users from the users directory.
+    /// </summary>
     public void Load()
     {
         // Loops through all the files in the users directory and deserializes them.
