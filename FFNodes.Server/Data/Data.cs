@@ -11,5 +11,7 @@ namespace FFNodes.Server.Data;
 
 public static class Data
 {
-    public static string ConnectionString { get; } = CLAESMath.EncryptStringAES($"{Environment.MachineName}")[..2];
+    public static string ConnectionString { get; } = CLAESMath.EncryptStringAES($"{Environment.MachineName}").Replace("==", "");
+
+    public static bool ValidConnection(string code) => code.Equals(ConnectionString);
 }
