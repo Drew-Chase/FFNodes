@@ -16,12 +16,12 @@ namespace FFNodes.Server.Controllers;
 public class AuthenticationController : ControllerBase
 {
     [HttpPost("connect")]
-    public IActionResult HandleConnectionRequest([FromForm] string code)
+    public IActionResult HandleConnectionRequest([FromHeader] string code)
     {
         return ValidConnection(code) ? Ok() : Unauthorized();
     }
 
     [HttpGet("user")]
     [Produces("application/json")]
-    public IActionResult GetUser([FromQuery] Guid id, [FromForm] string code) => ValidConnection(code) ? Ok(UserHandler.Instance.GetUser(id)) : Unauthorized(new { error = "Invalid or missing connection code." });
+    public IActionResult GetUser([FromQuery] Guid id, [FromHeader] string code) => ValidConnection(code) ? Ok(UserHandler.Instance.GetUser(id)) : Unauthorized(new { error = "Invalid or missing connection code." });
 }
