@@ -19,6 +19,8 @@ public class UserHandler
         users = new();
     }
 
+    public User? GetUser(Guid id) => users.FirstOrDefault(x => x.Id.Equals(id));
+
     public void Load()
     {
     }
