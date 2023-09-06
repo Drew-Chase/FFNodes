@@ -9,12 +9,18 @@ using FFNodes.Server.Model;
 
 namespace FFNodes.Core.Model;
 
-public struct User
+public sealed class User
 {
-    public Guid Id { get; set; }
+    public Guid Id { get; set; } = Guid.NewGuid();
     public string Username { get; set; }
-    public TimeSpan ActiveTime { get; set; }
-    public DateTime Join { get; set; }
-    public long Saved { get; set; }
-    public ProcessedFile[] Files { get; set; }
+    public TimeSpan ActiveTime { get; set; } = TimeSpan.Zero;
+    public DateTime Join { get; set; } = DateTime.Now;
+    public long Saved { get; set; } = 0;
+    public bool IsAdmin { get; set; } = false;
+    public ProcessedFile[] Files { get; set; } = Array.Empty<ProcessedFile>();
+
+    public User(string username)
+    {
+        Username = username ?? throw new ArgumentNullException(nameof(username));
+    }
 }
