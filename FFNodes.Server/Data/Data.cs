@@ -11,7 +11,16 @@ namespace FFNodes.Server.Data;
 
 public static class Data
 {
-    public static string ConnectionString { get; } = CLAESMath.EncryptStringAES($"{Environment.MachineName}").Replace("==", "");
+    public static string ConnectionString { get; private set; } = CLAESMath.EncryptStringAES(Configuration.Instance.AuthorizationToken.ToString("N")).Replace("==", "");
+    public static string ConnectionUrl { get; private set; } = $"ffn://{Configuration.Instance.Host}:{Configuration.Instance.Port}/{ConnectionString}";
 
     public static bool ValidConnection(string code) => code.Equals(ConnectionString);
+
+    public static void ResetConnectionCode()
+    {
+        Configuration.Instance.AuthorizationToken = Guid.NewGuid();
+        Configuration.Instance.Save();
+        ConnectionString = CLAESMath.EncryptStringAES(Configuration.Instance.AuthorizationToken.ToString("N")).Replace("==", "");
+        ConnectionUrl = $"ffn://{Configuration.Instance.Host}:{Configuration.Instance.Port}/{ConnectionString}";
+    }
 }
