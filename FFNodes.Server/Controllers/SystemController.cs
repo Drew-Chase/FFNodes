@@ -23,7 +23,19 @@ namespace FFNodes.Server.Controllers
             {
                 uptime = (DateTime.Now - Configuration.Instance.StartDate),
                 loading = !ProcessHandler.Instance.FinishedLoading,
-                connected_users = UserHandler.Instance.GetConnectedUsers().Select(user => user.Id)
+                connected_users = UserHandler.Instance.GetConnectedUsers().Select(user => user.Id),
+                connection_url = Data.Data.ConnectionUrl,
+            });
+        }
+
+        [HttpPost("reset-connection-code")]
+        [Produces("application/json")]
+        public IActionResult ResetConnectionCode()
+        {
+            Data.Data.ResetConnectionCode();
+            return Ok(new
+            {
+                connection_url = Data.Data.ConnectionUrl,
             });
         }
     }
