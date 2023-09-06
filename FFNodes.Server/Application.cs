@@ -6,6 +6,7 @@
 */
 
 using FFNodes.Server.Data;
+using FFNodes.Server.Handlers;
 using Serilog;
 using Serilog.Events;
 
@@ -15,10 +16,11 @@ namespace FFNodes.Server
     {
         private static void Main()
         {
+            TimeSpan flushTime = TimeSpan.FromSeconds(30);
             Log.Logger = new LoggerConfiguration()
                 .WriteTo.Console(LogEventLevel.Verbose)
-                .WriteTo.File(Files.DebugLog, LogEventLevel.Verbose, buffered: true, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000)
-                .WriteTo.File(Files.LatestLog, LogEventLevel.Information, buffered: true, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000)
+                .WriteTo.File(Files.DebugLog, LogEventLevel.Verbose, buffered: true, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000, flushToDiskInterval: flushTime)
+                .WriteTo.File(Files.LatestLog, LogEventLevel.Information, buffered: true, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000, flushToDiskInterval: flushTime)
                 .CreateLogger();
 
             AppDomain.CurrentDomain.ProcessExit += (s, e) =>
@@ -30,6 +32,7 @@ namespace FFNodes.Server
             Log.Information("Starting FFNodes Server");
 
             Configuration.Instance.Load();
+            ProcessHandler.Instance.Load();
 
             Host.CreateDefaultBuilder()
                 .UseSerilog()
