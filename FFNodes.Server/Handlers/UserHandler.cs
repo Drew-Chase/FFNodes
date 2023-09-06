@@ -29,11 +29,15 @@ public class UserHandler
     /// </summary>
     /// <param name="user"></param>
     /// <returns>if the user was successfully added.</returns>
-    public bool AddUser(User user)
+    public bool CreateUser(User user)
     {
         // Checks if the user is already in the list of users.
         if (!users.Any(u => u.Id.Equals(user.Id) || u.Username.Equals(user.Username)))
         {
+            if (!users.Any())
+            {
+                user.IsAdmin = true;
+            }
             // If not, add them.
             users.Add(user);
             return true;
