@@ -16,12 +16,12 @@ namespace FFNodes.Server.Handlers;
 /// <summary>
 /// Handles the processing of files.
 /// </summary>
-public sealed class ProcessHandler
+public sealed class FileSystemHandler
 {
     /// <summary>
     /// The instance of the process handler.
     /// </summary>
-    public static readonly ProcessHandler Instance = Instance ??= new ProcessHandler();
+    public static readonly FileSystemHandler Instance = Instance ??= new FileSystemHandler();
 
     private readonly List<ProcessedFile> processedFiles;
     private readonly Dictionary<User, List<ProcessedFile>> checkedOutFiles;
@@ -31,7 +31,7 @@ public sealed class ProcessHandler
     /// </summary>
     public bool FinishedLoading { get; set; } = false;
 
-    private ProcessHandler()
+    private FileSystemHandler()
     {
         processedFiles = new();
         checkedOutFiles = new();

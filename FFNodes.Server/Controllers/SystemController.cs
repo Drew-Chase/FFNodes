@@ -22,7 +22,7 @@ namespace FFNodes.Server.Controllers
             return Ok(new
             {
                 uptime = (DateTime.Now - Configuration.Instance.StartDate),
-                loading = !ProcessHandler.Instance.FinishedLoading,
+                loading = !FileSystemHandler.Instance.FinishedLoading,
                 connected_users = UserHandler.Instance.GetConnectedUsers().Select(user => user.Id),
                 connection_url = Data.Data.ConnectionUrl,
             });
