@@ -57,7 +57,7 @@ namespace FFNodes.Server
                     builder.UseStartup<Startup>();
 
                     Log.Information("Server running at {SERVER}", $"http://127.0.0.1:{Configuration.Instance.Port}");
-                    Log.Information("Connection url is {CONNECTION}", $"ffn://127.0.0.1:{Configuration.Instance.Port}/{Data.Data.ConnectionString}");
+                    Log.Information("Connection url is {CONNECTION}", Data.Data.ConnectionUrl);
                 }).Build().Run();
         }
     }
