@@ -5,7 +5,9 @@
     https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
 */
 
+using FFNodes.Server.Handlers;
 using Microsoft.AspNetCore.Mvc;
+using static FFNodes.Server.Data.Data;
 
 namespace FFNodes.Server.Controllers;
 
@@ -13,4 +15,13 @@ namespace FFNodes.Server.Controllers;
 [ApiController]
 public class AuthenticationController : ControllerBase
 {
+    [HttpPost("connect")]
+    public IActionResult HandleConnectionRequest([FromForm] string code)
+    {
+        return ValidConnection(code) ? Ok() : Unauthorized();
+    }
+
+    [HttpGet("user")]
+    [Produces("application/json")]
+    public IActionResult GetUser([FromQuery] Guid id, [FromForm] string code) => ValidConnection(code) ? Ok(UserHandler.Instance.GetUser(id)) : Unauthorized(new { error = "Invalid or missing connection code." });
 }
