@@ -31,8 +31,17 @@ namespace FFNodes.Server
 
             Log.Information("Starting FFNodes Server");
 
+            // Loads the configuration from the file system
             Configuration.Instance.Load();
-            ProcessHandler.Instance.Load();
+
+            // Loads all users from the file system
+            UserHandler.Instance.Load();
+
+            // Creates a new task to load the process handler
+            Task.Run(() =>
+            {
+                ProcessHandler.Instance.Load();
+            });
 
             Host.CreateDefaultBuilder()
                 .UseSerilog()
