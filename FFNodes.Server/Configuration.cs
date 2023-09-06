@@ -25,6 +25,12 @@ public sealed class Configuration
     [JsonProperty("scan_recursively")]
     public bool ScanRecursively { get; set; } = true;
 
+    [JsonProperty("authorization_token")]
+    public Guid AuthorizationToken { get; set; } = Guid.NewGuid();
+
+    [JsonProperty("host")]
+    public string Host { get; set; } = "localhost";
+
     [JsonIgnore]
     public DateTime StartDate { get; } = DateTime.Now;
 
