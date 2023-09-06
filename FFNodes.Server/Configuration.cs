@@ -25,6 +25,9 @@ public sealed class Configuration
     [JsonProperty("scan_recursively")]
     public bool ScanRecursively { get; set; } = true;
 
+    [JsonIgnore]
+    public DateTime StartDate { get; } = DateTime.Now;
+
     private Configuration()
     {
     }
