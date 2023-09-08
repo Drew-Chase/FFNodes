@@ -23,8 +23,8 @@ public sealed class FileSystemHandler
     /// </summary>
     public static readonly FileSystemHandler Instance = Instance ??= new FileSystemHandler();
 
-    private readonly List<ProcessedFile> processedFiles;
     private readonly Dictionary<User, List<ProcessedFile>> checkedOutFiles;
+    private List<ProcessedFile> processedFiles;
 
     /// <summary>
     /// If the processed files have finished loading.
@@ -89,7 +89,7 @@ public sealed class FileSystemHandler
     /// <summary>
     /// Loads the processed files.
     /// </summary>
-    public void Load()
+    public async Task Load()
     {
         if (!Configuration.Instance.Directories.Any())
         {
@@ -103,6 +103,7 @@ public sealed class FileSystemHandler
         {
             Log.Debug("Scanning {Directory}...", directory);
             processedFiles.AddRange(FFVideoUtility.GetFilesAsync(directory, Configuration.Instance.ScanRecursively).Select(i => new ProcessedFile(i)));
+            Log.Debug("Adding watcher for {Directory}...", directory);
             FileSystemWatcher watcher = new()
             {
                 EnableRaisingEvents = true,
@@ -110,14 +111,16 @@ public sealed class FileSystemHandler
                 NotifyFilter = NotifyFilters.CreationTime,
                 Path = directory
             };
-            watcher.Created += (s, e) =>
+            watcher.Created += async (s, e) =>
             {
-                if (FFVideoUtility.HasVideoExtension(e.FullPath))
+                if (FFVideoUtility.HasVideoExtension(e.FullPath) && !processedFiles.Any(item => item.Path.Equals(e.FullPath)))
                 {
                     processedFiles.Add(new(e.FullPath));
+                    Log.Information("Watched file {File} was created.", e.FullPath);
+                    await Sort();
                 }
             };
-            watcher.Renamed += (s, e) =>
+            watcher.Renamed += async (s, e) =>
             {
                 if (FFVideoUtility.HasVideoExtension(e.FullPath))
                 {
@@ -127,31 +130,37 @@ public sealed class FileSystemHandler
                         processedFiles.Remove(processedFile.Value);
                     }
                     processedFiles.Add(new(e.FullPath));
+                    Log.Information("Watched file {File} was renamed to {NewFile}.", e.OldFullPath, e.FullPath);
+                    await Sort();
                 }
             };
-            watcher.Deleted += (s, e) =>
+            watcher.Deleted += async (s, e) =>
             {
                 if (FFVideoUtility.HasVideoExtension(e.FullPath))
                 {
                     ProcessedFile? processedFile = processedFiles.FirstOrDefault(i => i.Path == e.FullPath);
                     if (processedFile != null && processedFile.HasValue)
                     {
+                        Log.Information("Watched file {File} was deleted.", processedFile.Value.Path);
                         processedFiles.Remove(processedFile.Value);
-                    }
-                }
-            };
-            watcher.Changed += (s, e) =>
-            {
-                if (FFVideoUtility.HasVideoExtension(e.FullPath))
-                {
-                    ProcessedFile? processedFile = processedFiles.FirstOrDefault(i => i.Path == e.FullPath);
-                    if (processedFile != null && processedFile.HasValue)
-                    {
-                        processedFiles.Remove(processedFile.Value);
+                        await Sort();
                     }
                 }
             };
         });
+        await Sort();
         FinishedLoading = true;
     }
+
+    /// <summary>
+    /// Sorts the processed files.
+    /// </summary>
+    /// <returns></returns>
+    public Task Sort() => Task.Run(() =>
+    {
+        Log.Warning("Beginning sort of processed files...");
+        processedFiles = processedFiles.OrderByDescending(i => i.OriginalSize).ToList();
+        GC.Collect();
+        Log.Information("Finished sorting processed files.");
+    });
 }
