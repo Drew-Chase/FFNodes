@@ -13,4 +13,9 @@ namespace FFNodes.Server.Controllers;
 [ApiController]
 public class FileSystemController : ControllerBase
 {
+    [HttpGet("rescan")]
+    public IActionResult Rescan()
+    {
+        return Ok();
+    }
 }
