@@ -18,37 +18,42 @@ namespace FFNodes.Server
     {
         private static void Main()
         {
-            OptionsManager optionsManager = new("FFNodes");
-            optionsManager.Add(new() { ShortName = "p", LongName = "port", Required = false, HasArgument = true, Description = "runs the server on and sets the port" });
-            optionsManager.Add(new() { ShortName = "c", LongName = "host", Required = false, HasArgument = true, Description = "runs the server on and sets the host" });
-
-            OptionsParser parser = optionsManager.Parse();
-            if (parser != null)
+            if (Environment.GetCommandLineArgs().Any())
             {
-                if (parser.IsPresent("port", out string portString))
-                {
-                    if (int.TryParse(portString, out int port))
-                    {
-                        Configuration.Instance.Port = port;
-                    }
-                    else
-                    {
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.Error.WriteLine($"Invalid port number: {portString}");
-                        Console.ResetColor();
-                        return;
-                    }
-                }
+                OptionsManager optionsManager = new("FFNodes");
+                optionsManager.Add(new() { ShortName = "p", LongName = "port", Required = false, HasArgument = true, Description = "runs the server on and sets the port" });
+                optionsManager.Add(new() { ShortName = "c", LongName = "host", Required = false, HasArgument = true, Description = "runs the server on and sets the host" });
 
-                if (parser.IsPresent("host", out string host))
+                OptionsParser parser = optionsManager.Parse();
+                if (parser != null)
                 {
-                    Configuration.Instance.Host = host;
+                    if (parser.IsPresent("port", out string portString))
+                    {
+                        if (int.TryParse(portString, out int port))
+                        {
+                            Configuration.Instance.Port = port;
+                            Configuration.Instance.Save();
+                        }
+                        else
+                        {
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.Error.WriteLine($"Invalid port number: {portString}");
+                            Console.ResetColor();
+                            return;
+                        }
+                    }
+
+                    if (parser.IsPresent("host", out string host))
+                    {
+                        Configuration.Instance.Host = host;
+                        Configuration.Instance.Save();
+                    }
                 }
-                Configuration.Instance.Save();
             }
 
             TimeSpan flushTime = TimeSpan.FromSeconds(30);
             Log.Logger = new LoggerConfiguration()
+                .MinimumLevel.Verbose()
                 .WriteTo.Console(LogEventLevel.Verbose)
                 .WriteTo.File(Files.DebugLog, LogEventLevel.Verbose, buffered: true, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000, flushToDiskInterval: flushTime)
                 .WriteTo.File(Files.LatestLog, LogEventLevel.Information, buffered: true, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000, flushToDiskInterval: flushTime)
@@ -69,10 +74,7 @@ namespace FFNodes.Server
             UserHandler.Instance.Load();
 
             // Creates a new task to load the process handler
-            Task.Run(() =>
-            {
-                FileSystemHandler.Instance.Load();
-            });
+            Task.Run(FileSystemHandler.Instance.Load);
 
             Host.CreateDefaultBuilder()
                 .UseSerilog()
