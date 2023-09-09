@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "FFNodes.Client.CLI": {
+      "commandName": "Project",
+      "commandLineArgs": "-c ffn://localhost:1818/DrnxoStOQZbmdoCijmQ/KF98PDcT0Bele/EarZDEPlW9wj5+MXHP5nFt+LNH32EX -u 3b332100-0b80-4aee-a65e-bdb402de78a5 -s"
+    }
+  }
+}
