@@ -24,6 +24,7 @@ public sealed class FileSystemHandler
     public static readonly FileSystemHandler Instance = Instance ??= new FileSystemHandler();
 
     private readonly Dictionary<User, List<ProcessedFile>> checkedOutFiles;
+    private readonly List<FileSystemWatcher> watcherList;
     private List<ProcessedFile> processedFiles;
 
     /// <summary>
@@ -35,46 +36,45 @@ public sealed class FileSystemHandler
     {
         processedFiles = new();
         checkedOutFiles = new();
+        watcherList = new();
     }
 
     /// <summary>
-    /// Checks out a number of files for a user.
+    /// Checks out a file for a user.
     /// </summary>
     /// <param name="user"></param>
     /// <param name="count"></param>
     /// <returns></returns>
-    public ProcessedFile[] CheckoutFiles(User user, int count)
+    public ProcessedFile CheckoutFiles(User user)
     {
-        List<ProcessedFile> files = new();
+        ProcessedFile file = processedFiles.First();
+        processedFiles.Remove(file);
 
-        for (int i = 0; i < count; i++)
+        if (!checkedOutFiles.ContainsKey(user))
         {
-            ProcessedFile file = processedFiles[i];
-            files.Add(file);
-            processedFiles.Remove(file);
+            checkedOutFiles.Add(user, new());
         }
+        checkedOutFiles[user].Add(file);
 
-        return (checkedOutFiles[user] = files).ToArray();
+        return file;
     }
 
     /// <summary>
     /// Checks in a number of files for a user.
     /// </summary>
     /// <param name="user"></param>
-    /// <param name="files"></param>
-    public void CheckinFiles(User user, ProcessedFile[] files)
+    /// <param name="file"></param>
+    public void CheckinFile(User user, ProcessedFile file)
     {
         List<ProcessedFile> alreadyProcessed = user.Files.ToList();
-        foreach (ProcessedFile file in files)
+        if (checkedOutFiles[user].Contains(file) && !alreadyProcessed.Contains(file))
         {
-            if (checkedOutFiles[user].Contains(file) && !alreadyProcessed.Contains(file))
-            {
-                processedFiles.Add(file);
-                alreadyProcessed.Add(file);
-                checkedOutFiles[user].Remove(file);
-            }
+            processedFiles.Add(file);
+            alreadyProcessed.Add(file);
+            checkedOutFiles[user].Remove(file);
         }
         user.Files = alreadyProcessed.ToArray();
+        UserHandler.Instance.Save(user);
     }
 
     /// <summary>
@@ -99,17 +99,45 @@ public sealed class FileSystemHandler
         Log.Information("Loading processed files...");
         processedFiles.Clear();
         FinishedLoading = false;
-        Parallel.ForEach(Configuration.Instance.Directories, directory =>
+
+        // Wait for all directories to be loaded.
+        Task.WaitAll(Configuration.Instance.Directories.Select(i => Load(i)).ToArray());
+
+        // Sort the files.
+        await Sort();
+        FinishedLoading = true;
+    }
+
+    public async Task Load(string directory, int attempt = 0)
+    {
+        Log.Debug("Scanning {Directory}...", directory);
+        try
         {
-            Log.Debug("Scanning {Directory}...", directory);
             processedFiles.AddRange(FFVideoUtility.GetFilesAsync(directory, Configuration.Instance.ScanRecursively).Select(i => new ProcessedFile(i)));
-            Log.Debug("Adding watcher for {Directory}...", directory);
+        }
+        catch (Exception e)
+        {
+            Log.Error("Failed to scan {Directory} - {MSG}.", directory, e.Message, e);
+            int maxAttempts = 5;
+            if (attempt >= maxAttempts)
+            {
+                Log.Error("Failed to scan {Directory} after {MAX} attempts.", directory, maxAttempts);
+                return;
+            }
+            Log.Error("Attempting again in 5 seconds...");
+            await Task.Delay(TimeSpan.FromSeconds(5));
+            await Load(directory, attempt + 1);
+            return;
+        }
+        Log.Debug("Adding watcher for {Directory}...", directory);
+        try
+        {
             FileSystemWatcher watcher = new()
             {
-                EnableRaisingEvents = true,
+                Path = directory,
                 IncludeSubdirectories = Configuration.Instance.ScanRecursively,
-                NotifyFilter = NotifyFilters.CreationTime,
-                Path = directory
+                NotifyFilter = NotifyFilters.CreationTime | NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.DirectoryName,
+                EnableRaisingEvents = true,
             };
             watcher.Created += async (s, e) =>
             {
@@ -143,13 +171,15 @@ public sealed class FileSystemHandler
                     {
                         Log.Information("Watched file {File} was deleted.", processedFile.Value.Path);
                         processedFiles.Remove(processedFile.Value);
-                        await Sort();
                     }
                 }
             };
-        });
-        await Sort();
-        FinishedLoading = true;
+            watcherList.Add(watcher);
+        }
+        catch (Exception e)
+        {
+            Log.Error("Failed to setup watcher for {Directory} - {MSG}.", directory, e.Message, e);
+        }
     }
 
     /// <summary>
@@ -160,7 +190,14 @@ public sealed class FileSystemHandler
     {
         Log.Warning("Beginning sort of processed files...");
         processedFiles = processedFiles.OrderByDescending(i => i.OriginalSize).ToList();
-        GC.Collect();
+        GC.Collect(); // Cleans up memory of the old array.
         Log.Information("Finished sorting processed files.");
     });
+
+    public bool TryParseFile(string filename, out ProcessedFile? file) => (file = ParseFile(filename)) != null;
+
+    public ProcessedFile? ParseFile(string filename)
+    {
+        return processedFiles.FirstOrDefault(i => Path.GetFileName(i.Path).Equals(filename));
+    }
 }
