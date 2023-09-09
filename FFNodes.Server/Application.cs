@@ -59,11 +59,17 @@ namespace FFNodes.Server
                 .WriteTo.Console(LogEventLevel.Verbose)
                 .WriteTo.File(Files.DebugLog, LogEventLevel.Verbose, buffered: true, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000, flushToDiskInterval: flushTime)
                 .WriteTo.File(Files.LatestLog, LogEventLevel.Information, buffered: true, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000, flushToDiskInterval: flushTime)
+                .WriteTo.File(Files.ErrorLog, LogEventLevel.Error, buffered: true, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000, flushToDiskInterval: flushTime)
                 .CreateLogger();
 
             AppDomain.CurrentDomain.ProcessExit += (s, e) =>
             {
                 Log.Information("Stopping Server");
+                Log.CloseAndFlush();
+            };
+            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            {
+                Log.Fatal(e.ExceptionObject as Exception, "Unhandled Exception");
                 Log.CloseAndFlush();
             };
 
