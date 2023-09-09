@@ -3,11 +3,15 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.7.34003.232
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FFNodes.Client", "FFNodes.Client\FFNodes.Client.csproj", "{FAA60AF0-4681-4559-92D0-32CE136610B6}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FFNodes.Client.GUI", "FFNodes.Client.GUI\FFNodes.Client.GUI.csproj", "{FAA60AF0-4681-4559-92D0-32CE136610B6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FFNodes.Server", "FFNodes.Server\FFNodes.Server.csproj", "{732E40C8-765B-43C4-80D3-C9CD99EEB6AE}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FFNodes.Server", "FFNodes.Server\FFNodes.Server.csproj", "{732E40C8-765B-43C4-80D3-C9CD99EEB6AE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FFNodes.Core", "FFNodes.Core\FFNodes.Core.csproj", "{EF831A0F-B6BB-42A1-8729-AE1F110A61CF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FFNodes.Core", "FFNodes.Core\FFNodes.Core.csproj", "{EF831A0F-B6BB-42A1-8729-AE1F110A61CF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FFNodes.Client.CLI", "FFNodes.Client.CLI\FFNodes.Client.CLI.csproj", "{C81D9B8B-31F6-42D3-B42C-100395AEDA27}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FFNodes.Client.Core", "FFNodes.Client.Core\FFNodes.Client.Core.csproj", "{F827F724-9803-43F0-BFDF-FCB43EC0EBF0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -29,6 +33,14 @@ Global
 		{EF831A0F-B6BB-42A1-8729-AE1F110A61CF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EF831A0F-B6BB-42A1-8729-AE1F110A61CF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EF831A0F-B6BB-42A1-8729-AE1F110A61CF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C81D9B8B-31F6-42D3-B42C-100395AEDA27}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C81D9B8B-31F6-42D3-B42C-100395AEDA27}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C81D9B8B-31F6-42D3-B42C-100395AEDA27}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C81D9B8B-31F6-42D3-B42C-100395AEDA27}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F827F724-9803-43F0-BFDF-FCB43EC0EBF0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F827F724-9803-43F0-BFDF-FCB43EC0EBF0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F827F724-9803-43F0-BFDF-FCB43EC0EBF0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F827F724-9803-43F0-BFDF-FCB43EC0EBF0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
