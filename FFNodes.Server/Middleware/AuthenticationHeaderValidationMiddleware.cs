@@ -5,10 +5,13 @@
     https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
 */
 
+// Ignore Spelling: Middleware
+
 using FFNodes.Core.Model;
 using FFNodes.Server.Handlers;
 using Microsoft.Extensions.Primitives;
 using Newtonsoft.Json;
+using Serilog;
 
 namespace FFNodes.Server.Middleware;
 
@@ -35,12 +38,14 @@ public class AuthenticationHeaderValidationMiddleware
                 }
                 if (UserHandler.Instance.GetUserFromHeaders(context, out User user))
                 {
+                    Log.Verbose("Accepting request from {RemoteAddress} with user id {UserId}.", context.Connection.RemoteIpAddress, user.Id);
                     context.Items["ConnectedUser"] = user;
                     UserHandler.Instance.PingUser(user);
                     await _next(context);
                 }
                 else
                 {
+                    Log.Error("Failed request from {RemoteAddress} with invalid user id.", context.Connection.RemoteIpAddress);
                     context.Response.ContentType = "application/json";
                     context.Response.StatusCode = 401;
                     await context.Response.WriteAsync(JsonConvert.SerializeObject(new { error = "Invalid or missing user id." }));
@@ -48,6 +53,7 @@ public class AuthenticationHeaderValidationMiddleware
             }
             else
             {
+                Log.Error("Failed request from {RemoteAddress} with invalid connection code.", context.Connection.RemoteIpAddress);
                 context.Response.ContentType = "application/json";
                 context.Response.StatusCode = 401;
                 await context.Response.WriteAsync(JsonConvert.SerializeObject(new { error = "Invalid or missing connection code." }));
