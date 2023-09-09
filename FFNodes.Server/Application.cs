@@ -9,6 +9,8 @@ using Chase.CLIParser;
 using FFNodes.Server.Data;
 using FFNodes.Server.Handlers;
 using FFNodes.Server.Middleware;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Serilog;
 using Serilog.Events;
 
@@ -107,9 +109,22 @@ namespace FFNodes.Server
             app.UseSerilogRequestLogging();
         }
 
-        public void ConfigureServices(IServiceCollection service)
+        public void ConfigureServices(IServiceCollection services)
         {
-            service.AddMvc(action =>
+            services.Configure<FormOptions>(options =>
+            {
+                options.MultipartBodyLengthLimit = long.MaxValue;
+            });
+
+            services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
+
+            services.Configure<KestrelServerOptions>(options =>
+            {
+                options.Limits.MaxConcurrentUpgradedConnections = null;
+                options.Limits.MaxConcurrentConnections = null;
+                options.Limits.MaxRequestBodySize = null;
+            });
+            services.AddMvc(action =>
             {
                 action.EnableEndpointRouting = false;
             });
