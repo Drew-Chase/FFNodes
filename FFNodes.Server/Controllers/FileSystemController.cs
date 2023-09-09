@@ -5,6 +5,11 @@
     https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
 */
 
+// Ignore Spelling: Checkin
+
+using FFNodes.Core.Model;
+using FFNodes.Server.Handlers;
+using FFNodes.Server.Model;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FFNodes.Server.Controllers;
@@ -13,6 +18,50 @@ namespace FFNodes.Server.Controllers;
 [ApiController]
 public class FileSystemController : ControllerBase
 {
+    private readonly User connectedUser;
+    private readonly IHttpContextAccessor _httpContextAccessor;
+
+    public FileSystemController(IHttpContextAccessor httpContextAccessor)
+    {
+        _httpContextAccessor = httpContextAccessor;
+        connectedUser = _httpContextAccessor.HttpContext.Items["ConnectedUser"] as User;
+    }
+
+    [HttpGet("checkout")]
+    public IActionResult CheckoutFiles()
+    {
+        if (FileSystemHandler.Instance.FinishedLoading)
+        {
+            ProcessedFile file = FileSystemHandler.Instance.CheckoutFiles(connectedUser);
+            Response.Headers.Add("Content-Disposition", $"attachment; filename=\"{Path.GetFileName(file.Path)}\"");
+            return new FileStreamResult(System.IO.File.OpenRead(file.Path), "application/octet-stream");
+        }
+        return BadRequest(new { error = "Server has not finished loading files!" });
+    }
+
+    [HttpPost("checkin")]
+    [Produces("application/json")]
+    [DisableRequestSizeLimit]
+    public async Task<IActionResult> CheckinFiles([FromForm] IFormFile file)
+    {
+        try
+        {
+            if (FileSystemHandler.Instance.FinishedLoading)
+            {
+                if (FileSystemHandler.Instance.TryParseFile(file.FileName, out ProcessedFile? processedFile) && processedFile.HasValue)
+                {
+                    using FileStream fs = System.IO.File.OpenWrite(processedFile.Value.Path + ".tmp");
+                    await file.CopyToAsync(fs);
+                    FileSystemHandler.Instance.CheckinFile(connectedUser, processedFile.Value);
+                    return Ok(processedFile.Value);
+                }
+                return BadRequest(new { error = "Could not find file with filename.", filename = file.FileName });
+            }
+            return BadRequest(new { error = "Server has not finished loading files!" });
+        }
+        catch (Exception e) { return BadRequest(new { error = e.Message }); }
+    }
+
     [HttpGet("rescan")]
     public IActionResult Rescan()
     {
