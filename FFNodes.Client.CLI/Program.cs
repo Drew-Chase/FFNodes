@@ -5,12 +5,57 @@
     https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
 */
 
+using Chase.CLIParser;
+using FFNodes.Client.Core.Networking;
+using FFNodes.Core.Model;
+
 namespace FFNodes.Client.CLI;
 
 internal class Program
 {
-    private static void Main(string[] args)
+    private static async Task Main(string[] args)
     {
-        Console.WriteLine("Hello, World!");
+        OptionsManager optionsManager = new("FFNodes");
+        optionsManager.Add(new Option() { ShortName = "s", LongName = "status", HasArgument = false, Required = false, Description = "Gets the status of the server." });
+        optionsManager.Add(new Option() { ShortName = "c", LongName = "connection", HasArgument = true, Required = true, Description = "The connection url provided by the server owner." });
+        optionsManager.Add(new Option() { ShortName = "u", LongName = "user", HasArgument = true, Required = true, Description = "The connecting user's id." });
+        OptionsParser parser = optionsManager.Parse(args);
+
+        if (parser != null)
+        {
+            if (parser.IsPresent("c", out string connectionUrl) && parser.IsPresent("u", out string userIdString) && Guid.TryParse(userIdString, out Guid userId))
+            {
+                using FFNetworkClient client = new(connectionUrl, userId);
+                if (parser.IsPresent("s"))
+                {
+                    SystemStatusModel? status;
+                    if ((status = await client.GetSystemStatus()).HasValue)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.Write("Uptime: ");
+                        Console.ForegroundColor = ConsoleColor.Blue;
+                        Console.WriteLine(status.Value.Uptime);
+
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.Write("Is Loading: ");
+                        Console.ForegroundColor = ConsoleColor.Blue;
+                        Console.WriteLine(status.Value.Loading);
+
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.Write("Connection Url: ");
+                        Console.ForegroundColor = ConsoleColor.Blue;
+                        Console.WriteLine(status.Value.ConnectionUrl);
+
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.Write("Connected Users: ");
+                        Console.ForegroundColor = ConsoleColor.Blue;
+                        Console.WriteLine(string.Join(',', status.Value.ConnectedUsers?.Select(i => i.Username) ?? Array.Empty<string>()));
+                        Console.ResetColor();
+                    }
+                }
+            }
+        }
+        await Console.Out.WriteLineAsync("Press any key to continue...");
+        Console.ReadKey();
     }
 }
