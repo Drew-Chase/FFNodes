@@ -68,7 +68,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\FFNodes.Core\FFNodes.Core.csproj" />
+    <ProjectReference Include="..\FFNodes.Client.Core\FFNodes.Client.Core.csproj" />
   </ItemGroup>
 
 </Project>
