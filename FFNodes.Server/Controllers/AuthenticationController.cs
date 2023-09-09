@@ -15,6 +15,15 @@ namespace FFNodes.Server.Controllers;
 [ApiController]
 public class AuthenticationController : ControllerBase
 {
+    private readonly User connectedUser;
+    private readonly IHttpContextAccessor _httpContextAccessor;
+
+    public AuthenticationController(IHttpContextAccessor httpContextAccessor)
+    {
+        _httpContextAccessor = httpContextAccessor;
+        connectedUser = _httpContextAccessor.HttpContext.Items["ConnectedUser"] as User;
+    }
+
     [HttpPost("connect")]
     public IActionResult HandleConnectionRequest() => Ok();
 
