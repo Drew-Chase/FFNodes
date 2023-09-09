@@ -7,7 +7,9 @@
 
 using FFNodes.Core.Model;
 using FFNodes.Server.Data;
+using Microsoft.Extensions.Primitives;
 using Newtonsoft.Json;
+using System.Diagnostics.CodeAnalysis;
 using Timer = System.Timers.Timer;
 
 namespace FFNodes.Server.Handlers;
@@ -77,6 +79,8 @@ public class UserHandler
         Load(user);
     }
 
+    public bool TryGetUser(Guid id, [NotNullWhen(true)] out User user) => (user = GetUser(id)) != null;
+
     /// <summary>
     /// Gets a user by their id.
     /// </summary>
@@ -114,6 +118,16 @@ public class UserHandler
                 users.Add(user);
             }
         }
+    }
+
+    public bool GetUserFromHeaders(HttpContext context, out User user)
+    {
+        user = null;
+        return context.Request.Headers.TryGetValue("User-ID", out StringValues user_id)
+           && user_id.Any()
+           && Guid.TryParse(user_id[0], out Guid id)
+           && TryGetUser(id, out user)
+           && user != null;
     }
 
     /// <summary>
