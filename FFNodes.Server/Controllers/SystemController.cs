@@ -27,16 +27,7 @@ namespace FFNodes.Server.Controllers
 
         [HttpGet()]
         [Produces("application/json")]
-        public IActionResult GetStatus()
-        {
-            return Ok(new
-            {
-                uptime = (DateTime.Now - Configuration.Instance.StartDate),
-                loading = !FileSystemHandler.Instance.FinishedLoading,
-                connected_users = UserHandler.Instance.GetConnectedUsers().Select(user => user.Id),
-                connection_url = Data.Data.ConnectionUrl,
-            });
-        }
+        public IActionResult GetStatus() => Ok(new SystemStatusModel(DateTime.Now - Configuration.Instance.StartDate, !FileSystemHandler.Instance.FinishedLoading, UserHandler.Instance.GetConnectedUsers(), Data.Data.ConnectionUrl));
 
         [HttpPost("reset-connection-code")]
         [Produces("application/json")]
