@@ -5,7 +5,7 @@
     https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
 */
 
-namespace FFNodes.Client;
+namespace FFNodes.Client.GUI;
 
 public partial class MainPage : ContentPage
 {

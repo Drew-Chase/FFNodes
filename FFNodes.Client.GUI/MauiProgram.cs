@@ -5,23 +5,28 @@
     https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
 */
 
+using FFNodes.Server.Data;
 using Microsoft.Extensions.Logging;
 
-namespace FFNodes.Client;
-
-public static class MauiProgram
+namespace FFNodes.Client.GUI
 {
-    public static MauiApp CreateMauiApp()
+    public static class MauiProgram
     {
-        var builder = MauiApp.CreateBuilder();
-        builder.UseMauiApp<App>();
-        builder.Services.AddMauiBlazorWebView();
+        public static MauiApp CreateMauiApp()
+        {
+            MauiAppBuilder builder = MauiApp.CreateBuilder();
+            builder.UseMauiApp<App>();
+
+            builder.Services.AddMauiBlazorWebView();
 
 #if DEBUG
-        builder.Services.AddBlazorWebViewDeveloperTools();
-        builder.Logging.AddDebug();
+            builder.Services.AddBlazorWebViewDeveloperTools();
+            builder.Logging.AddDebug();
 #endif
 
-        return builder.Build();
+            Configuration.Instance.Load();
+
+            return builder.Build();
+        }
     }
 }

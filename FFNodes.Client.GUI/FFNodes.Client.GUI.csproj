@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
+    <TargetFrameworks>net7.0-maccatalyst</TargetFrameworks>
     <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net7.0-windows10.0.19041.0</TargetFrameworks>
-
     <OutputType>Exe</OutputType>
     <RootNamespace>FFNodes.Client.GUI</RootNamespace>
     <UseMaui>true</UseMaui>
@@ -15,13 +15,15 @@
 
     <!-- App Identifier -->
     <ApplicationId>net.lfinteractive.ffnodes.client.gui</ApplicationId>
-    <ApplicationIdGuid>F226E48B-9BFA-401B-9C87-3608C384FC1C</ApplicationIdGuid>
+    <ApplicationIdGuid>2DD7F472-3FB4-4C3E-B500-1561A5D255DB</ApplicationIdGuid>
 
     <!-- Versions -->
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>
+
     <WindowsPackageType>None</WindowsPackageType>
 
+    <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">14.0</SupportedOSPlatformVersion>
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
     <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
   </PropertyGroup>
@@ -31,6 +33,7 @@
     <MauiIcon Include="Resources\AppIcon\icon.svg" />
 
     <!-- Splash Screen -->
+    <MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
 
     <!-- Images -->
     <MauiImage Include="Resources\Images\*" />
@@ -43,32 +46,18 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Platforms\Windows\icon.svg">
-      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-    </Content>
-    <Content Include="Resources\AppIcon\icon.svg">
-      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-    </Content>
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="7.0.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Chase.FFmpeg" Version="0.1.0" />
-    <PackageReference Include="Chase.FFmpeg.Downloader" Version="0.0.5" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="7.0.0" />
-    <PackageReference Include="PInvoke.User32" Version="0.7.124" />
+    <ProjectReference Include="..\FFNodes.Client.Core\FFNodes.Client.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="Data\" />
     <Folder Include="Resources\Fonts\" />
+    <Folder Include="Resources\Images\" />
     <Folder Include="Resources\Raw\" />
-    <Folder Include="Resources\Splash\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\FFNodes.Client.Core\FFNodes.Client.Core.csproj" />
   </ItemGroup>
 
 </Project>
