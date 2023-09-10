@@ -1,2 +1,59 @@
 ﻿@page "/"
+@using FFNodes.Client.Core.Networking;
+@using FFNodes.Core.Model;
+@using FFNodes.Server.Data;
 <link href="/css/login.css" rel="stylesheet" />
+<div id="landing" class="center horizontal vertical col">
+    <img src="/images/Logo.svg" alt="FFNodes">
+    <div id="form" class="col">
+        <div class="floating-input fill">
+            <input id="username" class="fill" type="text" @bind="Username" placeholder="" />
+            <label for="username" class="fill">Username</label>
+        </div>
+        <div class="floating-input fill">
+            <input id="connection-link" class="fill" type="url" @bind="ConnectionLink" placeholder="" />
+            <label for="connection-link" class="fill">Connection Link</label>
+        </div>
+        <p class="error fill">@Error</p>
+        <button class="primary" @onclick="Login">Connect <img src="/images/lock.svg" /> </button>
+    </div>
+</div>
+
+
+@code {
+    private string Username { get; set; }
+    private string ConnectionLink { get; set; }
+    private string Error { get; set; }
+    private async Task Login()
+    {
+        Error = "";
+        if (string.IsNullOrWhiteSpace(Username))
+        {
+            Error = "Username cannot be blank";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(ConnectionLink))
+        {
+            Error = "Connection Link cannot be blank";
+            return;
+        }
+        try
+        {
+            using FFNetworkClient client = new(ConnectionLink);
+            (bool success, User user) = await client.CreateUser(Username);
+            if (success)
+            {
+                nav.NavigateTo("/dashboard");
+                Configuration.Instance.UserId = user.Id;
+            }
+            else
+            {
+                Error = "Invalid Username or Connection Link";
+            }
+        }
+        catch (Exception e)
+        {
+            Error = $"Error: {e.Message}";
+        }
+    }
+}
