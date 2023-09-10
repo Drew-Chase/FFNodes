@@ -7,6 +7,8 @@
 
 using Chase.Networking;
 using FFNodes.Core.Model;
+using System.Text;
+using System.Text.Json;
 
 namespace FFNodes.Client.Core.Networking;
 
@@ -14,18 +16,39 @@ public class FFNetworkClient : IDisposable
 {
     private readonly NetworkClient client;
 
-    public FFNetworkClient(string connectionUrl, Guid userId)
+    public FFNetworkClient(string connectionUrl, Guid userId) : this(connectionUrl)
+    {
+        client.DefaultRequestHeaders.Add("User-ID", userId.ToString());
+    }
+
+    public FFNetworkClient(string connectionUrl)
     {
         client = new NetworkClient();
         Uri uri = new(connectionUrl);
         client.DefaultRequestHeaders.Add("Authentication", uri.LocalPath[1..]);
-        client.DefaultRequestHeaders.Add("User-ID", userId.ToString());
         client.BaseAddress = new Uri($"http://{uri.Host}:{uri.Port}");
     }
 
     public async Task<SystemStatusModel?> GetSystemStatus()
     {
         return (await client.GetAsJson($"{client.BaseAddress}api"))?.ToObject<SystemStatusModel>();
+    }
+
+    public async Task<(bool, User? user)> CreateUser(string username)
+    {
+        using HttpRequestMessage request = new(HttpMethod.Post, $"{client.BaseAddress}api/auth/user")
+        {
+            Content = new StringContent(JsonSerializer.Serialize(new User(username)), Encoding.UTF8, "application/json")
+        };
+        try
+        {
+            User? user = (await client.GetAsJson(request))?.ToObject<User>();
+            return (user != null, user);
+        }
+        catch
+        {
+            return (false, null);
+        }
     }
 
     public void Dispose()
