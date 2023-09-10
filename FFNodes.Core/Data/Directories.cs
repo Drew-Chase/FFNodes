@@ -7,7 +7,7 @@
 
 using System.Reflection;
 
-namespace FFNodes.Server.Data;
+namespace FFNodes.Core.Data;
 
 public static class Directories
 {

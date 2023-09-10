@@ -5,6 +5,7 @@
     https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
 */
 
+using FFNodes.Core.Data;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Serilog;

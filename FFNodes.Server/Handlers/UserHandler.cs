@@ -5,8 +5,8 @@
     https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
 */
 
+using FFNodes.Core.Data;
 using FFNodes.Core.Model;
-using FFNodes.Server.Data;
 using Microsoft.Extensions.Primitives;
 using Newtonsoft.Json;
 using System.Diagnostics.CodeAnalysis;

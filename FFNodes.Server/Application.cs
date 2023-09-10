@@ -6,6 +6,7 @@
 */
 
 using Chase.CLIParser;
+using FFNodes.Core.Data;
 using FFNodes.Server.Data;
 using FFNodes.Server.Handlers;
 using FFNodes.Server.Middleware;
