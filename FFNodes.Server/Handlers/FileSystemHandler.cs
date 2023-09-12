@@ -6,9 +6,11 @@
 */
 
 using Chase.FFmpeg.Extra;
+using FFNodes.Core.Data;
 using FFNodes.Core.Model;
 using FFNodes.Server.Data;
 using FFNodes.Server.Model;
+using Newtonsoft.Json;
 using Serilog;
 
 namespace FFNodes.Server.Handlers;
@@ -39,6 +41,8 @@ public sealed class FileSystemHandler
         watcherList = new();
     }
 
+    public static string GetFileReportPath(Guid userId, Guid fileId) => Path.Combine(Directories.Users, userId.ToString("N")[..2], userId.ToString("N"), fileId.ToString("N")[..2], $"{fileId:N}.json");
+
     /// <summary>
     /// Checks out a file for a user.
     /// </summary>
@@ -57,24 +61,6 @@ public sealed class FileSystemHandler
         checkedOutFiles[user].Add(file);
 
         return file;
-    }
-
-    /// <summary>
-    /// Checks in a number of files for a user.
-    /// </summary>
-    /// <param name="user"></param>
-    /// <param name="file"></param>
-    public void CheckinFile(User user, ProcessedFile file)
-    {
-        List<ProcessedFile> alreadyProcessed = user.Files.ToList();
-        if (checkedOutFiles[user].Contains(file) && !alreadyProcessed.Contains(file))
-        {
-            processedFiles.Add(file);
-            alreadyProcessed.Add(file);
-            checkedOutFiles[user].Remove(file);
-        }
-        user.Files = alreadyProcessed.ToArray();
-        UserHandler.Instance.Save(user);
     }
 
     /// <summary>
@@ -162,7 +148,7 @@ public sealed class FileSystemHandler
                     await Sort();
                 }
             };
-            watcher.Deleted += async (s, e) =>
+            watcher.Deleted += (s, e) =>
             {
                 if (FFVideoUtility.HasVideoExtension(e.FullPath))
                 {
@@ -180,6 +166,46 @@ public sealed class FileSystemHandler
         {
             Log.Error("Failed to setup watcher for {Directory} - {MSG}.", directory, e.Message, e);
         }
+    }
+
+    /// <summary>
+    /// Writes the processed file to the file system.
+    /// </summary>
+    /// <param name="user"></param>
+    /// <param name="file"></param>
+    /// <returns></returns>
+    public Task ReportProcessedFile(User user, ProcessedFile file) => Task.Run(() =>
+    {
+        List<Guid> files = user.Files.ToList();
+        files.Add(file.Id);
+        user.Files = files.ToArray();
+        UserHandler.Instance.Save(user);
+        string path = GetFileReportPath(user.Id, file.Id);
+        if (!File.Exists(path))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path) ?? "");
+        }
+        using StreamWriter writer = File.CreateText(path);
+        writer.Write(JsonConvert.SerializeObject(file, Formatting.Indented));
+        writer.Flush();
+    });
+
+    public ProcessedFile? LoadReportedFile(Guid userId, Guid fileId)
+    {
+        string file = GetFileReportPath(userId, fileId);
+        if (File.Exists(file))
+        {
+            try
+            {
+                using StreamReader reader = File.OpenText(file);
+                return JsonConvert.DeserializeObject<ProcessedFile>(reader.ReadToEnd());
+            }
+            catch (Exception e)
+            {
+                Log.Error("Failed to load file {File} - {ERROR}.", file, e.Message, e);
+            }
+        }
+        return null;
     }
 
     /// <summary>
