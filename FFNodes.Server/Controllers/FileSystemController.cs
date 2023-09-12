@@ -52,7 +52,7 @@ public class FileSystemController : ControllerBase
                 {
                     using FileStream fs = System.IO.File.OpenWrite(processedFile.Value.Path + ".tmp");
                     await file.CopyToAsync(fs);
-                    FileSystemHandler.Instance.CheckinFile(connectedUser, processedFile.Value);
+                    await FileSystemHandler.Instance.ReportProcessedFile(connectedUser, processedFile.Value);
                     return Ok(processedFile.Value);
                 }
                 return BadRequest(new { error = "Could not find file with filename.", filename = file.FileName });
@@ -60,6 +60,32 @@ public class FileSystemController : ControllerBase
             return BadRequest(new { error = "Server has not finished loading files!" });
         }
         catch (Exception e) { return BadRequest(new { error = e.Message }); }
+    }
+
+    [HttpGet("processed")]
+    [Produces("application/json")]
+    public IActionResult GetProcessedFiles([FromQuery] Guid? userId, [FromQuery] Guid fileId)
+    {
+        if (FileSystemHandler.Instance.FinishedLoading)
+        {
+            if (System.IO.File.Exists(FileSystemHandler.GetFileReportPath(userId ?? connectedUser.Id, fileId)))
+            {
+                ProcessedFile? file = FileSystemHandler.Instance.LoadReportedFile(userId ?? connectedUser.Id, fileId);
+                if (file != null && file.HasValue)
+                {
+                    return Ok(file.Value);
+                }
+                else
+                {
+                    return BadRequest(new { error = "Failed to load processed file, see server logs for more information." });
+                }
+            }
+            else
+            {
+                return BadRequest(new { error = "No processed file exists for user specified!", userId = userId ?? connectedUser.Id, fileId });
+            }
+        }
+        return BadRequest(new { error = "Server has not finished loading files!" });
     }
 
     [HttpGet("rescan")]
