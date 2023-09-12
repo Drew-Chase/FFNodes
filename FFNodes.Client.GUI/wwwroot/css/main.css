@@ -8,7 +8,7 @@
 :root {
     --Background: hsla(0, 0%, 4%, 1);
     --Primary: hsla(0, 88%, 56%, 1);
-    --scrollbar-width: 10px;
+    --scrollbar-width: 4px;
     scroll-behavior: smooth;
     scrollbar-width: var(--scrollbar-width);
     scrollbar-color: var(--Primary) transparent;
@@ -131,7 +131,7 @@ a:not(.button) {
 }
 
 .list {
-    box-shadow: 0px 0px 20px 10px rgba(0, 0, 0, 0.50) inset;
+    /*    box-shadow: 0px 0px 20px 10px rgba(0, 0, 0, 0.50) inset;*/
     width: 100%;
     min-height: 500px;
     height: 80vh;
@@ -216,8 +216,26 @@ input[type="text"], input[type="url"], input[type="number"], input[type="passwor
     background: var(--White, #FFF);
 }
 
-input:focus {
+input:read-only {
+    filter: brightness(.7);
+    cursor: default;
+}
+
+input:not(:read-only):focus {
     outline: 1px solid var(--Primary);
+}
+
+select {
+    padding: 0.75rem;
+    align-self: stretch;
+    border-radius: 0.375rem;
+    border: none;
+    outline: none;
+    background: var(--White, #FFF);
+    cursor: pointer;
+}
+select option{
+    padding: 1rem;
 }
 
 .floating-input {
@@ -244,3 +262,29 @@ input:focus {
         color: white;
         transform: translate(1rem, -4rem);
     }
+
+.page-title {
+    color: #2a2a2a;
+    font-family: Poppins;
+    font-size: 4.5rem;
+    font-style: normal;
+    font-weight: 900;
+    line-height: 1.375rem; /* 30.556% */
+    letter-spacing: 0.09rem;
+    text-transform: uppercase;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    flex: 1 0 0;
+    align-self: stretch;
+    margin-left: 1.44rem;
+}
+
+section {
+    border-radius: 1.125rem;
+    background: #181818;
+    margin: 2rem 0;
+    margin-right: 1rem;
+    height: calc(100vh - 4rem);
+    overflow: hidden;
+}
