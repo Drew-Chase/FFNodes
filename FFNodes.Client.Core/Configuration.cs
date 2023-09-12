@@ -27,6 +27,15 @@ public sealed class Configuration
     [JsonProperty("connection-url")]
     public string ConnectionUrl { get; set; }
 
+    [JsonProperty("concurrent-connections")]
+    public int ConcurrentConnections { get; set; } = 1;
+
+    [JsonProperty("codec")]
+    public string Codec { get; set; } = "auto";
+
+    [JsonProperty("working-directory")]
+    public string WorkingDirectory { get; set; } = Path.Combine(Directories.Data, "tmp");
+
     private Configuration()
     {
     }
