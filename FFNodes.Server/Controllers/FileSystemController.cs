@@ -28,11 +28,11 @@ public class FileSystemController : ControllerBase
     }
 
     [HttpGet("checkout")]
-    public IActionResult CheckoutFiles()
+    public IActionResult CheckoutFile()
     {
         if (FileSystemHandler.Instance.FinishedLoading)
         {
-            ProcessedFile file = FileSystemHandler.Instance.CheckoutFiles(connectedUser);
+            ProcessedFile file = FileSystemHandler.Instance.CheckoutFile(connectedUser);
             Response.Headers.Add("Content-Disposition", $"attachment; filename=\"{Path.GetFileName(file.Path)}\"");
             return new FileStreamResult(System.IO.File.OpenRead(file.Path), "application/octet-stream");
         }
