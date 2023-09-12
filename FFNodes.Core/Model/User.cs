@@ -5,7 +5,6 @@
     https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
 */
 
-using FFNodes.Server.Model;
 using Newtonsoft.Json;
 
 namespace FFNodes.Core.Model;
@@ -34,7 +33,7 @@ public sealed class User
     public bool IsAdmin { get; set; } = false;
 
     [JsonProperty("processed_files")]
-    public ProcessedFile[] Files { get; set; } = Array.Empty<ProcessedFile>();
+    public Guid[] Files { get; set; } = Array.Empty<Guid>();
 
     public User(string username)
     {
