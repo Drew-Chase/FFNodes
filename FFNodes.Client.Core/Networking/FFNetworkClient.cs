@@ -51,6 +51,20 @@ public class FFNetworkClient : IDisposable
         }
     }
 
+    public async Task<(bool, User? user)> LogInUser(Guid userId)
+    {
+        try
+        {
+            client.DefaultRequestHeaders.Add("User-ID", userId.ToString());
+            User? user = (await client.GetAsJson($"{client.BaseAddress}api/auth/user"))?.ToObject<User>();
+            return (user != null, user);
+        }
+        catch
+        {
+            return (false, null);
+        }
+    }
+
     public void Dispose()
     {
         GC.SuppressFinalize(this);
