@@ -49,7 +49,7 @@ public sealed class FileSystemHandler
     /// <param name="user"></param>
     /// <param name="count"></param>
     /// <returns></returns>
-    public ProcessedFile CheckoutFiles(User user)
+    public ProcessedFile CheckoutFile(User user)
     {
         ProcessedFile file = processedFiles.First();
         processedFiles.Remove(file);
@@ -166,6 +166,15 @@ public sealed class FileSystemHandler
         {
             Log.Error("Failed to setup watcher for {Directory} - {MSG}.", directory, e.Message, e);
         }
+    }
+
+    public ProcessedFile[] GetCheckedOutFiles(User user)
+    {
+        if (checkedOutFiles.ContainsKey(user))
+        {
+            return checkedOutFiles[user].ToArray();
+        }
+        return Array.Empty<ProcessedFile>();
     }
 
     /// <summary>
