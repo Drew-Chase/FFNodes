@@ -88,6 +88,8 @@ public class UserHandler
     /// <returns>a user or null if a user is not found.</returns>
     public User? GetUser(Guid id) => users.FirstOrDefault(x => x.Id.Equals(id));
 
+    public User? GetUser(string username) => users.FirstOrDefault(x => x.Username.Equals(username));
+
     /// <summary>
     /// Gets a list of all the connected users.
     /// </summary>
