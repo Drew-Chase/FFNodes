@@ -1,0 +1,47 @@
+/*
+    FFNodes - LFInteractive LLC. 2021-2024
+    FFNodes is a client/server solution for batch processing ffmpeg operations from multiple systems across the internet.
+    Licensed under GPL-3.0
+    https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
+*/
+
+.file-item {
+    padding: .5rem;
+    background-color: rgb(0, 0, 0, 0);
+    transition: background-color 200ms;
+    border-radius: 5px;
+}
+
+    .file-item:hover {
+        cursor: pointer;
+        background-color: rgb(0, 0, 0, 0.25);
+    }
+
+    .file-item .percentage {
+        --percentage: 50.00%;
+        position: relative;
+        border-radius: 100px;
+        overflow: hidden;
+        height: 3px;
+        background: white;
+    }
+
+        .file-item .percentage::after {
+            content: '';
+            position: absolute;
+            width: var(--percentage);
+            background-color: var(--Primary);
+            border-radius: 100px;
+            inset: 0;
+        }
+
+.title-bar .title-input {
+    width: 200px;
+    margin: 1rem;
+}
+
+#file-items {
+    margin: 1rem;
+    width: auto;
+    height: calc(100vh - 190px);
+}
