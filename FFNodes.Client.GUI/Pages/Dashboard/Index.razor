@@ -1,34 +1,16 @@
 ﻿@page "/dashboard"
+@using CommunityToolkit.Maui.Alerts;
 <link href="/css/dashboard.css" rel="stylesheet" />
 
 <link href="css/nav.css" rel="stylesheet" />
 <div class="row">
 
     <nav class="col center horizontal">
-        <div class="nav-item@(SelectedIndex==0?" selected":"")" @onclick=@(()=>SelectedIndex=0)>
-            <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 34 34" fill="none">
-                <path d="M29.25 15.25H4.75M29.25 15.25C31.183 15.25 32.75 16.817 32.75 18.75V29.25C32.75 31.183 31.183 32.75 29.25 32.75H4.75C2.817 32.75 1.25 31.183 1.25 29.25V18.75C1.25 16.817 2.817 15.25 4.75 15.25M29.25 15.25V11.75C29.25 9.817 27.683 8.25 25.75 8.25M4.75 15.25V11.75C4.75 9.817 6.317 8.25 8.25 8.25M8.25 8.25V4.75C8.25 2.817 9.817 1.25 11.75 1.25H22.25C24.183 1.25 25.75 2.817 25.75 4.75V8.25M8.25 8.25H25.75" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-            <span class="label">
-                <svg class="label-background" xmlns="http://www.w3.org/2000/svg" width="153" height="52" viewBox="0 0 153 52" fill="none">
-                    <rect x="8.77454" width="144.225" height="52" rx="4" fill="#262626" />
-                    <path d="M2.36222 26.9077C1.58832 26.55 1.58832 25.45 2.36222 25.0923L11.7667 20.7452C12.4294 20.4389 13.1863 20.9229 13.1863 21.6529L13.1863 30.3471C13.1863 31.0771 12.4294 31.5611 11.7668 31.2548L2.36222 26.9077Z" fill="#262626" />
-                </svg>
-                <span class="title">Dashboard</span>
-            </span>
+        <div id="nav-items" class="col">
+            <NavItemComponent Title="Dashboard" IsSelected=@(SelectedIndex==0) OnSelect=@(()=>SelectedIndex=0) Icon="dashboard.svg" />
+            <NavItemComponent Title="Users" IsSelected=@(SelectedIndex==1) OnSelect=@(()=>SelectedIndex=1) Icon="users.svg" />
         </div>
-        <div class="nav-item@(SelectedIndex==1?" selected":"")" @onclick=@(()=>SelectedIndex=1)>
-            <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="42" height="42" viewBox="0 0 42 42" fill="none">
-                <path d="M38.5 36.75V33.25C38.5 29.9883 36.2691 27.2476 33.25 26.4705M27.125 5.75883C29.6904 6.79726 31.5 9.31229 31.5 12.25C31.5 15.1877 29.6904 17.7027 27.125 18.7412M29.75 36.75C29.75 33.4884 29.75 31.8576 29.2172 30.5712C28.5067 28.856 27.144 27.4933 25.4288 26.7828C24.1424 26.25 22.5116 26.25 19.25 26.25H14C10.7384 26.25 9.10761 26.25 7.82122 26.7828C6.10602 27.4933 4.7433 28.856 4.03284 30.5712C3.5 31.8576 3.5 33.4884 3.5 36.75M23.625 12.25C23.625 16.116 20.491 19.25 16.625 19.25C12.759 19.25 9.625 16.116 9.625 12.25C9.625 8.38401 12.759 5.25 16.625 5.25C20.491 5.25 23.625 8.38401 23.625 12.25Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-            <span class="label">
-                <svg class="label-background" xmlns="http://www.w3.org/2000/svg" width="153" height="52" viewBox="0 0 153 52" fill="none">
-                    <rect x="8.77454" width="144.225" height="52" rx="4" fill="#262626" />
-                    <path d="M2.36222 26.9077C1.58832 26.55 1.58832 25.45 2.36222 25.0923L11.7667 20.7452C12.4294 20.4389 13.1863 20.9229 13.1863 21.6529L13.1863 30.3471C13.1863 31.0771 12.4294 31.5611 11.7668 31.2548L2.36222 26.9077Z" fill="#262626" />
-                </svg>
-                <span class="title">Users</span>
-            </span>
-        </div>
+        <NavItemComponent Title="Settings" IsSelected=@(SelectedIndex==2) OnSelect=@(()=>SelectedIndex=2) Icon="settings-icon.svg" />
     </nav>
 
     <div id="page-content" class="fill">
@@ -40,10 +22,19 @@
             case 1:
                 <Users />
                 break;
+            case 2:
+                <Settings />
+                break;
         }
     </div>
 </div>
 
 @code {
     public int SelectedIndex { get; set; } = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Toast.Make("Hello world");
+        await base.OnInitializedAsync();
+    }
 }
