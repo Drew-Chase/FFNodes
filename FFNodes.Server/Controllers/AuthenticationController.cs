@@ -29,26 +29,13 @@ public class AuthenticationController : ControllerBase
 
     [HttpGet("user")]
     [Produces("application/json")]
-    public IActionResult GetUser([FromQuery] Guid id) => Ok(UserHandler.Instance.GetUser(id));
+    public IActionResult GetUser([FromQuery] Guid? id) => Ok(id == null ? connectedUser : UserHandler.Instance.GetUser(id.Value));
 
     [HttpPost("user")]
     [Produces("application/json")]
-    public IActionResult CreateUser([FromBody] User user) => UserHandler.Instance.CreateUser(user) ? Ok(user) : BadRequest(new { error = "User already exists!" });
+    public IActionResult GetOrCreateUser([FromBody] User user) => UserHandler.Instance.CreateUser(user) ? Ok(user) : Ok(UserHandler.Instance.GetUser(user.Username));
 
     [HttpGet("users")]
     [Produces("application/json")]
-    public IActionResult GetUsers() => Ok(UserHandler.Instance.GetUsers()
-        .Select(user =>
-        {
-            // Removing the list of processed files from the response to improve performance.
-            return new
-            {
-                user.Id,
-                user.Username,
-                user.Saved,
-                user.Joined,
-                user.LastOnline,
-                user.ActiveTime,
-            };
-        }));
+    public IActionResult GetUsers() => Ok(UserHandler.Instance.GetUsers());
 }
