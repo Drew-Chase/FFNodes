@@ -7,6 +7,8 @@
     <PackageIcon>icon.png</PackageIcon>
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <AssemblyName>$(MSBuildProjectName.Replace(".", " "))</AssemblyName>
+    <BaseOutputPath>$(SolutionDir)bin\$(MSBuildProjectName)</BaseOutputPath>
+    <BaseIntermediateOutputPath>$(SolutionDir)bin\int\$(MSBuildProjectName)</BaseIntermediateOutputPath>
   </PropertyGroup>
 
   <ItemGroup>

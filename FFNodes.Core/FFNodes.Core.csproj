@@ -4,6 +4,8 @@
     <TargetFramework>net7.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <BaseOutputPath>$(SolutionDir)bin\$(MSBuildProjectName)</BaseOutputPath>
+    <BaseIntermediateOutputPath>$(SolutionDir)bin\int\$(MSBuildProjectName)</BaseIntermediateOutputPath>
   </PropertyGroup>
 
   <ItemGroup>
