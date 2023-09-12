@@ -11,7 +11,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FFNodes.Client.CLI", "FFNod
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FFNodes.Client.Core", "FFNodes.Client.Core\FFNodes.Client.Core.csproj", "{F827F724-9803-43F0-BFDF-FCB43EC0EBF0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FFNodes.Client.GUI", "FFNodes.Client.GUI\FFNodes.Client.GUI.csproj", "{0EB63793-5297-4990-8B4D-91BD476F0022}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FFNodes.Client.GUI", "FFNodes.Client.GUI\FFNodes.Client.GUI.csproj", "{0EB63793-5297-4990-8B4D-91BD476F0022}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
