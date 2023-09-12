@@ -1,0 +1,21 @@
+﻿<div class="nav-item@(IsSelected?" selected":"")" @onclick=OnSelect>
+    <img class="icon" src="/images/@Icon" alt="">
+    <span class="label">
+        <svg class="label-background" xmlns="http://www.w3.org/2000/svg" width="153" height="52" viewBox="0 0 153 52" fill="none">
+            <rect x="8.77454" width="144.225" height="52" rx="4" fill="#262626" />
+            <path d="M2.36222 26.9077C1.58832 26.55 1.58832 25.45 2.36222 25.0923L11.7667 20.7452C12.4294 20.4389 13.1863 20.9229 13.1863 21.6529L13.1863 30.3471C13.1863 31.0771 12.4294 31.5611 11.7668 31.2548L2.36222 26.9077Z" fill="#262626" />
+        </svg>
+        <span class="title">@Title</span>
+    </span>
+</div>
+
+@code {
+    [Parameter]
+    public string Title { get; set; } = "";
+    [Parameter]
+    public string Icon { get; set; } = "";
+    [Parameter]
+    public bool IsSelected { get; set; } = false;
+    [Parameter]
+    public Action OnSelect { get; set; } = () => { };
+}
