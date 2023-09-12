@@ -1,0 +1,69 @@
+/*
+    FFNodes - LFInteractive LLC. 2021-2024
+    FFNodes is a client/server solution for batch processing ffmpeg operations from multiple systems across the internet.
+    Licensed under GPL-3.0
+    https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
+*/
+
+nav {
+    width: 5.30688rem;
+    margin: 2rem;
+    flex-shrink: 0;
+    border-radius: 1.125rem;
+    background: #181818;
+    margin-left: 1rem;
+}
+
+    nav .nav-item {
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        width: 3.25rem;
+        height: 3.25rem;
+        margin-top: 1rem;
+        border-radius: 0.625rem;
+    }
+
+        nav .nav-item .label {
+            opacity: 0;
+            position: absolute;
+            left: calc(100% + 1.1rem);
+            pointer-events: none;
+            top: 0;
+            width: 9.53763rem;
+            height: 3.25rem;
+            display: flex;
+            align-items: center;
+            filter: drop-shadow(2px 4px 6px black)
+        }
+
+        nav .nav-item:hover .label {
+            opacity: 1;
+        }
+
+        nav .nav-item .label .title {
+            z-index: 1;
+            position: absolute;
+            left: 1.2rem;
+            font-size: 1.125rem;
+            line-height: 1.375rem;
+            letter-spacing: -0.0225rem;
+            text-transform: capitalize;
+        }
+
+        nav .nav-item svg.icon {
+            width: 2rem;
+            height: 2rem;
+            margin: auto;
+        }
+
+        nav .nav-item.selected, nav .nav-item:hover {
+            background: hsl(0, 88%, 56%);
+        }
+
+        nav .nav-item .label svg.label-background {
+            position: absolute;
+            z-index: 1;
+        }
