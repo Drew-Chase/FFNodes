@@ -1,20 +1,9 @@
-﻿<section>
+﻿@using FFNodes.Server.Data;
+<section>
     <div class="col fill">
         <div class="row title-bar">
             <div class="page-title fill">dashboard</div>
-            <div class="col title-input">
-                <label for="codec-dropdown">Codec</label>
-                <select id="codec-dropdown" class="dropdown">
-                    <option value="1" selected>Auto</option>
-                    <option value="2">H.264</option>
-                    <option value="3">NVENC</option>
-                    <option value="4">AMF</option>
-                </select>
-            </div>
-            <div class="col title-input">
-                <label for="concurrent-processes">Concurrent Processes</label>
-                <input id="concurrent-processes" type="number" min="1" max="10" value="1" />
-            </div>
+            
         </div>
         <div id="file-items" class="row list fill">
             @{
