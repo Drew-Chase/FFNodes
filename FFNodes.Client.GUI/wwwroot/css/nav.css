@@ -12,6 +12,8 @@ nav {
     border-radius: 1.125rem;
     background: #181818;
     margin-left: 1rem;
+    min-height: calc(100vh - 4rem);
+    transition: scale 200ms;
 }
 
     nav .nav-item {
@@ -36,7 +38,8 @@ nav {
             height: 3.25rem;
             display: flex;
             align-items: center;
-            filter: drop-shadow(2px 4px 6px black)
+            filter: drop-shadow(2px 4px 6px black);
+            z-index: 9;
         }
 
         nav .nav-item:hover .label {
@@ -44,7 +47,6 @@ nav {
         }
 
         nav .nav-item .label .title {
-            z-index: 1;
             position: absolute;
             left: 1.2rem;
             font-size: 1.125rem;
@@ -65,5 +67,8 @@ nav {
 
         nav .nav-item .label svg.label-background {
             position: absolute;
-            z-index: 1;
         }
+
+    nav #nav-items {
+        height: calc(100% - 5rem);
+    }
