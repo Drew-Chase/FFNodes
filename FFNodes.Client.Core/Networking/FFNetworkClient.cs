@@ -6,6 +6,7 @@
 */
 
 using Chase.Networking;
+using Chase.Networking.Event;
 using FFNodes.Core.Model;
 using System.Text;
 using System.Text.Json;
@@ -49,6 +50,11 @@ public class FFNetworkClient : IDisposable
         {
             return (false, null);
         }
+    }
+
+    public async Task CheckoutFile(DownloadProgressEvent downloadProgress)
+    {
+        await client.DownloadFileAsync($"{client.BaseAddress}api/fs/checkout", "", downloadProgress);
     }
 
     public async Task<(bool, User? user)> LogInUser(Guid userId)
