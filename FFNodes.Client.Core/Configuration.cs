@@ -14,11 +14,18 @@ namespace FFNodes.Server.Data;
 
 public sealed class Configuration
 {
+    public delegate void ConfigurationSavedEventHandler(object sender, EventArgs e);
+
+    public event ConfigurationSavedEventHandler ConfigurationSaved;
+
     [JsonIgnore]
     public static Configuration Instance = Instance ??= new();
 
     [JsonProperty("user-id")]
     public Guid UserId { get; set; }
+
+    [JsonProperty("connection-url")]
+    public string ConnectionUrl { get; set; }
 
     private Configuration()
     {
@@ -29,6 +36,9 @@ public sealed class Configuration
         Log.Debug("Saving config file: {CONFIG}", Files.Config);
         using StreamWriter writer = File.CreateText(Files.Config);
         writer.Write(JsonConvert.SerializeObject(this, Formatting.Indented));
+        writer.Flush();
+
+        ConfigurationSaved?.Invoke(this, EventArgs.Empty);
     }
 
     public void Load()
