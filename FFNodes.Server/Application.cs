@@ -6,6 +6,7 @@
 */
 
 using Chase.CLIParser;
+using FFNodes.Core;
 using FFNodes.Core.Data;
 using FFNodes.Server.Data;
 using FFNodes.Server.Handlers;
@@ -70,8 +71,10 @@ namespace FFNodes.Server
             };
             AppDomain.CurrentDomain.UnhandledException += (s, e) =>
             {
-                Log.Fatal(e.ExceptionObject as Exception, "Unhandled Exception");
-                Log.CloseAndFlush();
+                if (e.ExceptionObject is Exception exception)
+                {
+                    CrashHandler.HandleCrash(exception);
+                }
             };
 
             Log.Information("Starting FFNodes Server");
