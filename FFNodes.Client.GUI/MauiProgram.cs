@@ -5,6 +5,7 @@
     https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
 */
 
+using CommunityToolkit.Maui;
 using FFNodes.Client.Core.Handlers;
 using FFNodes.Core;
 using FFNodes.Core.Data;
@@ -32,6 +33,7 @@ public static class MauiProgram
 
         AppDomain.CurrentDomain.ProcessExit += (s, e) =>
         {
+            Configuration.Instance.Save();
             Log.Information("Stopping FFNodes");
             Log.CloseAndFlush();
         };
@@ -51,7 +53,7 @@ public static class MauiProgram
         CommandLineHandler.HandleCommandLine(Environment.GetCommandLineArgs()[1..]); // get the command line arguments, excluding the first argument which is the executable path.
 
         MauiAppBuilder builder = MauiApp.CreateBuilder();
-        builder.UseMauiApp<App>();
+        builder.UseMauiApp<App>().UseMauiCommunityToolkit();
 
         builder.Services.AddMauiBlazorWebView();
 
