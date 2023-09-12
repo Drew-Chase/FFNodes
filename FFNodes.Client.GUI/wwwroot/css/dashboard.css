@@ -34,14 +34,3 @@
             border-radius: 100px;
             inset: 0;
         }
-
-.title-bar .title-input {
-    width: 200px;
-    margin: 1rem;
-}
-
-#file-items {
-    margin: 1rem;
-    width: auto;
-    height: calc(100vh - 190px);
-}
