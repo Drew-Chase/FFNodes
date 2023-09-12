@@ -9,6 +9,7 @@ namespace FFNodes.Server.Model;
 
 public struct ProcessedFile
 {
+    public Guid Id { get; set; }
     public string Path { get; set; }
     public long OriginalSize { get; set; }
     public long CompressedSize { get; set; }
@@ -19,6 +20,7 @@ public struct ProcessedFile
 
     public ProcessedFile(string path)
     {
+        Id = Guid.NewGuid();
         FileInfo info = new(path);
         Path = path;
         OriginalSize = info.Length;
