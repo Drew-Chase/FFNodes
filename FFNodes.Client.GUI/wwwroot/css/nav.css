@@ -24,6 +24,8 @@ nav {
         cursor: pointer;
         width: 3.25rem;
         height: 3.25rem;
+        margin: 1rem;
+        padding: 0px;
         margin-top: 1rem;
         border-radius: 0.625rem;
     }
@@ -48,7 +50,7 @@ nav {
 
         nav .nav-item .label .title {
             position: absolute;
-            left: 1.2rem;
+            left: 2.5rem;
             font-size: 1.125rem;
             line-height: 1.375rem;
             letter-spacing: -0.0225rem;
