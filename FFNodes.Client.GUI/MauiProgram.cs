@@ -26,9 +26,9 @@ public static class MauiProgram
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Verbose()
             .WriteTo.Console(LogEventLevel.Verbose)
-            .WriteTo.File(Files.DebugLog, LogEventLevel.Verbose, buffered: true, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000, flushToDiskInterval: flushTime)
-            .WriteTo.File(Files.LatestLog, LogEventLevel.Information, buffered: true, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000, flushToDiskInterval: flushTime)
-            .WriteTo.File(Files.ErrorLog, LogEventLevel.Error, buffered: true, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000, flushToDiskInterval: flushTime)
+            .WriteTo.File(Files.DebugLog, LogEventLevel.Verbose, buffered: true, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000, flushToDiskInterval: flushTime)
+            .WriteTo.File(Files.LatestLog, LogEventLevel.Information, buffered: true, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000, flushToDiskInterval: flushTime)
+            .WriteTo.File(Files.ErrorLog, LogEventLevel.Error, buffered: false, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000)
             .CreateLogger();
 
         AppDomain.CurrentDomain.ProcessExit += (s, e) =>
