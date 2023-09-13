@@ -1,0 +1,1 @@
+dotnet publish .\FFNodes.Client.GUI\FFNodes.Client.GUI.csproj -c Release --no-self-contained -f net7.0-windows10.0.19041.0 -o ".\bin\publish\FFNodes.Client.GUI"
