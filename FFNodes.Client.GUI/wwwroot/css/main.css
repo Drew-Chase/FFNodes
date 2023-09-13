@@ -91,8 +91,7 @@ a:not(.button) {
     text-decoration: none;
     padding: 1rem;
     border-radius: 6px;
-    margin-left: 10px;
-    margin-right: 10px;
+    margin: auto 10px;
     text-align: center;
     transition: filter, box-shadow, transform;
     transition-duration: 200ms;
@@ -105,7 +104,11 @@ a:not(.button) {
     font-family: Inter;
 }
 
-    .button svg, button svg .button img, button img {
+    .button .media-buttons {
+        aspect-ratio: 1;
+    }
+
+    .button svg, button svg, .button img, button img {
         margin: 0 1rem;
     }
 
@@ -141,24 +144,26 @@ a:not(.button) {
     width: auto;
     height: calc(100vh - 190px);
 }
-    .list > *{
+
+    .list > * {
         margin: 1rem;
     }
+
     .list label {
         font-size: 1.25rem;
         margin: 1rem 0;
         color: white;
     }
 
-    label {
-        color: #545F71;
-        font-size: 0.875rem;
-        font-style: normal;
-        font-weight: 400;
-        line-height: 1.1875rem;
-        letter-spacing: -0.0175rem;
-        font-family: Inter;
-    }
+label {
+    color: #545F71;
+    font-size: 0.875rem;
+    font-style: normal;
+    font-weight: 400;
+    line-height: 1.1875rem;
+    letter-spacing: -0.0175rem;
+    font-family: Inter;
+}
 
 input[type="text"], input[type="url"], input[type="number"], input[type="password"] {
     display: flex;
@@ -270,4 +275,21 @@ input[type=range] {
         border-radius: 100px;
         background: var(--Primary);
         cursor: pointer;
+    }
+
+.file-input {
+    cursor: default;
+    position: relative;
+}
+
+    .file-input input:read-only {
+        filter: brightness(1);
+        cursor: default;
+    }
+
+    .file-input img {
+        position: absolute;
+        right: 0;
+        top: 50%;
+        margin: 0;
     }
