@@ -1,7 +1,7 @@
 ﻿<div class="file-item">
     <div class="col">
         <div class="row fill">
-            <div class="title fill">@FileName</div>
+            <div class="title fill">@FileName@(IsDownloading ? " (downloading)" : "")</div>
             <div class="percentage-label">@(Percentage.ToString("P2"))</div>
         </div>
         <div class="percentage fill" style="--percentage: @(Percentage.ToString("P2"))"></div>
@@ -13,4 +13,6 @@
     public string FileName { get; set; }
     [Parameter]
     public float Percentage { get; set; }
+    [Parameter]
+    public bool IsDownloading { get; set; }
 }
