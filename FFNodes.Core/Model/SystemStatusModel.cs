@@ -13,6 +13,7 @@ public struct SystemStatusModel
     public bool Loading { get; }
     public User[] ConnectedUsers { get; }
     public string ConnectionUrl { get; set; }
+    public string FFMpegCommand { get; set; }
 
     /// <summary>
     /// Creates a new instance of the SystemStatusModel struct.
@@ -21,11 +22,12 @@ public struct SystemStatusModel
     /// <param name="loading">If the file system is still loading results</param>
     /// <param name="connectedUsers">A list of all connected users</param>
     /// <param name="connectionUrl">The connection url</param>
-    public SystemStatusModel(TimeSpan uptime, bool loading, User[] connectedUsers, string connectionUrl)
+    public SystemStatusModel(TimeSpan uptime, bool loading, User[] connectedUsers, string connectionUrl, string ffmpegCommand)
     {
         Uptime = uptime;
         Loading = loading;
         ConnectedUsers = connectedUsers;
         ConnectionUrl = connectionUrl;
+        FFMpegCommand = ffmpegCommand;
     }
 }
