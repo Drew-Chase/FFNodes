@@ -7,7 +7,15 @@
 
 using System.Diagnostics;
 
-namespace FFNodes.Client.Data;
+namespace FFNodes.Client.Core.Data;
+
+public enum GPUVendor
+{
+    Unknown,
+    NVIDIA,
+    AMD,
+    Intel
+}
 
 /// <summary>
 /// Handles client specific operations.
@@ -18,9 +26,10 @@ public static class ClientHandler
     /// Gets the current GPU vendor.
     /// </summary>
     /// <returns></returns>
-    public static string GetGPUVendor()
+    public static GPUVendor GetGPUVendor()
     {
-        string filename, argument, vendor = "";
+        string filename, argument;
+        GPUVendor vendor = GPUVendor.Unknown;
         if (OperatingSystem.IsWindows())
         {
             filename = "powershell";
@@ -53,7 +62,18 @@ public static class ClientHandler
             {
                 if (OperatingSystem.IsWindows())
                 {
-                    vendor = data;
+                    if (data.Contains("amd", StringComparison.CurrentCultureIgnoreCase))
+                    {
+                        vendor = GPUVendor.AMD;
+                    }
+                    else if (data.Contains("nvidia", StringComparison.CurrentCultureIgnoreCase))
+                    {
+                        vendor = GPUVendor.NVIDIA;
+                    }
+                    else if (data.Contains("intel", StringComparison.CurrentCultureIgnoreCase))
+                    {
+                        vendor = GPUVendor.Intel;
+                    }
                 }
                 else
                 {
@@ -61,7 +81,19 @@ public static class ClientHandler
                     int endIndex = data.IndexOf(']');
                     if (startIndex >= 0 && endIndex > startIndex)
                     {
-                        vendor = data.Substring(startIndex + 1, endIndex - startIndex - 1);
+                        string content = data.Substring(startIndex + 1, endIndex - startIndex - 1);
+                        if (content.Contains("nvidia", StringComparison.CurrentCultureIgnoreCase))
+                        {
+                            vendor = GPUVendor.NVIDIA;
+                        }
+                        else if (content.Contains("amd", StringComparison.CurrentCultureIgnoreCase))
+                        {
+                            vendor = GPUVendor.AMD;
+                        }
+                        else if (content.Contains("intel", StringComparison.CurrentCultureIgnoreCase))
+                        {
+                            vendor = GPUVendor.Intel;
+                        }
                     }
                 }
             }
