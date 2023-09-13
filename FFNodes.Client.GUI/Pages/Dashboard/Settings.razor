@@ -1,4 +1,5 @@
-﻿@using FFNodes.Server.Data;
+﻿@using FFNodes.Client.Core.Data;
+@using FFNodes.Server.Data;
 <section>
     <div class="col fill">
         <div class="row title-bar">
@@ -8,7 +9,7 @@
             <div class="col fill">
                 <label for="codec-dropdown">Codec</label>
                 <select id="codec-dropdown" class="dropdown" @bind=Configuration.Instance.Codec>
-                    <option value="auto" selected>Auto</option>
+                    <option value="auto" selected>Auto (@AutoEncoder)</option>
                     <option value="h.264">H.264 (CPU)</option>
                     <option value="h.264_nvenc">NVIDIA NVENC (GPU)</option>
                     <option value="h.264_amf">AMD AMF (GPU)</option>
@@ -21,12 +22,33 @@
             </div>
             <div class="col fill">
                 <label for="concurrent-processes">Concurrent Processes (@Configuration.Instance.ConcurrentConnections)</label>
-                <input id="concurrent-processes" type="range" min="1" max="10" @bind=Configuration.Instance.ConcurrentConnections />
+                <input id="concurrent-processes" type="range" min="1" max="32" @bind=Configuration.Instance.ConcurrentConnections />
             </div>
+            <DirectoryInputComponent Title="Working Directory" Directory="@Configuration.Instance.WorkingDirectory" OnDirectorySelected=@(s=>Configuration.Instance.WorkingDirectory=s) />
         </div>
     </div>
 </section>
 
 @code {
+
+    private string AutoEncoder { get; set; } = "";
+    private GPUVendor Vendor { get; set; } = GPUVendor.Unknown;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Vendor = ClientHandler.GetGPUVendor();
+
+        AutoEncoder = Vendor switch
+        {
+            GPUVendor.NVIDIA => "NVIDIA NVENC",
+            GPUVendor.AMD => "AMD AMF",
+            GPUVendor.Intel => "Intel Quick Sync",
+            _ => "H264",
+
+        };
+
+
+        await base.OnInitializedAsync();
+    }
 
 }
