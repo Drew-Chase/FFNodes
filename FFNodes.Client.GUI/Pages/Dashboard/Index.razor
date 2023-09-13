@@ -1,5 +1,6 @@
 ﻿@page "/dashboard"
 @using CommunityToolkit.Maui.Alerts;
+@using Windows.UI.Notifications;
 <link href="/css/dashboard.css" rel="stylesheet" />
 
 <link href="css/nav.css" rel="stylesheet" />
@@ -32,9 +33,4 @@
 @code {
     public int SelectedIndex { get; set; } = 0;
 
-    protected override async Task OnInitializedAsync()
-    {
-        Toast.Make("Hello world");
-        await base.OnInitializedAsync();
-    }
 }
