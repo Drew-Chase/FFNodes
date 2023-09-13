@@ -1,0 +1,34 @@
+﻿@using CommunityToolkit.Maui.Storage;
+
+<div class="file-input col">
+    <label for="">@Title</label>
+    <input type="text" @bind=Directory>
+    <img class="button primary" src="/images/folder.svg" alt="" @onclick=PickDirectory>
+</div>
+
+@code {
+    [Parameter]
+    public string Title { get; set; }
+    [Parameter]
+    public string Directory { get; set; }
+    [Parameter]
+    public Action<string> OnDirectorySelected { get; set; } = s => { };
+
+    private async Task PickDirectory()
+    {
+        try
+        {
+            FolderPickerResult result = await FolderPicker.Default.PickAsync(Directory, CancellationToken.None);
+            result.EnsureSuccess();
+            if (result != null)
+            {
+                Directory = result.Folder.Path;
+                OnDirectorySelected(Directory);
+            }
+        }
+        catch (Exception e)
+        {
+            Log.Error(e, "Unable to pick directory");
+        }
+    }
+}
