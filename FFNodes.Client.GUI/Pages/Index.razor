@@ -92,6 +92,7 @@
             if (success)
             {
                 Configuration.Instance.UserId = user.Id;
+                Configuration.Instance.ConnectionUrl = ConnectionLink;
                 Configuration.Instance.Save();
                 nav.NavigateTo("/dashboard");
             }
