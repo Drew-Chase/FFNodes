@@ -1,22 +1,55 @@
-﻿@using FFNodes.Server.Data;
+﻿@using FFNodes.Client.Core.Networking;
+@using FFNodes.Client.GUI.Data;
+@using FFNodes.Server.Data;
+
 <section>
     <div class="col fill">
         <div class="row title-bar">
             <div class="page-title fill">dashboard</div>
-            
+            <div class="row">
+                <img src="/images/@(IsProcessing?"pause":"play").svg" alt="" class="button @(IsProcessing?"primary":"secondary") media-buttons" @onclick=@StartProcessing>
+                <img src="/images/stop.svg" alt="" class="button secondary media-buttons">
+            </div>
         </div>
         <div id="file-items" class="row list fill">
-            @{
-                int max = 100;
-            }
-            @for (int i = max; i >= 0; i--)
+            @foreach (FileItem file in Files)
             {
-                <FileItemComponent FileName="test.mp4" Percentage="i/(float)max" />
+                <FileItemComponent FileName="@file.FileName" Percentage=@file.Percentage IsDownloading=@file.IsDownloading />
             }
         </div>
     </div>
 </section>
 
 @code {
+    private bool IsProcessing { get; set; } = false;
+    private FFNetworkClient client { get; set; }
+    private FileItem[] Files { get; set; } = Array.Empty<FileItem>();
 
+    protected override async Task OnInitializedAsync()
+    {
+        client = new(Configuration.Instance.ConnectionUrl, Configuration.Instance.UserId);
+        await base.OnInitializedAsync();
+    }
+
+    private async Task StartProcessing()
+    {
+        if (!IsProcessing)
+        {
+            IsProcessing = true;
+            Task[] tasks = new Task[Configuration.Instance.ConcurrentConnections];
+            Files = new FileItem[Configuration.Instance.ConcurrentConnections];
+            for (int i = 0; i < tasks.Length; i++)
+            {
+                Files[i] = new FileItem("", 0, true);
+                tasks[i] = client.CheckoutFile((s, e) =>
+                {
+                    Files[i].FileName = "file";
+                    Files[i].Percentage = (float)e.Percentage;
+                    Files[i].IsDownloading = true;
+                    StateHasChanged();
+                });
+            }
+            await Task.WhenAll(tasks);
+        }
+    }
 }
