@@ -9,6 +9,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="obj\**" />
+    <EmbeddedResource Remove="obj\**" />
+    <None Remove="obj\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Chase.CLIParser" Version="0.0.4" />
     <PackageReference Include="Chase.Networking" Version="0.0.4" />
     <PackageReference Include="Serilog" Version="3.0.1" />
