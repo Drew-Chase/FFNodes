@@ -36,6 +36,7 @@ public class FileSystemController : ControllerBase
             Response.Headers.Add("Content-Disposition", $"attachment; filename=\"{Path.GetFileName(file.Path)}\"");
             return new FileStreamResult(System.IO.File.OpenRead(file.Path), "application/octet-stream");
         }
+        Response.Headers.Add("Content-Disposition", $"attachment; filename=\"error.json\"");
         return BadRequest(new { error = "Server has not finished loading files!" });
     }
 
