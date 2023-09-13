@@ -6,6 +6,7 @@
 */
 
 using Chase.CLIParser;
+using CLMath;
 using FFNodes.Client.Core.Networking;
 using FFNodes.Core.Model;
 
@@ -19,6 +20,7 @@ internal class Program
         optionsManager.Add(new Option() { ShortName = "s", LongName = "status", HasArgument = false, Required = false, Description = "Gets the status of the server." });
         optionsManager.Add(new Option() { ShortName = "c", LongName = "connection", HasArgument = true, Required = true, Description = "The connection url provided by the server owner." });
         optionsManager.Add(new Option() { ShortName = "u", LongName = "user", HasArgument = true, Required = true, Description = "The connecting user's id." });
+        optionsManager.Add(new Option() { ShortName = "ss", LongName = "start", HasArgument = false, Required = false, Description = "Start processing files" });
         OptionsParser parser = optionsManager.Parse(args);
 
         if (parser != null)
@@ -52,6 +54,18 @@ internal class Program
                         Console.WriteLine(string.Join(',', status.Value.ConnectedUsers?.Select(i => i.Username) ?? Array.Empty<string>()));
                         Console.ResetColor();
                     }
+                }
+                else if (parser.IsPresent("ss"))
+                {
+                    int max = 0;
+                    await client.CheckoutFile((s, e) =>
+                    {
+                        Console.Write(new string(' ', max));
+                        Console.CursorLeft = 0;
+                        string line = $"Downloading: {e.FileName} - {CLFileMath.AdjustedFileSize(e.BytesPerSecond)}ps - {e.Percentage:N2}";
+                        max = Math.Max(max, line.Length);
+                        Console.Write(line);
+                    });
                 }
             }
         }
