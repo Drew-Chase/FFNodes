@@ -55,7 +55,13 @@ public class FFNetworkClient : IDisposable
 
     public async Task<string> CheckoutFile(DownloadProgressEvent downloadProgress)
     {
-        return await client.DownloadFileAsync(new Uri($"{client.BaseAddress}api/fs/checkout"), Directory.CreateDirectory(Configuration.Instance.WorkingDirectory).FullName, downloadProgress);
+        return await client.DownloadFileAsync($"{client.BaseAddress}api/fs/checkout", Directory.CreateDirectory(Configuration.Instance.WorkingDirectory).FullName, downloadProgress);
+    }
+
+    public async Task<bool> CheckinFile(string path, DownloadProgressEvent? progress)
+    {
+        using HttpResponseMessage response = await client.UploadFileAsync($"{client.BaseAddress}api/fs/checkin", path, progress);
+        return response.IsSuccessStatusCode;
     }
 
     public async Task<(bool, User? user)> LogInUser(Guid userId)
