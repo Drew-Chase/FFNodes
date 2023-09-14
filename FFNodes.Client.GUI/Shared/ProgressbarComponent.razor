@@ -1,0 +1,14 @@
+﻿<div class="col">
+    <div class="row fill">
+        <div class="title fill">@Title</div>
+        <div class="percentage-label">@(Percentage.ToString("P2"))</div>
+    </div>
+    <div class="percentage fill" style="--percentage: @(Percentage.ToString("P2"))"></div>
+</div>
+
+@code {
+    [Parameter]
+    public string Title { get; set; }
+    [Parameter]
+    public double Percentage { get; set; }
+}
