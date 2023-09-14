@@ -51,8 +51,12 @@ public class FileSystemController : ControllerBase
             {
                 if (FileSystemHandler.Instance.TryParseFile(file.FileName, out ProcessedFile? processedFile) && processedFile.HasValue)
                 {
-                    using FileStream fs = System.IO.File.OpenWrite(processedFile.Value.Path + ".tmp");
-                    await file.CopyToAsync(fs);
+                    string path = Path.Combine(Path.GetDirectoryName(processedFile.Value.Path), file.FileName);
+                    System.IO.File.Delete(processedFile.Value.Path);
+                    using (FileStream fs = System.IO.File.OpenWrite(path))
+                    {
+                        await file.CopyToAsync(fs);
+                    }
                     await FileSystemHandler.Instance.ReportProcessedFile(connectedUser, processedFile.Value);
                     return Ok(processedFile.Value);
                 }
