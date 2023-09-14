@@ -1,0 +1,49 @@
+@using Chase.FFmpeg.Info;
+@using FFNodes.Client.GUI.Data;
+@using FFNodes.Core.Data;
+@using FFNodes.Server.Data;
+
+<div class="popup">
+    <div class="background"></div>
+    <div class="popup col">
+        <ProgressbarComponent Title="Size" Percentage=@(ConvertedFileSize / (double)MediaInfo.Size) />
+        <div class="row">
+            <b>Speed: </b>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public FileItem File { get; set; }
+    private FFMediaInfo MediaInfo { get; set; }
+    private long ConvertedFileSize { get; set; }
+    private FileSystemWatcher Watcher { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        MediaInfo = new(File.FileName);
+        string? file = Directory.GetFiles(Path.Combine(Configuration.Instance.WorkingDirectory, "output"), Path.GetFileNameWithoutExtension(File.FileName) + ".*", SearchOption.TopDirectoryOnly).FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(file) && System.IO.File.Exists(file))
+        {
+            ConvertedFileSize = new FileInfo(file).Length;
+            Watcher = new()
+                {
+                    EnableRaisingEvents = true,
+                    Path = Path.GetDirectoryName(file),
+                    IncludeSubdirectories = false,
+                    NotifyFilter = NotifyFilters.Size,
+                };
+            Watcher.Changed += (s, e) =>
+            {
+                if (e.FullPath == file)
+                {
+                    ConvertedFileSize = new FileInfo(file).Length;
+                    InvokeAsync(StateHasChanged);
+                }
+            };
+
+        }
+        await base.OnInitializedAsync();
+    }
+}
