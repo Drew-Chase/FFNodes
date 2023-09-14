@@ -1,18 +1,18 @@
-﻿<div class="file-item">
-    <div class="col">
-        <div class="row fill">
-            <div class="title fill">@FileName@(IsDownloading ? " (downloading)" : "")</div>
-            <div class="percentage-label">@(Percentage.ToString("P2"))</div>
-        </div>
-        <div class="percentage fill" style="--percentage: @(Percentage.ToString("P2"))"></div>
-    </div>
+﻿@using FFNodes.Client.GUI.Data;
+<div class="file-item" @onclick=@OnClick>
+    <ProgressbarComponent Title=@Title Percentage=@File.Percentage />
 </div>
 
 @code {
     [Parameter]
-    public string FileName { get; set; }
+    public FileItem File { get; set; }
+    public string Title { get; set; }
     [Parameter]
-    public float Percentage { get; set; }
-    [Parameter]
-    public bool IsDownloading { get; set; }
+    public Action OnClick { get; set; }= ()=> { };
+
+    protected override async Task OnInitializedAsync()
+    {
+        Title = $"{File.FileName} {(File.CurrentOperation != Operation.Processing ? $"({File.CurrentOperation})" : "")}";
+        await base.OnInitializedAsync();
+    }
 }
