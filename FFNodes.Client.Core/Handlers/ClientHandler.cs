@@ -106,4 +106,17 @@ public static class ClientHandler
 
         return vendor;
     }
+
+    public static string GetVendorSpecificCodec()
+    {
+        GPUVendor vendor = ClientHandler.GetGPUVendor();
+
+        return vendor switch
+        {
+            GPUVendor.NVIDIA => "h264_nvenc",
+            GPUVendor.AMD => "h264_amf",
+            GPUVendor.Intel => "h264_qsv",
+            _ => "h264",
+        };
+    }
 }
