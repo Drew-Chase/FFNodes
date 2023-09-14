@@ -2,8 +2,8 @@
   "profiles": {
     "Windows": {
       "commandName": "Project",
-      "jsWebView2Debugging": true,
-      "nativeDebugging": true
+      "jsWebView2Debugging": false,
+      "nativeDebugging": false
     }
   }
 }
