@@ -62,7 +62,7 @@ internal class Program
                     {
                         Console.Write(new string(' ', max));
                         Console.CursorLeft = 0;
-                        string line = $"Downloading: {e.FileName} - {CLFileMath.AdjustedFileSize(e.BytesPerSecond)}ps - {e.Percentage:N2}";
+                        string line = $"Downloading: {e.FileName} - {CLFileMath.AdjustedFileSize(e.BytesPerSecond)}ps - {e.Percentage:P2}";
                         max = Math.Max(max, line.Length);
                         Console.Write(line);
                     });
