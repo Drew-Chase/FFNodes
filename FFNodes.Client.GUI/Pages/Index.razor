@@ -55,10 +55,7 @@
                 (bool success, User? user) = await client.LogInUser(Configuration.Instance.UserId);
                 Username = user?.Username ?? "";
 
-                await InvokeAsync(() =>
-                {
-                    StateHasChanged();
-                });
+                await InvokeAsync(StateHasChanged);
 
                 if (Configuration.Instance.UserId != Guid.Empty && !string.IsNullOrWhiteSpace(ConnectionLink) && success)
                 {
