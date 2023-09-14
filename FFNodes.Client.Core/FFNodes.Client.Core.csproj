@@ -28,8 +28,4 @@
     <ProjectReference Include="..\FFNodes.Core\FFNodes.Core.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Events\" />
-  </ItemGroup>
-
 </Project>
