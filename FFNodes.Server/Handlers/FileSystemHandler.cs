@@ -233,6 +233,6 @@ public sealed class FileSystemHandler
 
     public ProcessedFile? ParseFile(string filename)
     {
-        return processedFiles.FirstOrDefault(i => Path.GetFileName(i.Path).Equals(filename));
+        return processedFiles.FirstOrDefault(i => Path.GetFileNameWithoutExtension(i.Path).Equals(Path.GetFileNameWithoutExtension(filename)));
     }
 }
