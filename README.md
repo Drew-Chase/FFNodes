@@ -6,7 +6,7 @@
 <article>
     <div class="col">
         <h1>Authentication</h1>
-        <p>The authentication system for FFNodes is elegantly straightforward, providing a seamless and secure user experience. When users attempt to access FFNodes, they are required to provide only two essential pieces of information: their username and an encrypted connection link. This minimalist approach prioritizes user convenience without compromising on security. The username ensures personalized access, while the encrypted connection link serves as a robust authentication token, effectively shielding against unauthorized entry. Together, these elements create a robust yet user-friendly authentication system, embodying FFNodes' commitment to simplicity and security for its users. The login page is as depicted on the left.</p>
+        <p>The authentication system for FFNodes is elegantly straightforward, providing a seamless and secure user experience. When users attempt to access FFNodes, they are required to provide only two essential pieces of information: their username and an encrypted connection link. This minimalist approach prioritizes user convenience without compromising on security. The username ensures personalized access, while the encrypted connection link serves as a robust authentication token, effectively shielding against unauthorized entry. Together, these elements create a robust yet user-friendly authentication system, embodying FFNodes' commitment to simplicity and security for its users.</p>
     </div>
     <img src="https://ffnodes.lfinteractive.net/assets/images/login.png" alt="">
 </article>
