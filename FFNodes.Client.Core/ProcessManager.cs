@@ -98,6 +98,7 @@ public class ProcessManager
                     {
                         CancelProcessing(fileId);
                     }
+                    Files[fileId].CurrentOperation = Operation.Processing;
                     Files[fileId].Percentage = e.Percentage;
                     fileItemProgress?.Invoke(this, new(Files[fileId]));
                 }, auto_start: false);
@@ -157,6 +158,7 @@ public class ProcessManager
         {
             await Client.CheckinFile(file, (s, e) =>
             {
+                Files[fileId].CurrentOperation = Operation.Uploading;
                 Files[fileId].Percentage = (float)e.Percentage;
                 fileItemProgress?.Invoke(this, new FileItemProgressUpdateEventArgs(Files[fileId]));
             });
