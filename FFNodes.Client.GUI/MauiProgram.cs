@@ -5,6 +5,7 @@
     https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
 */
 
+using Chase.FFmpeg.Extra;
 using CommunityToolkit.Maui;
 using FFNodes.Client.Core.Handlers;
 using FFNodes.Core;
@@ -31,9 +32,12 @@ public static class MauiProgram
             .WriteTo.File(Files.ErrorLog, LogEventLevel.Error, buffered: false, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000)
             .CreateLogger();
 
+        Log.Information("Starting FFNodes Client");
+
         AppDomain.CurrentDomain.ProcessExit += (s, e) =>
         {
             Configuration.Instance.Save();
+            Cleanup();
             Log.Information("Stopping FFNodes");
             Log.CloseAndFlush();
         };
@@ -57,13 +61,23 @@ public static class MauiProgram
 
         builder.Services.AddMauiBlazorWebView();
 
+        builder.Logging.SetMinimumLevel(LogLevel.Trace);
+        builder.Logging.AddSerilog();
 #if DEBUG
         builder.Services.AddBlazorWebViewDeveloperTools();
         builder.Logging.AddDebug();
 #endif
 
         Configuration.Instance.Load();
-
+        Cleanup();
         return builder.Build();
+    }
+
+    private static void Cleanup()
+    {
+        foreach (string file in FFVideoUtility.GetFiles(Configuration.Instance.WorkingDirectory, true))
+        {
+            File.Delete(file);
+        }
     }
 }
