@@ -9,10 +9,11 @@ namespace FFNodes.Client.GUI.Data;
 
 public enum Operation
 {
-    Downloading,
     Uploading,
     Processing,
     Cancelling,
+    Downloading,
+    Completed,
 }
 
 public sealed class FileItem
