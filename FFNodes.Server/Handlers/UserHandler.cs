@@ -5,10 +5,12 @@
     https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
 */
 
+// Ignore Spelling: username
+
 using FFNodes.Core.Data;
 using FFNodes.Core.Model;
+using FFNodes.Server.Data;
 using Microsoft.Extensions.Primitives;
-using Newtonsoft.Json;
 using System.Diagnostics.CodeAnalysis;
 using Timer = System.Timers.Timer;
 
@@ -42,6 +44,13 @@ public class UserHandler
             }
             // If not, add them.
             users.Add(user);
+
+            // Adds the users id to the configuration file.
+            List<Guid> items = Configuration.Instance.Users.ToList();
+            items.Add(user.Id);
+            Configuration.Instance.Users = items.ToArray();
+            Configuration.Instance.Save();
+
             Save(user);
             return true;
         }
@@ -70,15 +79,30 @@ public class UserHandler
         {
             // if the user has not pinged the server in 30 seconds, remove them from the connected
             connectedUsers.Remove(user);
-            users.Remove(user);
+            FileSystemHandler.Instance.MarkUsersActiveProcessesAsAbandoned(user);
         };
         timer.Start();
         connectedUsers[user] = timer;
-        user.LastOnline = DateTime.Now;
+
+        // Update the users last online time.
+        DateTime now = DateTime.Now;
+        if (user.LastOnline < now - TimeSpan.FromMinutes(1))
+        {
+            user.ActiveTime += now - user.LastOnline;
+        }
+        user.LastOnline = now;
+
+        // Reloads the user
         Save(user);
         Load(user);
     }
 
+    /// <summary>
+    /// Attempts to get a user by their id.
+    /// </summary>
+    /// <param name="id"></param>
+    /// <param name="user"></param>
+    /// <returns></returns>
     public bool TryGetUser(Guid id, [NotNullWhen(true)] out User user) => (user = GetUser(id)) != null;
 
     /// <summary>
@@ -88,6 +112,11 @@ public class UserHandler
     /// <returns>a user or null if a user is not found.</returns>
     public User? GetUser(Guid id) => users.FirstOrDefault(x => x.Id.Equals(id));
 
+    /// <summary>
+    /// Gets a user by their username.
+    /// </summary>
+    /// <param name="username"></param>
+    /// <returns></returns>
     public User? GetUser(string username) => users.FirstOrDefault(x => x.Username.Equals(username));
 
     /// <summary>
@@ -108,23 +137,22 @@ public class UserHandler
     public void Load()
     {
         // Loops through all the files in the users directory and deserializes them.
-        foreach (string file in Directory.GetFiles(Directories.Users, "*.json"))
+        foreach (Guid userId in Configuration.Instance.Users)
         {
-            // Opens the file and reads it.
-            using StreamReader reader = File.OpenText(file);
-            // Deserializes the user.
-            User? user = JsonConvert.DeserializeObject<User>(reader.ReadToEnd());
-            if (user != null)
-            {
-                // Adds the user to the list of users.
-                users.Add(user);
-            }
+            Load(userId);
         }
     }
 
+    /// <summary>
+    /// Attempts to get a user from the headers of a request.
+    /// </summary>
+    /// <param name="context"></param>
+    /// <param name="user"></param>
+    /// <returns></returns>
     public bool GetUserFromHeaders(HttpContext context, out User user)
     {
-        user = null;
+        user = null; // Sets the user to null by default.
+        // Checks if the user id header exists, if so, attempts to parse it.
         return context.Request.Headers.TryGetValue("User-ID", out StringValues user_id)
            && user_id.Any()
            && Guid.TryParse(user_id[0], out Guid id)
@@ -138,11 +166,9 @@ public class UserHandler
     /// <param name="user"></param>
     public void Load(Guid id)
     {
-        // Opens the file and reads it.
-        using StreamReader reader = File.OpenText(Path.Combine(Directories.Users, $"{id:N}.json"));
-
-        // Deserializes the user.
-        User? loadedUser = JsonConvert.DeserializeObject<User>(reader.ReadToEnd());
+        using DatabaseFile usersDatabase = DatabaseFile.Open(Path.Combine(Files.UsersDatabase));
+        // Loads the user from the users directory.
+        User? loadedUser = usersDatabase.ReadEntry<User>(id);
         if (loadedUser != null)
         {
             // Removes the user from the list of users if they already exist.
@@ -168,9 +194,9 @@ public class UserHandler
     /// <param name="user">The user that will be saved</param>
     public void Save(User user)
     {
-        // Seralizes the user and writes it to a file, overwrites the file if it already exists.
-        using StreamWriter writer = File.CreateText(Path.Combine(Directories.Users, $"{user.Id:N}.json"));
-        writer.Write(JsonConvert.SerializeObject(user));
+        using DatabaseFile usersDatabase = DatabaseFile.Open(Path.Combine(Files.UsersDatabase));
+        // Serializes the user and writes it to a file, overwrites the file if it already exists.
+        usersDatabase.WriteEntry(user.Id, user);
     }
 
     /// <summary>
@@ -184,4 +210,10 @@ public class UserHandler
             Save(user);
         }
     }
+
+    /// <summary>
+    /// Gets the users database.
+    /// </summary>
+    /// <returns></returns>
+    public DatabaseFile GetDatabase() => DatabaseFile.Open(Path.Combine(Files.UsersDatabase));
 }
