@@ -14,7 +14,6 @@ public static class Directories
     public static string Root { get; } = Directory.GetParent(Assembly.GetExecutingAssembly().Location)?.FullName ?? Directory.GetCurrentDirectory();
     public static string Data { get; } = Directory.CreateDirectory(Path.Combine(Root, "Data")).FullName;
     public static string CrashReports { get; } = Directory.CreateDirectory(Path.Combine(Root, "Crash Reports")).FullName;
-    public static string Users { get; } = Directory.CreateDirectory(Path.Combine(Data, "Users")).FullName;
     public static string FFmpeg { get; } = Directory.CreateDirectory(Path.Combine(Data, "ffmpeg")).FullName;
     public static string Logs { get; } = Directory.CreateDirectory(Path.Combine(Root, "Logs")).FullName;
 }
