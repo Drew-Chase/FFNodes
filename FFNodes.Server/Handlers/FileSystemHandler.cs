@@ -6,11 +6,9 @@
 */
 
 using Chase.FFmpeg.Extra;
-using FFNodes.Core.Data;
 using FFNodes.Core.Model;
 using FFNodes.Server.Data;
 using FFNodes.Server.Model;
-using Newtonsoft.Json;
 using Serilog;
 
 namespace FFNodes.Server.Handlers;
@@ -41,8 +39,6 @@ public sealed class FileSystemHandler
         watcherList = new();
     }
 
-    public static string GetFileReportPath(Guid userId, Guid fileId) => Path.Combine(Directories.Users, userId.ToString("N")[..2], userId.ToString("N"), fileId.ToString("N")[..2], $"{fileId:N}.json");
-
     /// <summary>
     /// Checks out a file for a user.
     /// </summary>
@@ -61,6 +57,21 @@ public sealed class FileSystemHandler
         checkedOutFiles[user].Add(file);
 
         return file;
+    }
+
+    /// <summary>
+    /// Marks all the users active processes as abandoned and removes it from the users checked out
+    /// files array then sorts it.
+    /// </summary>
+    /// <param name="user"></param>
+    public void MarkUsersActiveProcessesAsAbandoned(User user)
+    {
+        foreach (ProcessedFile file in checkedOutFiles[user])
+        {
+            processedFiles.Add(file);
+            checkedOutFiles[user].Remove(file);
+        }
+        Sort();
     }
 
     /// <summary>
@@ -185,34 +196,31 @@ public sealed class FileSystemHandler
     /// <returns></returns>
     public Task ReportProcessedFile(User user, ProcessedFile file) => Task.Run(() =>
     {
+        // Adds the file to the list of processed files.
         List<Guid> files = user.Files.ToList();
         files.Add(file.Id);
         user.Files = files.ToArray();
+
+        // Save the user and Processed File to the users database.
         UserHandler.Instance.Save(user);
-        string path = GetFileReportPath(user.Id, file.Id);
-        if (!File.Exists(path))
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(path) ?? "");
-        }
-        using StreamWriter writer = File.CreateText(path);
-        writer.Write(JsonConvert.SerializeObject(file, Formatting.Indented));
-        writer.Flush();
+        UserHandler.Instance.GetDatabase().WriteEntry(file.Id, file);
     });
 
-    public ProcessedFile? LoadReportedFile(Guid userId, Guid fileId)
+    /// <summary>
+    /// Loads a reported file.
+    /// </summary>
+    /// <param name="userId"></param>
+    /// <param name="fileId"></param>
+    /// <returns></returns>
+    public ProcessedFile? LoadReportedFile(Guid fileId)
     {
-        string file = GetFileReportPath(userId, fileId);
-        if (File.Exists(file))
+        try
         {
-            try
-            {
-                using StreamReader reader = File.OpenText(file);
-                return JsonConvert.DeserializeObject<ProcessedFile>(reader.ReadToEnd());
-            }
-            catch (Exception e)
-            {
-                Log.Error("Failed to load file {File} - {ERROR}.", file, e.Message, e);
-            }
+            return UserHandler.Instance.GetDatabase().ReadEntry<ProcessedFile>(fileId);
+        }
+        catch (Exception e)
+        {
+            Log.Error(e, "Failed to load file: {ERROR}.", e.Message);
         }
         return null;
     }
