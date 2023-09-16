@@ -29,7 +29,15 @@
     </div>
 </div>
 
+<LoadingComponent Message="Loading..." IsFullscreen=true Active=IsLoading />
 @code {
     public int SelectedIndex { get; set; } = 0;
+    private bool IsLoading { get; set; } = true;
+
+    protected async override Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        IsLoading = false;
+    }
 
 }

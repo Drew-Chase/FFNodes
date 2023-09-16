@@ -293,3 +293,52 @@ input[type=range] {
         top: 50%;
         margin: 0;
     }
+
+.loading {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms;
+}
+
+    .loading.active {
+        opacity: 1;
+        pointer-events: all;
+    }
+
+    .loading.fullscreen {
+        position: fixed !important;
+        background: var(--Background);
+        inset: 0;
+    }
+
+    .loading .message {
+        font-size: 3rem;
+        font-weight: 800;
+        margin-bottom: 8rem;
+    }
+
+.spinner {
+    min-width: 40px;
+    min-height: 40px;
+    height: 25%;
+    max-height: 200px;
+    max-width: 200px;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: 4px solid transparent;
+    border-top-color: var(--Primary);
+    animation: spin .5s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}

@@ -1,0 +1,16 @@
+﻿<div class="loading center col vertical horizontal @(IsFullscreen?"fullscreen":"") @(Active?"active":"")">
+    @if (!string.IsNullOrEmpty(Message))
+    {
+        <div class="message">@Message</div>
+    }
+    <span class="spinner"></span>
+</div>
+
+@code {
+    [Parameter]
+    public bool Active { get; set; } = true;
+    [Parameter]
+    public string Message { get; set; } = "";
+    [Parameter]
+    public bool IsFullscreen { get; set; } = false;
+}
