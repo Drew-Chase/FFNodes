@@ -8,9 +8,11 @@
 // Ignore Spelling: Checkin
 
 using FFNodes.Core.Model;
+using FFNodes.Server.Data;
 using FFNodes.Server.Handlers;
 using FFNodes.Server.Model;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.RegularExpressions;
 
 namespace FFNodes.Server.Controllers;
 
@@ -43,24 +45,44 @@ public class FileSystemController : ControllerBase
     [HttpPost("checkin")]
     [Produces("application/json")]
     [DisableRequestSizeLimit]
-    public async Task<IActionResult> CheckinFiles([FromForm] IFormFile file)
+    public async Task<IActionResult> CheckinFiles()
     {
         try
         {
             if (FileSystemHandler.Instance.FinishedLoading)
             {
-                if (FileSystemHandler.Instance.TryParseFile(file.FileName, out ProcessedFile? processedFile) && processedFile.HasValue)
+                string? contentDisposition = Request.Headers["Content-Disposition"].ToString();
+
+                if (!string.IsNullOrWhiteSpace(contentDisposition))
                 {
-                    string path = Path.Combine(Path.GetDirectoryName(processedFile.Value.Path), file.FileName);
-                    System.IO.File.Delete(processedFile.Value.Path);
-                    using (FileStream fs = System.IO.File.OpenWrite(path))
+                    string fileName = Regex.Match(contentDisposition, "filename=\"(.+?)\"").Groups[1].Value;
+                    if (!string.IsNullOrWhiteSpace(fileName))
                     {
-                        await file.CopyToAsync(fs);
+                        if (FileSystemHandler.Instance.TryParseFile(fileName, out ProcessedFile? processedFile) && processedFile.HasValue)
+                        {
+                            string? directory = Path.GetDirectoryName(processedFile.Value.Path);
+                            if (!string.IsNullOrWhiteSpace(directory))
+                            {
+#if DEBUG
+                                string path = Path.Combine(directory, $"{Path.GetFileNameWithoutExtension(fileName)}_tmp{Path.GetExtension(fileName)}");
+#else
+                                string path = Path.Combine(directory, fileName);
+                                System.IO.File.Delete(processedFile.Value.Path);
+#endif
+                                using (FileStream fs = System.IO.File.OpenWrite(path))
+                                {
+                                    await Request.Body.CopyToAsync(fs);
+                                }
+                                await FileSystemHandler.Instance.ReportProcessedFile(connectedUser, processedFile.Value);
+                                return Ok(processedFile.Value);
+                            }
+                            return BadRequest(new { error = "Parent directory of file could not be parsed.", filename = fileName });
+                        }
+                        return BadRequest(new { error = "Could not find file with filename.", filename = fileName });
                     }
-                    await FileSystemHandler.Instance.ReportProcessedFile(connectedUser, processedFile.Value);
-                    return Ok(processedFile.Value);
+                    return BadRequest(new { error = "Could parse the filename from the Content Disposition header", ContentDisposition = contentDisposition });
                 }
-                return BadRequest(new { error = "Could not find file with filename.", filename = file.FileName });
+                return BadRequest(new { error = "File name not found in the Content Disposition header" });
             }
             return BadRequest(new { error = "Server has not finished loading files!" });
         }
@@ -69,33 +91,33 @@ public class FileSystemController : ControllerBase
 
     [HttpGet("processed")]
     [Produces("application/json")]
-    public IActionResult GetProcessedFiles([FromQuery] Guid? userId, [FromQuery] Guid fileId)
+    public IActionResult GetProcessedFiles([FromQuery] Guid fileId)
     {
         if (FileSystemHandler.Instance.FinishedLoading)
         {
-            if (System.IO.File.Exists(FileSystemHandler.GetFileReportPath(userId ?? connectedUser.Id, fileId)))
+            using DatabaseFile usersDatabase = UserHandler.Instance.GetDatabase();
+            if (usersDatabase.Exists(fileId))
             {
-                ProcessedFile? file = FileSystemHandler.Instance.LoadReportedFile(userId ?? connectedUser.Id, fileId);
+                ProcessedFile? file = FileSystemHandler.Instance.LoadReportedFile(fileId);
                 if (file != null && file.HasValue)
                 {
                     return Ok(file.Value);
                 }
-                else
-                {
-                    return BadRequest(new { error = "Failed to load processed file, see server logs for more information." });
-                }
+                return BadRequest(new { error = "Failed to load processed file, see server logs for more information." });
             }
-            else
-            {
-                return BadRequest(new { error = "No processed file exists for user specified!", userId = userId ?? connectedUser.Id, fileId });
-            }
+            return BadRequest(new { error = "No processed file exists!", fileId });
         }
         return BadRequest(new { error = "Server has not finished loading files!" });
     }
 
     [HttpGet("rescan")]
-    public IActionResult Rescan()
+    public async Task<IActionResult> Rescan()
     {
-        return Ok();
+        if (connectedUser.IsAdmin)
+        {
+            await FileSystemHandler.Instance.Load();
+            return Ok();
+        }
+        return Unauthorized(new { error = "User is not authorized" });
     }
 }
