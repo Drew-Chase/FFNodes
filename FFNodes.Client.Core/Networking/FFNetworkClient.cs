@@ -18,17 +18,21 @@ public class FFNetworkClient : IDisposable
 {
     private readonly NetworkClient client;
 
+    public FFNetworkClient(string connectionUrl) : this()
+    {
+        Uri uri = new(connectionUrl);
+        client.DefaultRequestHeaders.Add("Authentication", uri.LocalPath[1..]);
+        client.BaseAddress = new Uri($"http://{uri.Host}:{uri.Port}");
+    }
+
     public FFNetworkClient(string connectionUrl, Guid userId) : this(connectionUrl)
     {
         client.DefaultRequestHeaders.Add("User-ID", userId.ToString());
     }
 
-    public FFNetworkClient(string connectionUrl)
+    private FFNetworkClient()
     {
         client = new NetworkClient();
-        Uri uri = new(connectionUrl);
-        client.DefaultRequestHeaders.Add("Authentication", uri.LocalPath[1..]);
-        client.BaseAddress = new Uri($"http://{uri.Host}:{uri.Port}");
     }
 
     public async Task<SystemStatusModel?> GetSystemStatus()
@@ -56,6 +60,11 @@ public class FFNetworkClient : IDisposable
     public async Task<string> CheckoutFile(DownloadProgressEvent downloadProgress)
     {
         return await client.DownloadFileAsync($"{client.BaseAddress}api/fs/checkout", Directory.CreateDirectory(Configuration.Instance.WorkingDirectory).FullName, downloadProgress);
+    }
+
+    public async Task<bool> Ping()
+    {
+        return (await client.GetAsync($"{client.BaseAddress}api/auth/connect")).IsSuccessStatusCode;
     }
 
     public async Task<bool> CheckinFile(string path, DownloadProgressEvent? progress)
