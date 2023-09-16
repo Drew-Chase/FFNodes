@@ -8,11 +8,16 @@
     public FileItem File { get; set; }
     public string Title { get; set; }
     [Parameter]
-    public Action OnClick { get; set; }= ()=> { };
+    public Action OnClick { get; set; } = () => { };
 
     protected override async Task OnInitializedAsync()
     {
-        Title = $"{File.FileName} {(File.CurrentOperation != Operation.Processing ? $"({File.CurrentOperation})" : "")}";
+       Title = $"{File.FileName} {(File.CurrentOperation != Operation.Processing ? $"({File.CurrentOperation})" : "")}";
         await base.OnInitializedAsync();
+    }
+    protected override void OnAfterRender(bool firstRender)
+    {
+        Title = $"{File.FileName} {(File.CurrentOperation != Operation.Processing ? $"({File.CurrentOperation})" : "")}";
+        base.OnAfterRender(firstRender);
     }
 }
