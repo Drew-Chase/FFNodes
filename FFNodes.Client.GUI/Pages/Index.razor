@@ -49,15 +49,15 @@
         {
             if (ConnectionLink != Configuration.Instance.ConnectionUrl && Uri.TryCreate(Configuration.Instance.ConnectionUrl, UriKind.Absolute, out Uri? connectionUri) && connectionUri.Scheme == "ffn")
             {
+                using FFNetworkClient client = new(ConnectionLink);
                 Log.Debug("Setting connection link to {LINK}", connectionUri);
                 ConnectionLink = Configuration.Instance.ConnectionUrl;
-                using FFNetworkClient client = new(ConnectionLink);
                 (bool success, User? user) = await client.LogInUser(Configuration.Instance.UserId);
                 Username = user?.Username ?? "";
 
                 await InvokeAsync(StateHasChanged);
 
-                if (Configuration.Instance.UserId != Guid.Empty && !string.IsNullOrWhiteSpace(ConnectionLink) && success)
+                if (Configuration.Instance.UserId != Guid.Empty && !string.IsNullOrWhiteSpace(ConnectionLink) && success && user != null)
                 {
                     nav.NavigateTo("/dashboard");
                 }
@@ -85,8 +85,8 @@
         try
         {
             using FFNetworkClient client = new(ConnectionLink);
-            (bool success, User user) = await client.CreateUser(Username);
-            if (success)
+            (bool success, User? user) = await client.CreateUser(Username);
+            if (success && user != null)
             {
                 Configuration.Instance.UserId = user.Id;
                 Configuration.Instance.ConnectionUrl = ConnectionLink;
