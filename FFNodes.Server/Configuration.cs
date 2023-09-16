@@ -32,8 +32,11 @@ public sealed class Configuration
     [JsonProperty("host")]
     public string Host { get; set; } = "localhost";
 
-    [JsonProperty("ffmpeg-command")]
+    [JsonProperty("ffmpeg_command")]
     public string FFmpegCommand { get; set; } = @"-y -hwaccel auto -i ""{INPUT}"" -c:v {CODEC} -c:a aac -filter_complex ""[0:a]dialoguenhance=original=0.5:enhance=2:voice=8, dynaudnorm[aout]"" -map ""[aout]"" -map 0:v ""{OUTPUT}.{EXTENSION}""";
+
+    [JsonProperty("users")]
+    public Guid[] Users { get; set; } = Array.Empty<Guid>();
 
     [JsonIgnore]
     public DateTime StartDate { get; } = DateTime.Now;
