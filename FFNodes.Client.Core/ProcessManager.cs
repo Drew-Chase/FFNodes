@@ -15,20 +15,36 @@ using FFNodes.Core.Model;
 using FFNodes.Server.Data;
 using Serilog;
 using System.Diagnostics;
+using Timer = System.Timers.Timer;
 
 namespace FFNodes.Client.Core;
 
 public class ProcessManager
 {
+    private readonly Timer pingTimer;
     public static ProcessManager Instance { get; } = Instance ??= new ProcessManager();
     public bool IsProcessing { get; set; } = false;
     public Dictionary<Guid, FileItem> Files { get; set; } = new();
-    private FFNetworkClient Client { get; set; }
+    public EventHandler<EventArgs> OnUpdateEvent { get; set; } = (s, e) => { };
     private Dictionary<Guid, Process> ActiveProcesses { get; set; } = new();
+    private FFNetworkClient Client { get; }
 
     private ProcessManager()
     {
-        Client = new(Configuration.Instance.ConnectionUrl, Configuration.Instance.UserId);
+        Client = new FFNetworkClient(Configuration.Instance.ConnectionUrl, Configuration.Instance.UserId);
+        pingTimer = new(TimeSpan.FromSeconds(10))
+        {
+            AutoReset = true,
+            Enabled = true,
+        };
+        pingTimer.Elapsed += async (s, e) =>
+        {
+            if (IsProcessing)
+            {
+                await Client.Ping();
+            }
+        };
+        pingTimer.Start();
     }
 
     public void PauseProcessing()
@@ -39,7 +55,7 @@ public class ProcessManager
         }
     }
 
-    public async Task<Guid> DownloadNextFile(EventHandler<FileItemProgressUpdateEventArgs>? fileItemProgress)
+    public async Task<Guid> DownloadNextFile(EventHandler<FileItemProgressUpdateEventArgs>? fileItemProgress = null)
     {
         if (IsProcessing)
         {
@@ -53,13 +69,14 @@ public class ProcessManager
                 }
                 Files[id] = new FileItem(e.FileName, (float)e.Percentage, Operation.Downloading);
                 fileItemProgress?.Invoke(this, new(Files[id]));
+                OnUpdateEvent?.Invoke(this, EventArgs.Empty);
             });
             return id;
         }
         return Guid.Empty;
     }
 
-    public async Task ProcessFile(Guid fileId, EventHandler<FileItemProgressUpdateEventArgs>? fileItemProgress)
+    public async Task ProcessFile(Guid fileId, EventHandler<FileItemProgressUpdateEventArgs>? fileItemProgress = null)
     {
         try
         {
@@ -83,6 +100,7 @@ public class ProcessManager
             .Replace("{EXTENSION}", Path.GetExtension(filePath)[1..]);
 
             Log.Debug("Running FFMPEG with Command: {FILE}.", cmd);
+            OnUpdateEvent?.Invoke(this, EventArgs.Empty);
             await Task.Run(() =>
             {
                 FFMediaInfo info = new(filePath);
@@ -101,6 +119,7 @@ public class ProcessManager
                     Files[fileId].CurrentOperation = Operation.Processing;
                     Files[fileId].Percentage = e.Percentage;
                     fileItemProgress?.Invoke(this, new(Files[fileId]));
+                    OnUpdateEvent?.Invoke(this, EventArgs.Empty);
                 }, auto_start: false);
 
                 process.Start();
@@ -118,6 +137,7 @@ public class ProcessManager
             CrashHandler.HandleCrash(e);
             Environment.Exit(1);
         }
+        OnUpdateEvent?.Invoke(this, EventArgs.Empty);
     }
 
     public void CancelProcessing()
@@ -131,6 +151,7 @@ public class ProcessManager
                 CancelProcessing(fileId);
             }
         }
+        OnUpdateEvent?.Invoke(this, EventArgs.Empty);
     }
 
     public void CancelProcessing(Guid fileId)
@@ -141,29 +162,57 @@ public class ProcessManager
             Files[fileId].Percentage = 1;
             ActiveProcesses[fileId].Kill();
             ActiveProcesses.Remove(fileId);
+        }
+        OnUpdateEvent?.Invoke(this, EventArgs.Empty);
+    }
+
+    public async Task UploadFile(Guid fileId, EventHandler<FileItemProgressUpdateEventArgs>? fileItemProgress = null)
+    {
+        if (IsProcessing)
+        {
+            Files[fileId].CurrentOperation = Operation.Uploading;
+
+            string? file = Directory.GetFiles(Path.Combine(Configuration.Instance.WorkingDirectory, "output"), Path.GetFileNameWithoutExtension(Files[fileId].FileName) + ".*", SearchOption.TopDirectoryOnly).FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(file) && File.Exists(file))
+            {
+                await Client.CheckinFile(file, (s, e) =>
+                {
+                    Files[fileId].CurrentOperation = Operation.Uploading;
+                    Files[fileId].Percentage = (float)e.Percentage;
+                    fileItemProgress?.Invoke(this, new FileItemProgressUpdateEventArgs(Files[fileId]));
+                    OnUpdateEvent?.Invoke(this, EventArgs.Empty);
+                });
+                File.Delete(file);
+            }
+
+            Files[fileId].CurrentOperation = Operation.Completed;
+            Files[fileId].Percentage = 1f;
+            OnUpdateEvent?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    private async Task CleanupFile(Guid fileId, int attempt = 0)
+    {
+        try
+        {
             string? file = Directory.GetFiles(Path.Combine(Configuration.Instance.WorkingDirectory, "output"), Path.GetFileNameWithoutExtension(Files[fileId].FileName) + ".*", SearchOption.TopDirectoryOnly).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(file) && File.Exists(file))
             {
                 File.Delete(file);
             }
         }
-    }
-
-    public async Task UploadFile(Guid fileId, EventHandler<FileItemProgressUpdateEventArgs>? fileItemProgress)
-    {
-        Files[fileId].CurrentOperation = Operation.Uploading;
-
-        string? file = Directory.GetFiles(Path.Combine(Configuration.Instance.WorkingDirectory, "output"), Path.GetFileNameWithoutExtension(Files[fileId].FileName) + ".*", SearchOption.TopDirectoryOnly).FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(file) && File.Exists(file))
+        catch (Exception e)
         {
-            await Client.CheckinFile(file, (s, e) =>
+            if (attempt < 5)
             {
-                Files[fileId].CurrentOperation = Operation.Uploading;
-                Files[fileId].Percentage = (float)e.Percentage;
-                fileItemProgress?.Invoke(this, new FileItemProgressUpdateEventArgs(Files[fileId]));
-            });
-            Files.Remove(fileId);
-            File.Delete(file);
+                Log.Error(e, "Unable to delete file: {FILE}, Trying again in 5 seconds", Files[fileId].FileName);
+                Thread.Sleep(TimeSpan.FromSeconds(5));
+                await CleanupFile(fileId, attempt + 1);
+            }
+            else
+            {
+                Log.Error(e, "Unable to delete file: {FILE}, Manual deletion will have to occur.", Files[fileId].FileName);
+            }
         }
     }
 }
