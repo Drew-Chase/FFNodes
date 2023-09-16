@@ -41,6 +41,7 @@
     protected override async Task OnInitializedAsync()
     {
         await FFmpegDownloader.Instance.GetLatest(Directories.FFmpeg);
+        ProcessManager.Instance.OnUpdateEvent += (_, _) => InvokeAsync(StateHasChanged);
         await base.OnInitializedAsync();
     }
 
@@ -48,21 +49,10 @@
     {
         if (ProcessManager.Instance.IsProcessing = !ProcessManager.Instance.IsProcessing)
         {
-            ProcessManager.Instance.Files.Clear();
             StateHasChanged();
-            Guid fileId = await ProcessManager.Instance.DownloadNextFile((s, e) =>
-            {
-                InvokeAsync(StateHasChanged);
-            });
-            await ProcessManager.Instance.ProcessFile(fileId, (s, e) =>
-            {
-                InvokeAsync(StateHasChanged);
-            });
-
-            await ProcessManager.Instance.UploadFile(fileId, (s, e) =>
-            {
-                InvokeAsync(StateHasChanged);
-            });
+            Guid fileId = await ProcessManager.Instance.DownloadNextFile();
+            await ProcessManager.Instance.ProcessFile(fileId);
+            await ProcessManager.Instance.UploadFile(fileId);
         }
     }
 
