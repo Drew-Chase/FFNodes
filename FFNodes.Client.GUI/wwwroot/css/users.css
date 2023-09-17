@@ -1,0 +1,72 @@
+.copy {
+    cursor: pointer !important;
+    filter: brightness(1) !important;
+    position: relative;
+    margin-right: .5rem;
+    max-width: 300px;
+    overflow: hidden;
+    background: white;
+    color: black;
+    padding: 1rem 5px;
+    border-radius: 0.5rem;
+    text-overflow: ellipsis;
+    transition: box-shadow, transform;
+    transition-duration: 200ms;
+    box-shadow: 0px 0px 0px 0px #EC2B35;
+}
+
+    .copy::before {
+        content: "Copied!";
+        position: absolute;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        inset: 0;
+        background-color: var(--Primary);
+        color: white;
+        z-index: 1;
+        transform: translateX(-100%);
+    }
+
+    .copy:focus::before {
+        animation: copy 2s;
+    }
+    .copy.reset::before {
+        content: "Code Reset!";
+        animation: copy 2s;
+    }
+
+    .copy:hover {
+        transform: translate(-5px, -5px);
+        box-shadow: 5px 5px 0px 0px hsl(357, 84%, 45%);
+    }
+
+@keyframes copy {
+    0% {
+        transform: translateX(-100%);
+    }
+
+    15% {
+        transform: translateX(0%);
+    }
+
+    75% {
+        transform: translateX(0%);
+    }
+
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+
+.user-item {
+    background-color: #232323;
+    margin-bottom: 1rem;
+}
+
+    .user-item .button {
+        width: 1rem;
+        height: 1rem;
+        aspect-ratio: 1;
+    }
