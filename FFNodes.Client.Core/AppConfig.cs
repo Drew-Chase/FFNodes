@@ -7,6 +7,7 @@
 
 using Chase.CommonLib.FileSystem.Configuration;
 using FFNodes.Core.Data;
+using FFNodes.Core.Model;
 using Newtonsoft.Json;
 
 namespace FFNodes.Server.Data;
@@ -15,6 +16,9 @@ public sealed class AppConfig : AppConfigBase<AppConfig>
 {
     [JsonProperty("user-id")]
     public Guid UserId { get; set; }
+
+    [JsonIgnore]
+    public User CurrentUser { get; set; }
 
     [JsonProperty("connection-url")]
     public string ConnectionUrl { get; set; }
