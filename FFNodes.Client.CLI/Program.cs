@@ -6,7 +6,7 @@
 */
 
 using Chase.CLIParser;
-using CLMath;
+using Chase.CommonLib.Math;
 using FFNodes.Client.Core.Networking;
 using FFNodes.Core.Model;
 
@@ -62,7 +62,7 @@ internal class Program
                     {
                         Console.Write(new string(' ', max));
                         Console.CursorLeft = 0;
-                        string line = $"Downloading: {e.FileName} - {CLFileMath.AdjustedFileSize(e.BytesPerSecond)}ps - {e.Percentage:P2}";
+                        string line = $"Downloading: {e.FileName} - {AdvancedFileInfo.SizeToString((long)e.BytesPerSecond, unit: FileSizeUnit.Bits)}ps - {e.Percentage:P2}";
                         max = Math.Max(max, line.Length);
                         Console.Write(line);
                     });

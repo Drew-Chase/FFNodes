@@ -11,11 +11,8 @@ using Newtonsoft.Json;
 
 namespace FFNodes.Server.Data;
 
-public sealed class AppConfig : AppConfigBase
+public sealed class AppConfig : AppConfigBase<AppConfig>
 {
-    [JsonIgnore]
-    public static readonly AppConfig Instance = Instance ??= new();
-
     [JsonProperty("user-id")]
     public Guid UserId { get; set; }
 

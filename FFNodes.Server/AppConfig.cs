@@ -11,11 +11,8 @@ using Serilog.Events;
 
 namespace FFNodes.Server.Data;
 
-public sealed class AppConfig : AppConfigBase
+public sealed class AppConfig : AppConfigBase<AppConfig>
 {
-    [JsonIgnore]
-    public static readonly AppConfig Instance = Instance ??= new();
-
     [JsonProperty("port")]
     public int Port { get; set; } = 1818;
 
