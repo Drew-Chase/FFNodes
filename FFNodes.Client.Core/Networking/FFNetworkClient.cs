@@ -11,6 +11,7 @@ using FFNodes.Core.Model;
 using FFNodes.Server.Data;
 using System.Text;
 using System.Text.Json;
+using Newtonsoft.Json.Linq;
 
 namespace FFNodes.Client.Core.Networking;
 
@@ -38,6 +39,15 @@ public class FFAdvancedNetworkClient : IDisposable
     public async Task<SystemStatusModel?> GetSystemStatus()
     {
         return (await client.GetAsJson($"{client.BaseAddress}api"))?.ToObject<SystemStatusModel>();
+    }
+    public async Task<string?> ResetConnectionCode()
+    {
+        JObject? json = await client.GetAsJson($"{client.BaseAddress}api/reset-connection-code");
+        if (json != null && json.ContainsKey("connection_url"))
+        {
+            return json["connection_url"]?.ToObject<string>();
+        }
+        return null;
     }
 
     public async Task<(bool, User? user)> CreateUser(string username)
@@ -87,7 +97,19 @@ public class FFAdvancedNetworkClient : IDisposable
         }
     }
 
-    public async Task<User[]> GetUsers() => (await client.GetAsJson($"{client.BaseAddress}api/auth/users"))?.ToObject<User[]>() ?? Array.Empty<User>();
+    //public async Task<User[]> GetUsers()
+    //{
+    //using HttpResponseMessage response = await client.GetAsync($"{client.BaseAddress}api/auth/users");
+    //if (response.IsSuccessStatusCode)
+    //{
+    //    string content = await response.Content.ReadAsStringAsync();
+    //    return JsonSerializer.Deserialize<User[]>(content) ?? Array.Empty<User>();
+    //}
+    //    var json = await client.GetAsJsonArray($"{client.BaseAddress}api/auth/users");
+    //    return json?.ToObject<User[]>() ?? Array.Empty<User>();
+    //}
+
+    public async Task<User[]> GetUsers() => (await client.GetAsJsonArray($"{client.BaseAddress}api/auth/users"))?.ToObject<User[]>() ?? Array.Empty<User>();
 
     public void Dispose()
     {
