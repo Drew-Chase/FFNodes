@@ -62,6 +62,7 @@
 
                 if (AppConfig.Instance.UserId != Guid.Empty && !string.IsNullOrWhiteSpace(ConnectionLink) && success && user != null)
                 {
+                    AppConfig.Instance.CurrentUser = user;
                     nav.NavigateTo("/dashboard");
                 }
             }
@@ -93,6 +94,7 @@
             (bool success, User? user) = await client.CreateUser(Username);
             if (success && user != null)
             {
+                AppConfig.Instance.CurrentUser = user;
                 AppConfig.Instance.UserId = user.Id;
                 AppConfig.Instance.ConnectionUrl = ConnectionLink;
                 AppConfig.Instance.Save();
