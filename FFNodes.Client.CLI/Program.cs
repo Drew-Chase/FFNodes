@@ -27,7 +27,7 @@ internal class Program
         {
             if (parser.IsPresent("c", out string connectionUrl) && parser.IsPresent("u", out string userIdString) && Guid.TryParse(userIdString, out Guid userId))
             {
-                using FFNetworkClient client = new(connectionUrl, userId);
+                using FFAdvancedNetworkClient client = new(connectionUrl, userId);
                 if (parser.IsPresent("s"))
                 {
                     SystemStatusModel? status;

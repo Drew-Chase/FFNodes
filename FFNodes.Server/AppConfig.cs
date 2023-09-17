@@ -5,17 +5,16 @@
     https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
 */
 
-using FFNodes.Core.Data;
+using Chase.CommonLib.FileSystem.Configuration;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using Serilog;
+using Serilog.Events;
 
 namespace FFNodes.Server.Data;
 
-public sealed class Configuration
+public sealed class AppConfig : AppConfigBase
 {
     [JsonIgnore]
-    public static Configuration Instance = Instance ??= new();
+    public static readonly AppConfig Instance = Instance ??= new();
 
     [JsonProperty("port")]
     public int Port { get; set; } = 1818;
@@ -38,30 +37,9 @@ public sealed class Configuration
     [JsonProperty("users")]
     public Guid[] Users { get; set; } = Array.Empty<Guid>();
 
+    [JsonProperty("log-level")]
+    public LogEventLevel DefaultLogLevel { get; set; } = LogEventLevel.Information;
+
     [JsonIgnore]
     public DateTime StartDate { get; } = DateTime.Now;
-
-    private Configuration()
-    {
-    }
-
-    public void Save()
-    {
-        Log.Debug("Saving config file: {CONFIG}", Files.Config);
-        using StreamWriter writer = File.CreateText(Files.Config);
-        writer.Write(JsonConvert.SerializeObject(this, Formatting.Indented));
-    }
-
-    public void Load()
-    {
-        if (!File.Exists(Files.Config))
-        {
-            Save();
-        }
-        else
-        {
-            Log.Debug("Loading config file: {CONFIG}", Files.Config);
-            Instance = JObject.Parse(File.ReadAllText(Files.Config))?.ToObject<Configuration>() ?? Instance;
-        }
-    }
 }

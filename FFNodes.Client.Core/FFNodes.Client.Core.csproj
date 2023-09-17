@@ -24,7 +24,6 @@
     <ProjectReference Include="..\Chase.FFMPEG\Chase.FFmpeg.Downloader\Chase.FFmpeg.Downloader.csproj" />
     <ProjectReference Include="..\Chase.FFMPEG\Chase.FFmpeg.Extra\Chase.FFmpeg.Extra.csproj" />
     <ProjectReference Include="..\Chase.FFMPEG\Chase.FFmpeg\Chase.FFmpeg.csproj" />
-    <ProjectReference Include="..\Chase.Networking\Chase.Networking\Chase.Networking.csproj" />
     <ProjectReference Include="..\FFNodes.Core\FFNodes.Core.csproj" />
   </ItemGroup>
 

@@ -35,6 +35,9 @@ public sealed class User
     [JsonProperty("processed_files")]
     public Guid[] Files { get; set; } = Array.Empty<Guid>();
 
+    [JsonIgnore]
+    public bool IsOnline => (DateTime.Now - LastOnline).TotalSeconds < 30;
+
     public User(string username)
     {
         Username = username ?? throw new ArgumentNullException(nameof(username));

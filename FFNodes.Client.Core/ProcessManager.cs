@@ -27,11 +27,11 @@ public class ProcessManager
     public Dictionary<Guid, FileItem> Files { get; set; } = new();
     public EventHandler<EventArgs> OnUpdateEvent { get; set; } = (s, e) => { };
     private Dictionary<Guid, Process> ActiveProcesses { get; set; } = new();
-    private FFNetworkClient Client { get; }
+    private FFAdvancedNetworkClient Client { get; }
 
     private ProcessManager()
     {
-        Client = new FFNetworkClient(Configuration.Instance.ConnectionUrl, Configuration.Instance.UserId);
+        Client = new FFAdvancedNetworkClient(AppConfig.Instance.ConnectionUrl, AppConfig.Instance.UserId);
         pingTimer = new(TimeSpan.FromSeconds(10))
         {
             AutoReset = true,
@@ -83,10 +83,10 @@ public class ProcessManager
             Log.Debug("Starting to process file: {FILE}.", Files[fileId].FileName);
             SystemStatusModel? status = await Client.GetSystemStatus();
             Files[fileId].CurrentOperation = Operation.Processing;
-            string filePath = Path.Combine(Configuration.Instance.WorkingDirectory, Files[fileId].FileName);
-            string outputDirectory = Directory.CreateDirectory(Path.Combine(Configuration.Instance.WorkingDirectory, "output")).FullName;
+            string filePath = Path.Combine(AppConfig.Instance.WorkingDirectory, Files[fileId].FileName);
+            string outputDirectory = Directory.CreateDirectory(Path.Combine(AppConfig.Instance.WorkingDirectory, "output")).FullName;
             string outputFile = Path.Combine(outputDirectory, Path.GetFileNameWithoutExtension(Files[fileId].FileName));
-            string codec = Configuration.Instance.Codec;
+            string codec = AppConfig.Instance.Codec;
 
             if (codec == "auto")
             {
@@ -172,7 +172,7 @@ public class ProcessManager
         {
             Files[fileId].CurrentOperation = Operation.Uploading;
 
-            string? file = Directory.GetFiles(Path.Combine(Configuration.Instance.WorkingDirectory, "output"), Path.GetFileNameWithoutExtension(Files[fileId].FileName) + ".*", SearchOption.TopDirectoryOnly).FirstOrDefault();
+            string? file = Directory.GetFiles(Path.Combine(AppConfig.Instance.WorkingDirectory, "output"), Path.GetFileNameWithoutExtension(Files[fileId].FileName) + ".*", SearchOption.TopDirectoryOnly).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(file) && File.Exists(file))
             {
                 await Client.CheckinFile(file, (s, e) =>
@@ -195,7 +195,7 @@ public class ProcessManager
     {
         try
         {
-            string? file = Directory.GetFiles(Path.Combine(Configuration.Instance.WorkingDirectory, "output"), Path.GetFileNameWithoutExtension(Files[fileId].FileName) + ".*", SearchOption.TopDirectoryOnly).FirstOrDefault();
+            string? file = Directory.GetFiles(Path.Combine(AppConfig.Instance.WorkingDirectory, "output"), Path.GetFileNameWithoutExtension(Files[fileId].FileName) + ".*", SearchOption.TopDirectoryOnly).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(file) && File.Exists(file))
             {
                 File.Delete(file);

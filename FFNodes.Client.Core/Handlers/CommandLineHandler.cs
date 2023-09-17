@@ -23,13 +23,13 @@ public class CommandLineHandler
         {
             if (parser.IsPresent("c", out string connectionUrl))
             {
-                Configuration.Instance.ConnectionUrl = connectionUrl;
-                Configuration.Instance.Save();
+                AppConfig.Instance.ConnectionUrl = connectionUrl;
+                AppConfig.Instance.Save();
             }
             if (parser.IsPresent("u", out string userString) && Guid.TryParse(userString, out Guid userId))
             {
-                Configuration.Instance.UserId = userId;
-                Configuration.Instance.Save();
+                AppConfig.Instance.UserId = userId;
+                AppConfig.Instance.Save();
             }
         }
     }

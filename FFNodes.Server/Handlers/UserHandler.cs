@@ -7,6 +7,7 @@
 
 // Ignore Spelling: username
 
+using Chase.CommonLib.FileSystem;
 using FFNodes.Core.Data;
 using FFNodes.Core.Model;
 using FFNodes.Server.Data;
@@ -46,10 +47,10 @@ public class UserHandler
             users.Add(user);
 
             // Adds the users id to the configuration file.
-            List<Guid> items = Configuration.Instance.Users.ToList();
+            List<Guid> items = AppConfig.Instance.Users.ToList();
             items.Add(user.Id);
-            Configuration.Instance.Users = items.ToArray();
-            Configuration.Instance.Save();
+            AppConfig.Instance.Users = items.ToArray();
+            AppConfig.Instance.Save();
 
             Save(user);
             return true;
@@ -137,7 +138,7 @@ public class UserHandler
     public void Load()
     {
         // Loops through all the files in the users directory and deserializes them.
-        foreach (Guid userId in Configuration.Instance.Users)
+        foreach (Guid userId in AppConfig.Instance.Users)
         {
             Load(userId);
         }

@@ -41,7 +41,7 @@
     {
         await Update();
 
-        Configuration.Instance.ConfigurationSaved += async (s, e) => await Update();
+        AppConfig.Instance.ConfigurationSaved += async (s, e) => await Update();
 
         await base.OnInitializedAsync();
         IsLoading = false;
@@ -51,16 +51,16 @@
     {
         try
         {
-            if (ConnectionLink != Configuration.Instance.ConnectionUrl && Uri.TryCreate(Configuration.Instance.ConnectionUrl, UriKind.Absolute, out Uri? connectionUri) && connectionUri.Scheme == "ffn")
+            if (ConnectionLink != AppConfig.Instance.ConnectionUrl && Uri.TryCreate(AppConfig.Instance.ConnectionUrl, UriKind.Absolute, out Uri? connectionUri) && connectionUri.Scheme == "ffn")
             {
-                ConnectionLink = Configuration.Instance.ConnectionUrl;
-                using FFNetworkClient client = new(ConnectionLink);
+                ConnectionLink = AppConfig.Instance.ConnectionUrl;
+                using FFAdvancedNetworkClient client = new(ConnectionLink);
                 Log.Debug("Setting connection link to {LINK}", connectionUri);
-                (bool success, User? user) = await client.LogInUser(Configuration.Instance.UserId);
+                (bool success, User? user) = await client.LogInUser(AppConfig.Instance.UserId);
                 Username = user?.Username ?? "";
 
 
-                if (Configuration.Instance.UserId != Guid.Empty && !string.IsNullOrWhiteSpace(ConnectionLink) && success && user != null)
+                if (AppConfig.Instance.UserId != Guid.Empty && !string.IsNullOrWhiteSpace(ConnectionLink) && success && user != null)
                 {
                     nav.NavigateTo("/dashboard");
                 }
@@ -89,13 +89,13 @@
         IsLoading = true;
         try
         {
-            using FFNetworkClient client = new(ConnectionLink);
+            using FFAdvancedNetworkClient client = new(ConnectionLink);
             (bool success, User? user) = await client.CreateUser(Username);
             if (success && user != null)
             {
-                Configuration.Instance.UserId = user.Id;
-                Configuration.Instance.ConnectionUrl = ConnectionLink;
-                Configuration.Instance.Save();
+                AppConfig.Instance.UserId = user.Id;
+                AppConfig.Instance.ConnectionUrl = ConnectionLink;
+                AppConfig.Instance.Save();
                 nav.NavigateTo("/dashboard");
                 return;
             }

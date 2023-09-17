@@ -1,6 +1,3 @@
-[submodule "Chase.Networking"]
-	path = Chase.Networking
-	url = https://github.com/dcmanproductions/Chase.Networking
 [submodule "Chase.FFMPEG"]
 	path = Chase.FFMPEG
 	url = https://github.com/dcmanproductions/Chase.FFMPEG

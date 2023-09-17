@@ -11,16 +11,16 @@ namespace FFNodes.Server.Data;
 
 public static class Data
 {
-    public static string ConnectionString { get; private set; } = CLAESMath.EncryptStringAES(Configuration.Instance.AuthorizationToken.ToString("N")).Replace("==", "");
-    public static string ConnectionUrl { get; private set; } = $"ffn://{Configuration.Instance.Host}:{Configuration.Instance.Port}/{ConnectionString}";
+    public static string ConnectionString { get; private set; } = CLAESMath.EncryptStringAES(AppConfig.Instance.AuthorizationToken.ToString("N")).Replace("==", "");
+    public static string ConnectionUrl { get; private set; } = $"ffn://{AppConfig.Instance.Host}:{AppConfig.Instance.Port}/{ConnectionString}";
 
     public static bool ValidConnection(string code) => code.Equals(ConnectionString);
 
     public static void ResetConnectionCode()
     {
-        Configuration.Instance.AuthorizationToken = Guid.NewGuid();
-        Configuration.Instance.Save();
-        ConnectionString = CLAESMath.EncryptStringAES(Configuration.Instance.AuthorizationToken.ToString("N")).Replace("==", "");
-        ConnectionUrl = $"ffn://{Configuration.Instance.Host}:{Configuration.Instance.Port}/{ConnectionString}";
+        AppConfig.Instance.AuthorizationToken = Guid.NewGuid();
+        AppConfig.Instance.Save();
+        ConnectionString = CLAESMath.EncryptStringAES(AppConfig.Instance.AuthorizationToken.ToString("N")).Replace("==", "");
+        ConnectionUrl = $"ffn://{AppConfig.Instance.Host}:{AppConfig.Instance.Port}/{ConnectionString}";
     }
 }

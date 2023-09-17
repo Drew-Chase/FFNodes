@@ -5,6 +5,7 @@
     https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
 */
 
+using Chase.CommonLib.FileSystem;
 using Chase.FFmpeg.Extra;
 using FFNodes.Core.Model;
 using FFNodes.Server.Data;
@@ -88,7 +89,7 @@ public sealed class FileSystemHandler
     /// </summary>
     public async Task Load()
     {
-        if (!Configuration.Instance.Directories.Any())
+        if (!AppConfig.Instance.Directories.Any())
         {
             Log.Warning("Please fill out the directories in the configuration file.");
             return;
@@ -98,7 +99,7 @@ public sealed class FileSystemHandler
         FinishedLoading = false;
 
         // Wait for all directories to be loaded.
-        Task.WaitAll(Configuration.Instance.Directories.Select(i => Load(i)).ToArray());
+        Task.WaitAll(AppConfig.Instance.Directories.Select(i => Load(i)).ToArray());
 
         // Sort the files.
         await Sort();
@@ -110,7 +111,7 @@ public sealed class FileSystemHandler
         Log.Debug("Scanning {Directory}...", directory);
         try
         {
-            processedFiles.AddRange(FFVideoUtility.GetFilesAsync(directory, Configuration.Instance.ScanRecursively).Select(i => new ProcessedFile(i)));
+            processedFiles.AddRange(FFVideoUtility.GetFilesAsync(directory, AppConfig.Instance.ScanRecursively).Select(i => new ProcessedFile(i)));
         }
         catch (Exception e)
         {
@@ -132,7 +133,7 @@ public sealed class FileSystemHandler
             FileSystemWatcher watcher = new()
             {
                 Path = directory,
-                IncludeSubdirectories = Configuration.Instance.ScanRecursively,
+                IncludeSubdirectories = AppConfig.Instance.ScanRecursively,
                 NotifyFilter = NotifyFilters.CreationTime | NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.DirectoryName,
                 EnableRaisingEvents = true,
             };
@@ -203,7 +204,8 @@ public sealed class FileSystemHandler
 
         // Save the user and Processed File to the users database.
         UserHandler.Instance.Save(user);
-        UserHandler.Instance.GetDatabase().WriteEntry(file.Id, file);
+        using DatabaseFile db = UserHandler.Instance.GetDatabase();
+        db.WriteEntry(file.Id, file);
     });
 
     /// <summary>

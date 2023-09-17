@@ -13,8 +13,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FFNodes.Client.Core", "FFNo
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FFNodes.Client.GUI", "FFNodes.Client.GUI\FFNodes.Client.GUI.csproj", "{0EB63793-5297-4990-8B4D-91BD476F0022}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Chase.Networking", "Chase.Networking\Chase.Networking\Chase.Networking.csproj", "{2C394771-1DFB-4C8F-8C65-A17BC8B735B3}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Chase.FFmpeg", "Chase.FFMPEG\Chase.FFmpeg\Chase.FFmpeg.csproj", "{B724276F-3F3A-467A-B7C8-D7623CC85888}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Chase.FFmpeg.Extra", "Chase.FFMPEG\Chase.FFmpeg.Extra\Chase.FFmpeg.Extra.csproj", "{856F87AA-1DB0-4F90-B532-8314F04E4AB7}"
@@ -49,10 +47,6 @@ Global
 		{0EB63793-5297-4990-8B4D-91BD476F0022}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0EB63793-5297-4990-8B4D-91BD476F0022}.Release|Any CPU.Build.0 = Release|Any CPU
 		{0EB63793-5297-4990-8B4D-91BD476F0022}.Release|Any CPU.Deploy.0 = Release|Any CPU
-		{2C394771-1DFB-4C8F-8C65-A17BC8B735B3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2C394771-1DFB-4C8F-8C65-A17BC8B735B3}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2C394771-1DFB-4C8F-8C65-A17BC8B735B3}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2C394771-1DFB-4C8F-8C65-A17BC8B735B3}.Release|Any CPU.Build.0 = Release|Any CPU
 		{B724276F-3F3A-467A-B7C8-D7623CC85888}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{B724276F-3F3A-467A-B7C8-D7623CC85888}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B724276F-3F3A-467A-B7C8-D7623CC85888}.Release|Any CPU.ActiveCfg = Release|Any CPU

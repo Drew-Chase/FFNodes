@@ -36,7 +36,7 @@ public static class MauiProgram
 
         AppDomain.CurrentDomain.ProcessExit += (s, e) =>
         {
-            Configuration.Instance.Save();
+            AppConfig.Instance.Save();
             Cleanup();
             Log.Information("Stopping FFNodes");
             Log.CloseAndFlush();
@@ -68,14 +68,14 @@ public static class MauiProgram
         builder.Logging.AddDebug();
 #endif
 
-        Configuration.Instance.Load();
+        AppConfig.Instance.Initialize(Files.Config);
         Cleanup();
         return builder.Build();
     }
 
     private static void Cleanup()
     {
-        foreach (string file in FFVideoUtility.GetFiles(Configuration.Instance.WorkingDirectory, true))
+        foreach (string file in FFVideoUtility.GetFiles(AppConfig.Instance.WorkingDirectory, true))
         {
             File.Delete(file);
         }

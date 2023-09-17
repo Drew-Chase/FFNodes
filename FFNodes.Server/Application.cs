@@ -22,23 +22,25 @@ namespace FFNodes.Server
     {
         private static void Main()
         {
+            // Loads the configuration from the file system
+            AppConfig.Instance.Initialize(Files.Config);
+
+            int port = AppConfig.Instance.Port;
+
+            LogEventLevel logEventLevel = AppConfig.Instance.DefaultLogLevel;
             if (Environment.GetCommandLineArgs().Any())
             {
                 OptionsManager optionsManager = new("FFNodes");
-                optionsManager.Add(new() { ShortName = "p", LongName = "port", Required = false, HasArgument = true, Description = "runs the server on and sets the port" });
-                optionsManager.Add(new() { ShortName = "c", LongName = "host", Required = false, HasArgument = true, Description = "runs the server on and sets the host" });
+                optionsManager.Add(new() { ShortName = "p", LongName = "port", Required = false, HasArgument = true, Description = "runs the server on the port" });
+                optionsManager.Add(new() { ShortName = "c", LongName = "host", Required = false, HasArgument = true, Description = "runs the server with the specified host" });
+                optionsManager.Add(new() { ShortName = "v", LongName = "loglevel", Required = false, HasArgument = true, Description = $"Sets the minimum log level, valid options are {string.Join(", ", ((LogEventLevel[])Enum.GetValues(typeof(LogEventLevel))).Select(i => i.ToString()))}. Default is {logEventLevel}" });
 
                 OptionsParser parser = optionsManager.Parse();
                 if (parser != null)
                 {
                     if (parser.IsPresent("port", out string portString))
                     {
-                        if (int.TryParse(portString, out int port))
-                        {
-                            Configuration.Instance.Port = port;
-                            Configuration.Instance.Save();
-                        }
-                        else
+                        if (!int.TryParse(portString, out port))
                         {
                             Console.ForegroundColor = ConsoleColor.Red;
                             Console.Error.WriteLine($"Invalid port number: {portString}");
@@ -49,8 +51,22 @@ namespace FFNodes.Server
 
                     if (parser.IsPresent("host", out string host))
                     {
-                        Configuration.Instance.Host = host;
-                        Configuration.Instance.Save();
+                        AppConfig.Instance.Host = host;
+                    }
+
+                    if (parser.IsPresent("v", out string levelString))
+                    {
+                        if (Enum.TryParse(levelString, true, out LogEventLevel level))
+                        {
+                            logEventLevel = level;
+                        }
+                        else
+                        {
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.Error.WriteLine($"Invalid log level: {levelString}");
+                            Console.ResetColor();
+                            return;
+                        }
                     }
                 }
             }
@@ -58,7 +74,7 @@ namespace FFNodes.Server
             TimeSpan flushTime = TimeSpan.FromSeconds(30);
             Log.Logger = new LoggerConfiguration()
                 .MinimumLevel.Verbose()
-                .WriteTo.Console(LogEventLevel.Verbose)
+                .WriteTo.Console(logEventLevel)
                 .WriteTo.File(Files.DebugLog, LogEventLevel.Verbose, buffered: true, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000, flushToDiskInterval: flushTime)
                 .WriteTo.File(Files.LatestLog, LogEventLevel.Information, buffered: true, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000, flushToDiskInterval: flushTime)
                 .WriteTo.File(Files.ErrorLog, LogEventLevel.Error, buffered: true, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000, flushToDiskInterval: flushTime)
@@ -79,9 +95,6 @@ namespace FFNodes.Server
 
             Log.Information("Starting FFNodes Server");
 
-            // Loads the configuration from the file system
-            Configuration.Instance.Load();
-
             // Loads all users from the file system
             UserHandler.Instance.Load();
 
@@ -96,11 +109,11 @@ namespace FFNodes.Server
                     builder.UseContentRoot(Directory.GetCurrentDirectory());
                     builder.UseKestrel(options =>
                     {
-                        options.ListenAnyIP(Configuration.Instance.Port);
+                        options.ListenAnyIP(port);
                     });
                     builder.UseStartup<Startup>();
 
-                    Log.Information("Server running at {SERVER}", $"http://127.0.0.1:{Configuration.Instance.Port}");
+                    Log.Information("Server running at {SERVER}", $"http://{AppConfig.Instance.Host}:{port}");
                     Log.Information("Connection url is {CONNECTION}", Data.Data.ConnectionUrl);
                 }).Build().Run();
         }

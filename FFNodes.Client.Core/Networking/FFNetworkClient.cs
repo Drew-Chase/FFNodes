@@ -5,8 +5,8 @@
     https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
 */
 
-using Chase.Networking;
-using Chase.Networking.Event;
+using Chase.CommonLib.Events;
+using Chase.CommonLib.Networking;
 using FFNodes.Core.Model;
 using FFNodes.Server.Data;
 using System.Text;
@@ -14,25 +14,25 @@ using System.Text.Json;
 
 namespace FFNodes.Client.Core.Networking;
 
-public class FFNetworkClient : IDisposable
+public class FFAdvancedNetworkClient : IDisposable
 {
-    private readonly NetworkClient client;
+    private readonly AdvancedNetworkClient client;
 
-    public FFNetworkClient(string connectionUrl) : this()
+    public FFAdvancedNetworkClient(string connectionUrl) : this()
     {
         Uri uri = new(connectionUrl);
         client.DefaultRequestHeaders.Add("Authentication", uri.LocalPath[1..]);
         client.BaseAddress = new Uri($"http://{uri.Host}:{uri.Port}");
     }
 
-    public FFNetworkClient(string connectionUrl, Guid userId) : this(connectionUrl)
+    public FFAdvancedNetworkClient(string connectionUrl, Guid userId) : this(connectionUrl)
     {
         client.DefaultRequestHeaders.Add("User-ID", userId.ToString());
     }
 
-    private FFNetworkClient()
+    private FFAdvancedNetworkClient()
     {
-        client = new NetworkClient();
+        client = new AdvancedNetworkClient();
     }
 
     public async Task<SystemStatusModel?> GetSystemStatus()
@@ -59,7 +59,7 @@ public class FFNetworkClient : IDisposable
 
     public async Task<string> CheckoutFile(DownloadProgressEvent downloadProgress)
     {
-        return await client.DownloadFileAsync($"{client.BaseAddress}api/fs/checkout", Directory.CreateDirectory(Configuration.Instance.WorkingDirectory).FullName, downloadProgress);
+        return await client.DownloadFileAsync($"{client.BaseAddress}api/fs/checkout", Directory.CreateDirectory(AppConfig.Instance.WorkingDirectory).FullName, downloadProgress);
     }
 
     public async Task<bool> Ping()
@@ -86,6 +86,8 @@ public class FFNetworkClient : IDisposable
             return (false, null);
         }
     }
+
+    public async Task<User[]> GetUsers() => (await client.GetAsJson($"{client.BaseAddress}api/auth/users"))?.ToObject<User[]>() ?? Array.Empty<User>();
 
     public void Dispose()
     {
