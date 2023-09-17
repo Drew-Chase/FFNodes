@@ -75,9 +75,12 @@ public static class MauiProgram
 
     private static void Cleanup()
     {
-        foreach (string file in FFVideoUtility.GetFiles(AppConfig.Instance.WorkingDirectory, true))
+        if (Directory.Exists(AppConfig.Instance.WorkingDirectory))
         {
-            File.Delete(file);
+            foreach (string file in FFVideoUtility.GetFiles(AppConfig.Instance.WorkingDirectory, true))
+            {
+                File.Delete(file);
+            }
         }
     }
 }
