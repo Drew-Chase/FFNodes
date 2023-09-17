@@ -1,23 +1,39 @@
 ﻿@using FFNodes.Client.Core.Networking;
 @using FFNodes.Core.Model;
 @using FFNodes.Server.Data;
+<link href="/css/users.css" rel="stylesheet" />
 <section>
     <div class="col fill">
         <div class="row title-bar">
             <div class="page-title fill">Users</div>
-            <div class="col title-input fill">
+            <div class="col title-input">
                 <label for="connect-code">Connect Code</label>
-                <input id="connect-code" type="text" class="copy" readonly value="@AppConfig.Instance.ConnectionUrl" />
+                <div id="connect-code" class="copy @(IsResetting?"reset":"")" tabindex="-1" @onclick=@(async ()=>await Clipboard.Default.SetTextAsync(AppConfig.Instance.ConnectionUrl))>@AppConfig.Instance.ConnectionUrl</div>
             </div>
+            @if (AppConfig.Instance.CurrentUser.IsAdmin)
+            {
+                <div class="button secondary"><img src="/images/reset.svg" style="padding: .3rem 0;" /></div>
+            }
+
         </div>
 
         <div class="list">
+
+            @foreach (User user in Items)
+            {
+                <div class="file-item user-item row center horizontal">
+                    <span class="name fill">@user.Username</span>
+                    <div class="button secondary"><img src="/images/info.svg" /></div>
+                </div>
+            }
+
         </div>
     </div>
 </section>
 
 @code {
     private User[] Items { get; set; } = Array.Empty<User>();
+    private bool IsResetting { get; set; } = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -27,11 +43,21 @@
 
     private async Task Update()
     {
-        using FFAdvancedNetworkClient client = new(AppConfig.Instance.ConnectionUrl, AppConfig.Instance.UserId);
-        Items = await client.GetUsers();
+        using (FFAdvancedNetworkClient client = new(AppConfig.Instance.ConnectionUrl, AppConfig.Instance.UserId))
+        {
+            Items = await client.GetUsers();
+        }
         StateHasChanged();
     }
+    private async Task ResetCode()
+    {
+        IsResetting = true;
 
+        using (FFAdvancedNetworkClient client = new(AppConfig.Instance.ConnectionUrl, AppConfig.Instance.UserId))
+        {
+            await client.ResetConnectionCode();
+        }
 
-
+        IsResetting = false;
+    }
 }
