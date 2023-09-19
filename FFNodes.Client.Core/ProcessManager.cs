@@ -12,7 +12,6 @@ using FFNodes.Client.Core.Networking;
 using FFNodes.Client.GUI.Data;
 using FFNodes.Core;
 using FFNodes.Core.Model;
-using FFNodes.Server.Data;
 using Serilog;
 using System.Diagnostics;
 using Timer = System.Timers.Timer;
@@ -31,7 +30,7 @@ public class ProcessManager
 
     private ProcessManager()
     {
-        Client = new FFAdvancedNetworkClient(AppConfig.Instance.ConnectionUrl, AppConfig.Instance.UserId);
+        Client = new FFAdvancedNetworkClient(ClientAppConfig.Instance.ConnectionUrl, ClientAppConfig.Instance.UserId);
         pingTimer = new(TimeSpan.FromSeconds(10))
         {
             AutoReset = true,
@@ -76,17 +75,17 @@ public class ProcessManager
         return Guid.Empty;
     }
 
-    public async Task ProcessFile(Guid fileId, EventHandler<FileItemProgressUpdateEventArgs>? fileItemProgress = null)
+    public async Task<bool> ProcessFile(Guid fileId, EventHandler<FileItemProgressUpdateEventArgs>? fileItemProgress = null)
     {
         try
         {
             Log.Debug("Starting to process file: {FILE}.", Files[fileId].FileName);
             SystemStatusModel? status = await Client.GetSystemStatus();
             Files[fileId].CurrentOperation = Operation.Processing;
-            string filePath = Path.Combine(AppConfig.Instance.WorkingDirectory, Files[fileId].FileName);
-            string outputDirectory = Directory.CreateDirectory(Path.Combine(AppConfig.Instance.WorkingDirectory, "output")).FullName;
+            string filePath = Path.Combine(ClientAppConfig.Instance.WorkingDirectory, Files[fileId].FileName);
+            string outputDirectory = Directory.CreateDirectory(Path.Combine(ClientAppConfig.Instance.WorkingDirectory, "output")).FullName;
             string outputFile = Path.Combine(outputDirectory, Path.GetFileNameWithoutExtension(Files[fileId].FileName));
-            string codec = AppConfig.Instance.Codec;
+            string codec = ClientAppConfig.Instance.Codec;
 
             if (codec == "auto")
             {
@@ -101,35 +100,36 @@ public class ProcessManager
 
             Log.Debug("Running FFMPEG with Command: {FILE}.", cmd);
             OnUpdateEvent?.Invoke(this, EventArgs.Empty);
-            await Task.Run(() =>
-            {
-                FFMediaInfo info = new(filePath);
-                string newFileName = "";
-                Process process = Chase.FFmpeg.FFProcessHandler.ExecuteFFmpeg(cmd, info: info, updated: (s, e) =>
-                {
-                    if (string.IsNullOrWhiteSpace(newFileName))
-                    {
-                        newFileName = Directory.GetFiles(outputDirectory, Path.GetFileNameWithoutExtension(outputFile) + ".*", SearchOption.TopDirectoryOnly).First();
-                    }
-                    long currentSize = new FileInfo(newFileName).Length;
-                    if (currentSize >= (long)info.Size)
-                    {
-                        CancelProcessing(fileId);
-                    }
-                    Files[fileId].CurrentOperation = Operation.Processing;
-                    Files[fileId].Percentage = e.Percentage;
-                    fileItemProgress?.Invoke(this, new(Files[fileId]));
-                    OnUpdateEvent?.Invoke(this, EventArgs.Empty);
-                }, auto_start: false);
+            return await Task.Run(() =>
+             {
+                 FFMediaInfo info = new(filePath);
+                 string newFileName = "";
+                 Process process = Chase.FFmpeg.FFProcessHandler.ExecuteFFmpeg(cmd, info: info, updated: (s, e) =>
+                 {
+                     if (string.IsNullOrWhiteSpace(newFileName))
+                     {
+                         newFileName = Directory.GetFiles(outputDirectory, Path.GetFileNameWithoutExtension(outputFile) + ".*", SearchOption.TopDirectoryOnly).First();
+                     }
+                     long currentSize = new FileInfo(newFileName).Length;
+                     if (currentSize >= (long)info.Size)
+                     {
+                         CancelProcessing(fileId);
+                     }
+                     Files[fileId].CurrentOperation = Operation.Processing;
+                     Files[fileId].Percentage = e.Percentage;
+                     fileItemProgress?.Invoke(this, new(Files[fileId]));
+                     OnUpdateEvent?.Invoke(this, EventArgs.Empty);
+                 }, auto_start: false);
 
-                process.Start();
-                ActiveProcesses.Add(fileId, process);
-                process.BeginErrorReadLine();
-                process.BeginOutputReadLine();
-                process.WaitForExit();
-                ActiveProcesses.Remove(fileId);
-                Log.Debug("Done processing file: {FILE}.", Files[fileId].FileName);
-            });
+                 process.Start();
+                 ActiveProcesses.Add(fileId, process);
+                 process.BeginErrorReadLine();
+                 process.BeginOutputReadLine();
+                 process.WaitForExit();
+                 ActiveProcesses.Remove(fileId);
+                 Log.Debug("Done processing file: {FILE}.", Files[fileId].FileName);
+                 return process.ExitCode == 0;
+             });
         }
         catch (Exception e)
         {
@@ -138,6 +138,7 @@ public class ProcessManager
             Environment.Exit(1);
         }
         OnUpdateEvent?.Invoke(this, EventArgs.Empty);
+        return false;
     }
 
     public void CancelProcessing()
@@ -160,7 +161,7 @@ public class ProcessManager
         {
             Files[fileId].CurrentOperation = Operation.Cancelling;
             Files[fileId].Percentage = 1;
-            ActiveProcesses[fileId].Kill();
+            ActiveProcesses[fileId]?.Kill();
             ActiveProcesses.Remove(fileId);
         }
         OnUpdateEvent?.Invoke(this, EventArgs.Empty);
@@ -172,7 +173,7 @@ public class ProcessManager
         {
             Files[fileId].CurrentOperation = Operation.Uploading;
 
-            string? file = Directory.GetFiles(Path.Combine(AppConfig.Instance.WorkingDirectory, "output"), Path.GetFileNameWithoutExtension(Files[fileId].FileName) + ".*", SearchOption.TopDirectoryOnly).FirstOrDefault();
+            string? file = Directory.GetFiles(Path.Combine(ClientAppConfig.Instance.WorkingDirectory, "output"), Path.GetFileNameWithoutExtension(Files[fileId].FileName) + ".*", SearchOption.TopDirectoryOnly).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(file) && File.Exists(file))
             {
                 await Client.CheckinFile(file, (s, e) =>
@@ -195,7 +196,7 @@ public class ProcessManager
     {
         try
         {
-            string? file = Directory.GetFiles(Path.Combine(AppConfig.Instance.WorkingDirectory, "output"), Path.GetFileNameWithoutExtension(Files[fileId].FileName) + ".*", SearchOption.TopDirectoryOnly).FirstOrDefault();
+            string? file = Directory.GetFiles(Path.Combine(ClientAppConfig.Instance.WorkingDirectory, "output"), Path.GetFileNameWithoutExtension(Files[fileId].FileName) + ".*", SearchOption.TopDirectoryOnly).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(file) && File.Exists(file))
             {
                 File.Delete(file);
