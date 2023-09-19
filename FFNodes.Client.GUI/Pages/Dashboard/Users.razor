@@ -1,6 +1,5 @@
 ﻿@using FFNodes.Client.Core.Networking;
 @using FFNodes.Core.Model;
-@using FFNodes.Server.Data;
 <link href="/css/users.css" rel="stylesheet" />
 <section>
     <div class="col fill">
@@ -8,9 +7,9 @@
             <div class="page-title fill">Users</div>
             <div class="col title-input">
                 <label for="connect-code">Connect Code</label>
-                <div id="connect-code" class="copy @(IsResetting?"reset":"")" tabindex="-1" @onclick=@(async ()=>await Clipboard.Default.SetTextAsync(AppConfig.Instance.ConnectionUrl))>@AppConfig.Instance.ConnectionUrl</div>
+                <div id="connect-code" class="copy @(IsResetting?"reset":"")" tabindex="-1" @onclick=@(async ()=>await Clipboard.Default.SetTextAsync(ClientAppConfig.Instance.ConnectionUrl))>@ClientAppConfig.Instance.ConnectionUrl</div>
             </div>
-            @if (AppConfig.Instance.CurrentUser.IsAdmin)
+            @if (ClientAppConfig.Instance.CurrentUser.IsAdmin)
             {
                 <div class="button secondary"><img src="/images/reset.svg" style="padding: .3rem 0;" /></div>
             }
@@ -43,7 +42,7 @@
 
     private async Task Update()
     {
-        using (FFAdvancedNetworkClient client = new(AppConfig.Instance.ConnectionUrl, AppConfig.Instance.UserId))
+        using (FFAdvancedNetworkClient client = new(ClientAppConfig.Instance.ConnectionUrl, ClientAppConfig.Instance.UserId))
         {
             Items = await client.GetUsers();
         }
@@ -53,7 +52,7 @@
     {
         IsResetting = true;
 
-        using (FFAdvancedNetworkClient client = new(AppConfig.Instance.ConnectionUrl, AppConfig.Instance.UserId))
+        using (FFAdvancedNetworkClient client = new(ClientAppConfig.Instance.ConnectionUrl, ClientAppConfig.Instance.UserId))
         {
             await client.ResetConnectionCode();
         }

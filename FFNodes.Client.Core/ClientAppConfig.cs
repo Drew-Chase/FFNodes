@@ -10,9 +10,9 @@ using FFNodes.Core.Data;
 using FFNodes.Core.Model;
 using Newtonsoft.Json;
 
-namespace FFNodes.Server.Data;
+namespace FFNodes.Client.Core;
 
-public sealed class AppConfig : AppConfigBase<AppConfig>
+public sealed class ClientAppConfig : AppConfigBase<ClientAppConfig>
 {
     [JsonProperty("user-id")]
     public Guid UserId { get; set; }

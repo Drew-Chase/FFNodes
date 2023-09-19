@@ -1,7 +1,6 @@
 @using Chase.FFmpeg.Info;
 @using FFNodes.Client.GUI.Data;
 @using FFNodes.Core.Data;
-@using FFNodes.Server.Data;
 
 <div class="popup">
     <div class="background"></div>
@@ -23,7 +22,7 @@
     protected override async Task OnInitializedAsync()
     {
         MediaInfo = new(File.FileName);
-        string? file = Directory.GetFiles(Path.Combine(AppConfig.Instance.WorkingDirectory, "output"), Path.GetFileNameWithoutExtension(File.FileName) + ".*", SearchOption.TopDirectoryOnly).FirstOrDefault();
+        string? file = Directory.GetFiles(Path.Combine(ClientAppConfig.Instance.WorkingDirectory, "output"), Path.GetFileNameWithoutExtension(File.FileName) + ".*", SearchOption.TopDirectoryOnly).FirstOrDefault();
         if (!string.IsNullOrWhiteSpace(file) && System.IO.File.Exists(file))
         {
             ConvertedFileSize = new FileInfo(file).Length;

@@ -7,10 +7,10 @@
 
 using Chase.FFmpeg.Extra;
 using CommunityToolkit.Maui;
+using FFNodes.Client.Core;
 using FFNodes.Client.Core.Handlers;
 using FFNodes.Core;
 using FFNodes.Core.Data;
-using FFNodes.Server.Data;
 using Microsoft.Extensions.Logging;
 using Serilog;
 using Serilog.Events;
@@ -36,7 +36,7 @@ public static class MauiProgram
 
         AppDomain.CurrentDomain.ProcessExit += (s, e) =>
         {
-            AppConfig.Instance.Save();
+            ClientAppConfig.Instance.Save();
             Cleanup();
             Log.Information("Stopping FFNodes");
             Log.CloseAndFlush();
@@ -68,16 +68,16 @@ public static class MauiProgram
         builder.Logging.AddDebug();
 #endif
 
-        AppConfig.Instance.Initialize(Files.Config);
+        ClientAppConfig.Instance.Initialize(Files.Config);
         Cleanup();
         return builder.Build();
     }
 
     private static void Cleanup()
     {
-        if (Directory.Exists(AppConfig.Instance.WorkingDirectory))
+        if (Directory.Exists(ClientAppConfig.Instance.WorkingDirectory))
         {
-            foreach (string file in FFVideoUtility.GetFiles(AppConfig.Instance.WorkingDirectory, true))
+            foreach (string file in FFVideoUtility.GetFiles(ClientAppConfig.Instance.WorkingDirectory, true))
             {
                 File.Delete(file);
             }

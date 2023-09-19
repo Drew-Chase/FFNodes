@@ -1,5 +1,4 @@
 ﻿@using FFNodes.Client.Core.Data;
-@using FFNodes.Server.Data;
 <section>
     <div class="col fill">
         <div class="row title-bar">
@@ -8,7 +7,7 @@
         <div class="list col fill">
             <div class="col fill">
                 <label for="codec-dropdown">Codec</label>
-                <select id="codec-dropdown" class="dropdown" @bind=AppConfig.Instance.Codec>
+                <select id="codec-dropdown" class="dropdown" @bind=ClientAppConfig.Instance.Codec>
                     <option value="auto" selected>Auto (@AutoEncoder)</option>
                     <option value="h.264">H.264 (CPU)</option>
                     <option value="h.264_nvenc">NVIDIA NVENC (GPU)</option>
@@ -21,10 +20,10 @@
                 </select>
             </div>
             <div class="col fill">
-                <label for="concurrent-processes">Concurrent Processes (@AppConfig.Instance.ConcurrentConnections)</label>
-                <input id="concurrent-processes" type="range" min="1" max="32" @bind=AppConfig.Instance.ConcurrentConnections />
+                <label for="concurrent-processes">Concurrent Processes (@ClientAppConfig.Instance.ConcurrentConnections)</label>
+                <input id="concurrent-processes" type="range" min="1" max="32" @bind=ClientAppConfig.Instance.ConcurrentConnections />
             </div>
-            <DirectoryInputComponent Title="Working Directory" Directory="@AppConfig.Instance.WorkingDirectory" OnDirectorySelected=@(s=>AppConfig.Instance.WorkingDirectory=s) />
+            <DirectoryInputComponent Title="Working Directory" Directory="@ClientAppConfig.Instance.WorkingDirectory" OnDirectorySelected=@(s=>ClientAppConfig.Instance.WorkingDirectory=s) />
         </div>
     </div>
 </section>

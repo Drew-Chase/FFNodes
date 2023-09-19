@@ -1,7 +1,6 @@
 ﻿@page "/"
 @using FFNodes.Client.Core.Networking;
 @using FFNodes.Core.Model;
-@using FFNodes.Server.Data;
 @using Serilog;
 <link href="/css/login.css" rel="stylesheet" />
 <div id="landing" class="center horizontal vertical col">
@@ -29,7 +28,6 @@
 
 <LoadingComponent Message="Loading..." IsFullscreen=true Active=IsLoading />
 
-
 @code {
     private string Username { get; set; } = "";
     private string ConnectionLink { get; set; } = "";
@@ -41,7 +39,7 @@
     {
         await Update();
 
-        AppConfig.Instance.ConfigurationSaved += async (s, e) => await Update();
+        ClientAppConfig.Instance.ConfigurationSaved += async (s, e) => await Update();
 
         await base.OnInitializedAsync();
         IsLoading = false;
@@ -51,18 +49,18 @@
     {
         try
         {
-            if (ConnectionLink != AppConfig.Instance.ConnectionUrl && Uri.TryCreate(AppConfig.Instance.ConnectionUrl, UriKind.Absolute, out Uri? connectionUri) && connectionUri.Scheme == "ffn")
+            if (ConnectionLink != ClientAppConfig.Instance.ConnectionUrl && Uri.TryCreate(ClientAppConfig.Instance.ConnectionUrl, UriKind.Absolute, out Uri? connectionUri) && connectionUri.Scheme == "ffn")
             {
-                ConnectionLink = AppConfig.Instance.ConnectionUrl;
+                ConnectionLink = ClientAppConfig.Instance.ConnectionUrl;
                 using FFAdvancedNetworkClient client = new(ConnectionLink);
                 Log.Debug("Setting connection link to {LINK}", connectionUri);
-                (bool success, User? user) = await client.LogInUser(AppConfig.Instance.UserId);
+                (bool success, User? user) = await client.LogInUser(ClientAppConfig.Instance.UserId);
                 Username = user?.Username ?? "";
 
 
-                if (AppConfig.Instance.UserId != Guid.Empty && !string.IsNullOrWhiteSpace(ConnectionLink) && success && user != null)
+                if (ClientAppConfig.Instance.UserId != Guid.Empty && !string.IsNullOrWhiteSpace(ConnectionLink) && success && user != null)
                 {
-                    AppConfig.Instance.CurrentUser = user;
+                    ClientAppConfig.Instance.CurrentUser = user;
                     nav.NavigateTo("/dashboard");
                 }
             }
@@ -94,10 +92,10 @@
             (bool success, User? user) = await client.CreateUser(Username);
             if (success && user != null)
             {
-                AppConfig.Instance.CurrentUser = user;
-                AppConfig.Instance.UserId = user.Id;
-                AppConfig.Instance.ConnectionUrl = ConnectionLink;
-                AppConfig.Instance.Save();
+                ClientAppConfig.Instance.CurrentUser = user;
+                ClientAppConfig.Instance.UserId = user.Id;
+                ClientAppConfig.Instance.ConnectionUrl = ConnectionLink;
+                ClientAppConfig.Instance.Save();
                 nav.NavigateTo("/dashboard");
                 return;
             }

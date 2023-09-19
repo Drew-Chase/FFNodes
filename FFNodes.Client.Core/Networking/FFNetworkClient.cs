@@ -8,10 +8,9 @@
 using Chase.CommonLib.Events;
 using Chase.CommonLib.Networking;
 using FFNodes.Core.Model;
-using FFNodes.Server.Data;
+using Newtonsoft.Json.Linq;
 using System.Text;
 using System.Text.Json;
-using Newtonsoft.Json.Linq;
 
 namespace FFNodes.Client.Core.Networking;
 
@@ -40,6 +39,7 @@ public class FFAdvancedNetworkClient : IDisposable
     {
         return (await client.GetAsJson($"{client.BaseAddress}api"))?.ToObject<SystemStatusModel>();
     }
+
     public async Task<string?> ResetConnectionCode()
     {
         JObject? json = await client.GetAsJson($"{client.BaseAddress}api/reset-connection-code");
@@ -69,7 +69,7 @@ public class FFAdvancedNetworkClient : IDisposable
 
     public async Task<string> CheckoutFile(DownloadProgressEvent downloadProgress)
     {
-        return await client.DownloadFileAsync($"{client.BaseAddress}api/fs/checkout", Directory.CreateDirectory(AppConfig.Instance.WorkingDirectory).FullName, downloadProgress);
+        return await client.DownloadFileAsync($"{client.BaseAddress}api/fs/checkout", Directory.CreateDirectory(ClientAppConfig.Instance.WorkingDirectory).FullName, downloadProgress);
     }
 
     public async Task<bool> Ping()

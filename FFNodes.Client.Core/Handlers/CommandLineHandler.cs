@@ -6,7 +6,6 @@
 */
 
 using Chase.CLIParser;
-using FFNodes.Server.Data;
 
 namespace FFNodes.Client.Core.Handlers;
 
@@ -23,13 +22,13 @@ public class CommandLineHandler
         {
             if (parser.IsPresent("c", out string connectionUrl))
             {
-                AppConfig.Instance.ConnectionUrl = connectionUrl;
-                AppConfig.Instance.Save();
+                ClientAppConfig.Instance.ConnectionUrl = connectionUrl;
+                ClientAppConfig.Instance.Save();
             }
             if (parser.IsPresent("u", out string userString) && Guid.TryParse(userString, out Guid userId))
             {
-                AppConfig.Instance.UserId = userId;
-                AppConfig.Instance.Save();
+                ClientAppConfig.Instance.UserId = userId;
+                ClientAppConfig.Instance.Save();
             }
         }
     }
