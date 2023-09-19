@@ -6,7 +6,6 @@
 @using FFNodes.Core.Data;
 @using FFNodes.Core.Model;
 @using FFNodes.Core;
-@using FFNodes.Server.Data;
 @using System.Diagnostics;
 @using Newtonsoft.Json;
 @inject IJSRuntime JSRuntime;
@@ -51,8 +50,10 @@
         {
             StateHasChanged();
             Guid fileId = await ProcessManager.Instance.DownloadNextFile();
-            await ProcessManager.Instance.ProcessFile(fileId);
-            await ProcessManager.Instance.UploadFile(fileId);
+            if (fileId != Guid.Empty && await ProcessManager.Instance.ProcessFile(fileId))
+            {
+                await ProcessManager.Instance.UploadFile(fileId);
+            }
         }
     }
 
