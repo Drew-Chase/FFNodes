@@ -27,7 +27,7 @@ namespace FFNodes.Server.Controllers
 
         [HttpGet()]
         [Produces("application/json")]
-        public IActionResult GetStatus() => Ok(new SystemStatusModel(DateTime.Now - AppConfig.Instance.StartDate, !FileSystemHandler.Instance.FinishedLoading, UserHandler.Instance.GetConnectedUsers(), Data.Data.ConnectionUrl, AppConfig.Instance.FFmpegCommand));
+        public IActionResult GetStatus() => Ok(new SystemStatusModel(DateTime.Now - ServerAppConfig.Instance.StartDate, !FileSystemHandler.Instance.FinishedLoading, UserHandler.Instance.GetConnectedUsers(), Data.Data.ConnectionUrl, ServerAppConfig.Instance.FFmpegCommand, ServerAppConfig.Instance.OnlyKeepIfSmaller));
 
         [HttpPost("reset-connection-code")]
         [Produces("application/json")]
