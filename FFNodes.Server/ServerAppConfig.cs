@@ -11,7 +11,7 @@ using Serilog.Events;
 
 namespace FFNodes.Server.Data;
 
-public sealed class AppConfig : AppConfigBase<AppConfig>
+public sealed class ServerAppConfig : AppConfigBase<ServerAppConfig>
 {
     [JsonProperty("port")]
     public int Port { get; set; } = 1818;
@@ -34,8 +34,14 @@ public sealed class AppConfig : AppConfigBase<AppConfig>
     [JsonProperty("users")]
     public Guid[] Users { get; set; } = Array.Empty<Guid>();
 
-    [JsonProperty("log-level")]
+    [JsonProperty("log_level")]
     public LogEventLevel DefaultLogLevel { get; set; } = LogEventLevel.Information;
+
+    [JsonProperty("total_saved_bytes")]
+    public long TotalSavedBytes { get; set; }
+
+    [JsonProperty("only_keep_smaller")]
+    public bool OnlyKeepIfSmaller { get; set; } = true;
 
     [JsonIgnore]
     public DateTime StartDate { get; } = DateTime.Now;

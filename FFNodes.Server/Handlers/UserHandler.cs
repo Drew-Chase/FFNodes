@@ -47,10 +47,10 @@ public class UserHandler
             users.Add(user);
 
             // Adds the users id to the configuration file.
-            List<Guid> items = AppConfig.Instance.Users.ToList();
+            List<Guid> items = ServerAppConfig.Instance.Users.ToList();
             items.Add(user.Id);
-            AppConfig.Instance.Users = items.ToArray();
-            AppConfig.Instance.Save();
+            ServerAppConfig.Instance.Users = items.ToArray();
+            ServerAppConfig.Instance.Save();
 
             Save(user);
             return true;
@@ -138,7 +138,7 @@ public class UserHandler
     public void Load()
     {
         // Loops through all the files in the users directory and deserializes them.
-        foreach (Guid userId in AppConfig.Instance.Users)
+        foreach (Guid userId in ServerAppConfig.Instance.Users)
         {
             Load(userId);
         }

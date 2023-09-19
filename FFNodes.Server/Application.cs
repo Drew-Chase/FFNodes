@@ -23,11 +23,11 @@ namespace FFNodes.Server
         private static void Main()
         {
             // Loads the configuration from the file system
-            AppConfig.Instance.Initialize(Files.Config);
+            ServerAppConfig.Instance.Initialize(Files.Config);
 
-            int port = AppConfig.Instance.Port;
+            int port = ServerAppConfig.Instance.Port;
 
-            LogEventLevel logEventLevel = AppConfig.Instance.DefaultLogLevel;
+            LogEventLevel logEventLevel = ServerAppConfig.Instance.DefaultLogLevel;
             if (Environment.GetCommandLineArgs().Any())
             {
                 OptionsManager optionsManager = new("FFNodes");
@@ -51,7 +51,7 @@ namespace FFNodes.Server
 
                     if (parser.IsPresent("host", out string host))
                     {
-                        AppConfig.Instance.Host = host;
+                        ServerAppConfig.Instance.Host = host;
                     }
 
                     if (parser.IsPresent("v", out string levelString))
@@ -113,7 +113,7 @@ namespace FFNodes.Server
                     });
                     builder.UseStartup<Startup>();
 
-                    Log.Information("Server running at {SERVER}", $"http://{AppConfig.Instance.Host}:{port}");
+                    Log.Information("Server running at {SERVER}", $"http://{ServerAppConfig.Instance.Host}:{port}");
                     Log.Information("Connection url is {CONNECTION}", Data.Data.ConnectionUrl);
                 }).Build().Run();
         }

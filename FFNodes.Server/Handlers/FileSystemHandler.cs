@@ -89,7 +89,7 @@ public sealed class FileSystemHandler
     /// </summary>
     public async Task Load()
     {
-        if (!AppConfig.Instance.Directories.Any())
+        if (!ServerAppConfig.Instance.Directories.Any())
         {
             Log.Warning("Please fill out the directories in the configuration file.");
             return;
@@ -99,7 +99,7 @@ public sealed class FileSystemHandler
         FinishedLoading = false;
 
         // Wait for all directories to be loaded.
-        Task.WaitAll(AppConfig.Instance.Directories.Select(i => Load(i)).ToArray());
+        Task.WaitAll(ServerAppConfig.Instance.Directories.Select(i => Load(i)).ToArray());
 
         // Sort the files.
         await Sort();
@@ -111,7 +111,7 @@ public sealed class FileSystemHandler
         Log.Debug("Scanning {Directory}...", directory);
         try
         {
-            processedFiles.AddRange(FFVideoUtility.GetFilesAsync(directory, AppConfig.Instance.ScanRecursively).Select(i => new ProcessedFile(i)));
+            processedFiles.AddRange(FFVideoUtility.GetFilesAsync(directory, ServerAppConfig.Instance.ScanRecursively).Select(i => new ProcessedFile(i)));
         }
         catch (Exception e)
         {
@@ -133,7 +133,7 @@ public sealed class FileSystemHandler
             FileSystemWatcher watcher = new()
             {
                 Path = directory,
-                IncludeSubdirectories = AppConfig.Instance.ScanRecursively,
+                IncludeSubdirectories = ServerAppConfig.Instance.ScanRecursively,
                 NotifyFilter = NotifyFilters.CreationTime | NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.DirectoryName,
                 EnableRaisingEvents = true,
             };
@@ -201,6 +201,8 @@ public sealed class FileSystemHandler
         List<Guid> files = user.Files.ToList();
         files.Add(file.Id);
         user.Files = files.ToArray();
+        ServerAppConfig.Instance.TotalSavedBytes += file.OriginalSize - file.CompressedSize;
+        ServerAppConfig.Instance.Save();
 
         // Save the user and Processed File to the users database.
         UserHandler.Instance.Save(user);

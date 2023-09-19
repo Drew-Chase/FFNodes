@@ -18,16 +18,16 @@ namespace FFNodes.Server.Data;
 
 public static class Data
 {
-    public static string ConnectionString { get; private set; } = new Crypt().Encrypt(AppConfig.Instance.AuthorizationToken.ToString("N"));
-    public static string ConnectionUrl { get; private set; } = $"ffn://{AppConfig.Instance.Host}:{AppConfig.Instance.Port}/{ConnectionString}";
+    public static string ConnectionString { get; private set; } = new Crypt().Encrypt(ServerAppConfig.Instance.AuthorizationToken.ToString("N"));
+    public static string ConnectionUrl { get; private set; } = $"ffn://{ServerAppConfig.Instance.Host}:{ServerAppConfig.Instance.Port}/{ConnectionString}";
 
     public static bool ValidConnection(string code) => code.Equals(ConnectionString);
 
     public static void ResetConnectionCode()
     {
-        AppConfig.Instance.AuthorizationToken = Guid.NewGuid();
-        AppConfig.Instance.Save();
-        ConnectionString = new Crypt().Encrypt(AppConfig.Instance.AuthorizationToken.ToString("N"));
-        ConnectionUrl = $"ffn://{AppConfig.Instance.Host}:{AppConfig.Instance.Port}/{ConnectionString}";
+        ServerAppConfig.Instance.AuthorizationToken = Guid.NewGuid();
+        ServerAppConfig.Instance.Save();
+        ConnectionString = new Crypt().Encrypt(ServerAppConfig.Instance.AuthorizationToken.ToString("N"));
+        ConnectionUrl = $"ffn://{ServerAppConfig.Instance.Host}:{ServerAppConfig.Instance.Port}/{ConnectionString}";
     }
 }
