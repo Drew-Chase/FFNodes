@@ -14,6 +14,7 @@ public struct SystemStatusModel
     public User[] ConnectedUsers { get; }
     public string ConnectionUrl { get; set; }
     public string FFMpegCommand { get; set; }
+    public bool OnlyKeepIfSmaller { get; set; }
 
     /// <summary>
     /// Creates a new instance of the SystemStatusModel struct.
@@ -22,12 +23,13 @@ public struct SystemStatusModel
     /// <param name="loading">If the file system is still loading results</param>
     /// <param name="connectedUsers">A list of all connected users</param>
     /// <param name="connectionUrl">The connection url</param>
-    public SystemStatusModel(TimeSpan uptime, bool loading, User[] connectedUsers, string connectionUrl, string ffmpegCommand)
+    public SystemStatusModel(TimeSpan uptime, bool loading, User[] connectedUsers, string connectionUrl, string ffmpegCommand, bool onlyKeepIfSmaller)
     {
         Uptime = uptime;
         Loading = loading;
         ConnectedUsers = connectedUsers;
         ConnectionUrl = connectionUrl;
         FFMpegCommand = ffmpegCommand;
+        OnlyKeepIfSmaller = onlyKeepIfSmaller;
     }
 }
