@@ -20,13 +20,27 @@ namespace FFNodes.Server.Handlers;
 public class UserHandler
 {
     public static readonly UserHandler Instance = Instance ??= new UserHandler();
-    private readonly List<User> users;
+    private readonly Dictionary<Guid, User> users;
     private readonly Dictionary<User, Timer> connectedUsers;
+
+    private readonly Timer saveTimer;
+
+    public DatabaseFile UsersDatabaseFile { get; private set; }
 
     private UserHandler()
     {
         users = new();
         connectedUsers = new();
+        saveTimer = new(ServerAppConfig.Instance.UserDatabaseDumpInterval)
+        {
+            AutoReset = true,
+            Enabled = true,
+        };
+        saveTimer.Elapsed += (_, _) => SaveAll();
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => SaveAll();
+        AppDomain.CurrentDomain.UnhandledException += (_, _) => SaveAll();
+        UsersDatabaseFile = DatabaseFile.Open(Path.Combine(Files.UsersDatabase));
+        saveTimer.Start();
     }
 
     /// <summary>
@@ -37,14 +51,14 @@ public class UserHandler
     public bool CreateUser(User user)
     {
         // Checks if the user is already in the list of users.
-        if (!users.Any(u => u.Id.Equals(user.Id) || u.Username.Equals(user.Username)))
+        if (!users.ContainsKey(user.Id) || users.Values.Any(u => u.Username.Equals(user.Username)))
         {
             if (!users.Any())
             {
                 user.IsAdmin = true;
             }
             // If not, add them.
-            users.Add(user);
+            users.Add(user.Id, user);
 
             // Adds the users id to the configuration file.
             List<Guid> items = ServerAppConfig.Instance.Users.ToList();
@@ -52,7 +66,6 @@ public class UserHandler
             ServerAppConfig.Instance.Users = items.ToArray();
             ServerAppConfig.Instance.Save();
 
-            Save(user);
             return true;
         }
         return false;
@@ -93,9 +106,8 @@ public class UserHandler
         }
         user.LastOnline = now;
 
-        // Reloads the user
-        Save(user);
-        Load(user);
+        // Save the user.
+        users[user.Id] = user;
     }
 
     /// <summary>
@@ -111,14 +123,14 @@ public class UserHandler
     /// </summary>
     /// <param name="id">the users id</param>
     /// <returns>a user or null if a user is not found.</returns>
-    public User? GetUser(Guid id) => users.FirstOrDefault(x => x.Id.Equals(id));
+    public User? GetUser(Guid id) => users[id];
 
     /// <summary>
     /// Gets a user by their username.
     /// </summary>
     /// <param name="username"></param>
     /// <returns></returns>
-    public User? GetUser(string username) => users.FirstOrDefault(x => x.Username.Equals(username));
+    public User? GetUser(string username) => users.Values.FirstOrDefault(x => x.Username.Equals(username));
 
     /// <summary>
     /// Gets a list of all the connected users.
@@ -130,7 +142,7 @@ public class UserHandler
     /// Gets a list of all the users.
     /// </summary>
     /// <returns></returns>
-    public User[] GetUsers() => users.ToArray();
+    public User[] GetUsers() => users.Values.ToArray();
 
     /// <summary>
     /// Loads all the users from the users directory.
@@ -167,19 +179,19 @@ public class UserHandler
     /// <param name="user"></param>
     public void Load(Guid id)
     {
-        using DatabaseFile usersDatabase = DatabaseFile.Open(Path.Combine(Files.UsersDatabase));
         // Loads the user from the users directory.
-        User? loadedUser = usersDatabase.ReadEntry<User>(id);
+        User? loadedUser = UsersDatabaseFile.ReadEntry<User>(id);
         if (loadedUser != null)
         {
-            // Removes the user from the list of users if they already exist.
-            User? item = users.FirstOrDefault(u => u.Id.Equals(loadedUser.Id));
-            if (item != null)
+            // Checks if the user is already in the list of users.
+            if (users.ContainsKey(id))
             {
-                users.Remove(item);
+                users.Add(id, loadedUser); // Adds the user to the list of users.
             }
-            // Adds the user to the list of users.
-            users.Add(loadedUser);
+            else
+            {
+                users[id] = loadedUser;// Updates the user.
+            }
         }
     }
 
@@ -190,31 +202,14 @@ public class UserHandler
     public void Load(User user) => Load(user.Id);
 
     /// <summary>
-    /// Saves a user.
-    /// </summary>
-    /// <param name="user">The user that will be saved</param>
-    public void Save(User user)
-    {
-        using DatabaseFile usersDatabase = DatabaseFile.Open(Path.Combine(Files.UsersDatabase));
-        // Serializes the user and writes it to a file, overwrites the file if it already exists.
-        usersDatabase.WriteEntry(user.Id, user);
-    }
-
-    /// <summary>
     /// Saves all the users.
     /// </summary>
-    public void SaveAll()
+    private void SaveAll()
     {
-        // Loops through all the users and saves them.
-        foreach (User user in users)
+        foreach ((Guid id, User user) in users)
         {
-            Save(user);
+            UsersDatabaseFile.WriteEntry(id, user);
         }
+        UsersDatabaseFile.Flush();
     }
-
-    /// <summary>
-    /// Gets the users database.
-    /// </summary>
-    /// <returns></returns>
-    public DatabaseFile GetDatabase() => DatabaseFile.Open(Path.Combine(Files.UsersDatabase));
 }
