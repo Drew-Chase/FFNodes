@@ -7,10 +7,8 @@
 
 // Ignore Spelling: Checkin
 
-using Chase.CommonLib.FileSystem;
 using FFNodes.Core.Model;
 using FFNodes.Server.Handlers;
-using FFNodes.Server.Model;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.RegularExpressions;
 
@@ -73,7 +71,18 @@ public class FileSystemController : ControllerBase
                                 {
                                     await Request.Body.CopyToAsync(fs);
                                 }
-                                await FileSystemHandler.Instance.ReportProcessedFile(connectedUser, processedFile.Value);
+                                TimeSpan duration = TimeSpan.Zero;
+
+                                // Check for X-Duration header.
+                                if (Request.Headers.ContainsKey("X-Duration"))
+                                {
+                                    string durationString = Request.Headers["X-Duration"].ToString();
+                                    if (!string.IsNullOrWhiteSpace(durationString) && long.TryParse(durationString, out long ticks) && ticks > 0)
+                                    {
+                                        duration = TimeSpan.FromTicks(ticks);
+                                    }
+                                }
+                                await FileSystemHandler.Instance.ReportProcessedFile(connectedUser, processedFile.Value, path, duration);
                                 return Ok(processedFile.Value);
                             }
                             return BadRequest(new { error = "Parent directory of file could not be parsed.", filename = fileName });
@@ -95,8 +104,7 @@ public class FileSystemController : ControllerBase
     {
         if (FileSystemHandler.Instance.FinishedLoading)
         {
-            using DatabaseFile usersDatabase = UserHandler.Instance.GetDatabase();
-            if (usersDatabase.Exists(fileId))
+            if (UserHandler.Instance.UsersDatabaseFile.Exists(fileId))
             {
                 ProcessedFile? file = FileSystemHandler.Instance.LoadReportedFile(fileId);
                 if (file != null && file.HasValue)
