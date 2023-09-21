@@ -5,7 +5,7 @@
     https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
 */
 
-namespace FFNodes.Server.Model;
+namespace FFNodes.Core.Model;
 
 public struct ProcessedFile
 {
@@ -17,6 +17,7 @@ public struct ProcessedFile
     public TimeSpan Duration { get; set; }
     public DateTime Completed { get; set; }
     public bool HasProcessed { get; set; }
+    public string Command { get; set; }
 
     public ProcessedFile(string path)
     {
