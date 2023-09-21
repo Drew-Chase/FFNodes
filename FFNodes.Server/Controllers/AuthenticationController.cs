@@ -24,12 +24,12 @@ public class AuthenticationController : ControllerBase
         connectedUser = _httpContextAccessor.HttpContext.Items["ConnectedUser"] as User;
     }
 
-    [HttpPost("connect")]
+    [HttpGet("connect")]
     public IActionResult HandleConnectionRequest() => Ok();
 
     [HttpGet("user")]
     [Produces("application/json")]
-    public IActionResult GetUser([FromQuery] Guid? id) => Ok(id == null ? connectedUser : UserHandler.Instance.GetUser(id.Value));
+    public IActionResult GetUser([FromQuery] Guid? id, [FromQuery] string? username) => Ok(id != null ? UserHandler.Instance.GetUser(id.Value) : !string.IsNullOrWhiteSpace(username) ? UserHandler.Instance.GetUser(username) : connectedUser);
 
     [HttpPost("user")]
     [Produces("application/json")]
