@@ -42,7 +42,12 @@ public class FFAdvancedNetworkClient : IDisposable
 
     public async Task<string?> ResetConnectionCode()
     {
-        JObject? json = await client.GetAsJson($"{client.BaseAddress}api/reset-connection-code");
+        using HttpRequestMessage request = new()
+        {
+            Method = HttpMethod.Post,
+            RequestUri = new Uri($"{client.BaseAddress}api/reset-connection-code"),
+        };
+        JObject? json = await client.GetAsJson(request);
         if (json != null && json.ContainsKey("connection_url"))
         {
             return json["connection_url"]?.ToObject<string>();
@@ -50,7 +55,7 @@ public class FFAdvancedNetworkClient : IDisposable
         return null;
     }
 
-    public async Task<(bool, User? user)> CreateUser(string username)
+    public async Task<(bool, User? user)> LoginOrCreateUser(string username)
     {
         using HttpRequestMessage request = new(HttpMethod.Post, $"{client.BaseAddress}api/auth/user")
         {
@@ -77,9 +82,18 @@ public class FFAdvancedNetworkClient : IDisposable
         return (await client.GetAsync($"{client.BaseAddress}api/auth/connect")).IsSuccessStatusCode;
     }
 
-    public async Task<bool> CheckinFile(string path, DownloadProgressEvent? progress)
+    public async Task<bool> CheckinFile(string path, TimeSpan duration, DownloadProgressEvent? progress)
     {
-        using HttpResponseMessage response = await client.UploadFileAsync($"{client.BaseAddress}api/fs/checkin", path, progress);
+        using HttpRequestMessage request = new()
+        {
+            RequestUri = new($"{client.BaseAddress}api/fs/checkin"),
+            Method = HttpMethod.Post,
+            Headers =
+            {
+                { "X-Duration", duration.Ticks.ToString() },
+            },
+        };
+        using HttpResponseMessage response = await client.UploadFileAsync(request, path, progress);
         return response.IsSuccessStatusCode;
     }
 
@@ -109,7 +123,11 @@ public class FFAdvancedNetworkClient : IDisposable
     //    return json?.ToObject<User[]>() ?? Array.Empty<User>();
     //}
 
-    public async Task<User[]> GetUsers() => (await client.GetAsJsonArray($"{client.BaseAddress}api/auth/users"))?.ToObject<User[]>() ?? Array.Empty<User>();
+    public async Task<User[]> GetUsers()
+    {
+        JArray? v = await client.GetAsJsonArray($"{client.BaseAddress}api/auth/users");
+        return v?.ToObject<User[]>() ?? Array.Empty<User>();
+    }
 
     public void Dispose()
     {
