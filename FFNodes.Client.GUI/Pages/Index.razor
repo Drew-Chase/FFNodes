@@ -2,66 +2,33 @@
 @using FFNodes.Client.Core.Networking;
 @using FFNodes.Core.Model;
 @using Serilog;
-<link href="/css/login.css" rel="stylesheet" />
-<div id="landing" class="center horizontal vertical col">
-    <img src="/images/Logo.svg" alt="FFNodes">
-    <div id="form" class="col">
-        <div class="floating-input fill">
-            <input id="username" class="fill" type="text" @bind="Username" placeholder="" />
-            <label for="username" class="fill">Username</label>
-        </div>
-        <div class="floating-input fill">
-            @if (string.IsNullOrWhiteSpace(ConnectionLink))
-            {
-                <input id="connection-link" class="fill" type="url" @bind="ConnectionLink" placeholder="" />
-            }
-            else
-            {
-                <input id="connection-link" class="fill" type="url" @bind="ConnectionLink" placeholder="" readonly />
-            }
-            <label for="connection-link" class="fill">Connection Link</label>
-        </div>
-        <p class="error fill">@Error</p>
-        <button class="primary" @onclick="Login">Connect <img src="/images/lock.svg" /> </button>
-    </div>
-</div>
 
-<LoadingComponent Message="Loading..." IsFullscreen=true Active=IsLoading />
+<LoadingComponent Message="Loading..." IsFullscreen=true Active=true />
 
 @code {
-    private string Username { get; set; } = "";
-    private string ConnectionLink { get; set; } = "";
-    private string Error { get; set; } = "";
-    private bool IsLoading { get; set; } = true;
-
 
     protected async override Task OnInitializedAsync()
     {
         await Update();
 
-        ClientAppConfig.Instance.ConfigurationSaved += async (s, e) => await Update();
-
         await base.OnInitializedAsync();
-        IsLoading = false;
     }
 
     private async Task Update()
     {
         try
         {
-            if (ConnectionLink != ClientAppConfig.Instance.ConnectionUrl && Uri.TryCreate(ClientAppConfig.Instance.ConnectionUrl, UriKind.Absolute, out Uri? connectionUri) && connectionUri.Scheme == "ffn")
+            if (Uri.TryCreate(ClientAppConfig.Instance.ConnectionUrl, UriKind.Absolute, out Uri? connectionUri) && connectionUri.Scheme == "ffn")
             {
-                ConnectionLink = ClientAppConfig.Instance.ConnectionUrl;
-                using FFAdvancedNetworkClient client = new(ConnectionLink);
+                using FFAdvancedNetworkClient client = new(ClientAppConfig.Instance.ConnectionUrl);
                 Log.Debug("Setting connection link to {LINK}", connectionUri);
                 (bool success, User? user) = await client.LogInUser(ClientAppConfig.Instance.UserId);
-                Username = user?.Username ?? "";
 
-
-                if (ClientAppConfig.Instance.UserId != Guid.Empty && !string.IsNullOrWhiteSpace(ConnectionLink) && success && user != null)
+                if (ClientAppConfig.Instance.UserId != Guid.Empty && success && user != null)
                 {
                     ClientAppConfig.Instance.CurrentUser = user;
                     nav.NavigateTo("/dashboard");
+                    return;
                 }
             }
             await InvokeAsync(StateHasChanged);
@@ -70,44 +37,7 @@
         {
             Log.Error(e, "Error updating connection link");
         }
+        nav.NavigateTo("/login");
     }
 
-    private async Task Login()
-    {
-        Error = "";
-        if (string.IsNullOrWhiteSpace(Username))
-        {
-            Error = "Username cannot be blank";
-            return;
-        }
-        if (string.IsNullOrWhiteSpace(ConnectionLink))
-        {
-            Error = "Connection Link cannot be blank";
-            return;
-        }
-        IsLoading = true;
-        try
-        {
-            using FFAdvancedNetworkClient client = new(ConnectionLink);
-            (bool success, User? user) = await client.CreateUser(Username);
-            if (success && user != null)
-            {
-                ClientAppConfig.Instance.CurrentUser = user;
-                ClientAppConfig.Instance.UserId = user.Id;
-                ClientAppConfig.Instance.ConnectionUrl = ConnectionLink;
-                ClientAppConfig.Instance.Save();
-                nav.NavigateTo("/dashboard");
-                return;
-            }
-            else
-            {
-                Error = "Invalid Username or Connection Link";
-            }
-        }
-        catch (Exception e)
-        {
-            Error = $"Error: {e.Message}";
-        }
-        IsLoading = false;
-    }
 }
