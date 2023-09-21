@@ -1,0 +1,24 @@
+﻿<div class="popup alert">
+    <div class="popup-background" @onclick=OnClickCancel></div>
+    <div class="popup-body col">
+        <p class="title">@Title</p>
+        <div class="popup-content">
+            <p class="message">@((MarkupString)Message)</p>
+        </div>
+        <div class="buttons row center horizontal vertical">
+            <button class="button primary" @onclick="OnClickOkay">Okay</button>
+            <button class="button secondary" @onclick="OnClickCancel">Cancel</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public required string Title { get; set; }
+    [Parameter]
+    public required string Message { get; set; }
+    [Parameter]
+    public Action OnClickOkay { get; set; } = () => { };
+    [Parameter]
+    public Action OnClickCancel { get; set; } = () => { };
+}
