@@ -13,8 +13,10 @@ using FFNodes.Server.Handlers;
 using FFNodes.Server.Middleware;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Newtonsoft.Json.Serialization;
 using Serilog;
 using Serilog.Events;
+using System.IO.Compression;
 
 namespace FFNodes.Server
 {
@@ -70,14 +72,24 @@ namespace FFNodes.Server
                     }
                 }
             }
+            string[] logs = Directory.GetFiles(Directories.Logs, "*.log");
+            if (logs.Any())
+            {
+                using ZipArchive archive = ZipFile.Open(Path.Combine(Directories.Logs, $"logs-{DateTime.Now:MM-dd-yyyy HH-mm-ss.ffff}.zip"), ZipArchiveMode.Create);
+                foreach (string log in logs)
+                {
+                    archive.CreateEntryFromFile(log, Path.GetFileName(log));
+                    File.Delete(log);
+                }
+            }
 
             TimeSpan flushTime = TimeSpan.FromSeconds(30);
             Log.Logger = new LoggerConfiguration()
                 .MinimumLevel.Verbose()
                 .WriteTo.Console(logEventLevel)
-                .WriteTo.File(Files.DebugLog, LogEventLevel.Verbose, buffered: true, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000, flushToDiskInterval: flushTime)
-                .WriteTo.File(Files.LatestLog, LogEventLevel.Information, buffered: true, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000, flushToDiskInterval: flushTime)
-                .WriteTo.File(Files.ErrorLog, LogEventLevel.Error, buffered: true, rollingInterval: RollingInterval.Day, rollOnFileSizeLimit: true, fileSizeLimitBytes: 5_000_000, flushToDiskInterval: flushTime)
+                .WriteTo.File(Files.DebugLog, LogEventLevel.Verbose, buffered: true, flushToDiskInterval: flushTime)
+                .WriteTo.File(Files.LatestLog, LogEventLevel.Information, buffered: true, flushToDiskInterval: flushTime)
+                .WriteTo.File(Files.ErrorLog, LogEventLevel.Error, buffered: true, flushToDiskInterval: flushTime)
                 .CreateLogger();
 
             AppDomain.CurrentDomain.ProcessExit += (s, e) =>
@@ -137,6 +149,14 @@ namespace FFNodes.Server
             services.Configure<FormOptions>(options =>
             {
                 options.MultipartBodyLengthLimit = long.MaxValue;
+            });
+
+            services.AddControllers().AddNewtonsoftJson(options =>
+            {
+                options.SerializerSettings.ContractResolver = new DefaultContractResolver
+                {
+                    NamingStrategy = new SnakeCaseNamingStrategy() // Use SnakeCaseNamingStrategy
+                };
             });
 
             services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
