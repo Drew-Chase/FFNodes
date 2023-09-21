@@ -45,4 +45,7 @@ public sealed class ServerAppConfig : AppConfigBase<ServerAppConfig>
 
     [JsonIgnore]
     public DateTime StartDate { get; } = DateTime.Now;
+
+    [JsonProperty("user_db_dump_interval")]
+    public TimeSpan UserDatabaseDumpInterval { get; set; } = TimeSpan.FromMinutes(30);
 }
