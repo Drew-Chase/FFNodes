@@ -5,15 +5,28 @@
     https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
 */
 
+using Newtonsoft.Json;
+
 namespace FFNodes.Core.Model;
 
 public struct SystemStatusModel
 {
+    [JsonProperty("uptime")]
     public TimeSpan Uptime { get; }
+
+    [JsonProperty("loading")]
     public bool Loading { get; }
+
+    [JsonProperty("connected_users")]
     public User[] ConnectedUsers { get; }
+
+    [JsonProperty("connection_url")]
     public string ConnectionUrl { get; set; }
+
+    [JsonProperty("ffmpeg_command")]
     public string FFMpegCommand { get; set; }
+
+    [JsonProperty("only_keep_if_smaller")]
     public bool OnlyKeepIfSmaller { get; set; }
 
     /// <summary>
