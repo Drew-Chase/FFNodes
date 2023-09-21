@@ -10,7 +10,10 @@
             <NavItemComponent Title="Dashboard" IsSelected=@(SelectedIndex==0) OnSelect=@(()=>SelectedIndex=0) Icon="dashboard.svg" />
             <NavItemComponent Title="Users" IsSelected=@(SelectedIndex==1) OnSelect=@(()=>SelectedIndex=1) Icon="users.svg" />
         </div>
-        <NavItemComponent Title="Settings" IsSelected=@(SelectedIndex==2) OnSelect=@(()=>SelectedIndex=2) Icon="settings-icon.svg" />
+        <div class="col">
+            <NavItemComponent Title="Logout" IsSelected=@(SelectedIndex==-1) OnSelect=@Logout Icon="logout-icon.svg" />
+            <NavItemComponent Title="Settings" IsSelected=@(SelectedIndex==2) OnSelect=@(()=>SelectedIndex=2) Icon="settings-icon.svg" />
+        </div>
     </nav>
 
     <div id="page-content" class="fill">
@@ -38,6 +41,13 @@
     {
         await base.OnInitializedAsync();
         IsLoading = false;
+    }
+
+    private void Logout()
+    {
+        ClientAppConfig.Instance.ConnectionUrl = "";
+        ClientAppConfig.Instance.Save();
+        nav.NavigateTo("/");
     }
 
 }
