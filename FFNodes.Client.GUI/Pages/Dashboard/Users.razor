@@ -7,11 +7,11 @@
             <div class="page-title fill">Users</div>
             <div class="col title-input">
                 <label for="connect-code">Connect Code</label>
-                <div id="connect-code" class="copy @(IsResetting?"reset":"")" tabindex="-1" @onclick=@(async ()=>await Clipboard.Default.SetTextAsync(ClientAppConfig.Instance.ConnectionUrl))>@ClientAppConfig.Instance.ConnectionUrl</div>
+                <div id="connect-code" class="copy @(IsResetting?"reset":"")" tabindex="-1" @onclick=CopyCode>@ClientAppConfig.Instance.ConnectionUrl</div>
             </div>
             @if (ClientAppConfig.Instance.CurrentUser.IsAdmin)
             {
-                <div class="button secondary"><img src="/images/reset.svg" style="padding: .3rem 0;" /></div>
+                <div class="button secondary" @onclick=@(()=>ResetAlert=true)><img src="/images/reset.svg" style="padding: .3rem 0;" /></div>
             }
 
         </div>
@@ -30,9 +30,15 @@
     </div>
 </section>
 
+@if (ResetAlert)
+{
+    <AlertComponent Title="alert" Message="Resetting the connection code will disconnect all connected users, aside from your self. <br>Are you sure you still want to reset your connection code?" OnClickOkay=@(async ()=>{ResetAlert=false;await ResetCode();}) OnClickCancel=@(()=>ResetAlert=false) />
+}
+
 @code {
     private User[] Items { get; set; } = Array.Empty<User>();
     private bool IsResetting { get; set; } = false;
+    private bool ResetAlert { get; set; } = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -47,16 +53,30 @@
             Items = await client.GetUsers();
         }
         StateHasChanged();
+
     }
+
     private async Task ResetCode()
     {
         IsResetting = true;
 
         using (FFAdvancedNetworkClient client = new(ClientAppConfig.Instance.ConnectionUrl, ClientAppConfig.Instance.UserId))
         {
-            await client.ResetConnectionCode();
+            string? code = await client.ResetConnectionCode();
+            if (!string.IsNullOrWhiteSpace(code))
+            {
+                ClientAppConfig.Instance.ConnectionUrl = code;
+                ClientAppConfig.Instance.Save();
+            }
         }
 
+        await Task.Delay(1000);
+
         IsResetting = false;
+    }
+
+    private async Task CopyCode()
+    {
+        await Clipboard.Default.SetTextAsync(ClientAppConfig.Instance.ConnectionUrl);
     }
 }
