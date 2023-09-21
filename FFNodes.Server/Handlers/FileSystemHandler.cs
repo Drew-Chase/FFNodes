@@ -5,11 +5,9 @@
     https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
 */
 
-using Chase.CommonLib.FileSystem;
 using Chase.FFmpeg.Extra;
 using FFNodes.Core.Model;
 using FFNodes.Server.Data;
-using FFNodes.Server.Model;
 using Serilog;
 
 namespace FFNodes.Server.Handlers;
@@ -195,7 +193,7 @@ public sealed class FileSystemHandler
     /// <param name="user"></param>
     /// <param name="file"></param>
     /// <returns></returns>
-    public Task ReportProcessedFile(User user, ProcessedFile file) => Task.Run(() =>
+    public Task ReportProcessedFile(User user, ProcessedFile file, string path, TimeSpan duration) => Task.Run(() =>
     {
         // Adds the file to the list of processed files.
         List<Guid> files = user.Files.ToList();
@@ -204,10 +202,18 @@ public sealed class FileSystemHandler
         ServerAppConfig.Instance.TotalSavedBytes += file.OriginalSize - file.CompressedSize;
         ServerAppConfig.Instance.Save();
 
+        FileInfo info = new(path);
+
+        file.CompressedSize = info.Length;
+        file.Completed = DateTime.Now;
+        file.HasProcessed = true;
+        file.Successful = true;
+        file.Path = path;
+        file.Duration = duration;
+        file.Command = ServerAppConfig.Instance.FFmpegCommand;
+
         // Save the user and Processed File to the users database.
-        UserHandler.Instance.Save(user);
-        using DatabaseFile db = UserHandler.Instance.GetDatabase();
-        db.WriteEntry(file.Id, file);
+        UserHandler.Instance.UsersDatabaseFile.WriteEntry(file.Id, file);
     });
 
     /// <summary>
@@ -220,7 +226,7 @@ public sealed class FileSystemHandler
     {
         try
         {
-            return UserHandler.Instance.GetDatabase().ReadEntry<ProcessedFile>(fileId);
+            return UserHandler.Instance.UsersDatabaseFile.ReadEntry<ProcessedFile>(fileId);
         }
         catch (Exception e)
         {
