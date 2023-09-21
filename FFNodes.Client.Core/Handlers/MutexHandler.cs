@@ -21,6 +21,7 @@ public static class MutexHandler
         }
         else
         {
+            CommandLineHandler.HandleCommandLine(Environment.GetCommandLineArgs()[1..]);
             StartNamedPipeServer(name);
         }
     }
