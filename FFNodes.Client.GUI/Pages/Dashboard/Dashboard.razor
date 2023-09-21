@@ -15,8 +15,11 @@
         <div class="row title-bar">
             <div class="page-title fill">dashboard</div>
             <div class="row">
-                <img src="/images/@(ProcessManager.Instance.IsProcessing?"pause":"play").svg" alt="" class="button @(ProcessManager.Instance.IsProcessing?"primary":"secondary") media-buttons" @onclick=@StartProcessing>
-                <img src="/images/stop.svg" alt="" class="button secondary media-buttons" @onclick=@(()=>{ ProcessManager.Instance.CancelProcessing(); ProcessManager.Instance.IsProcessing=false;StateHasChanged();})>
+                <img src="/images/@(ProcessManager.Instance.IsProcessing?"pause":"play").svg" alt="" class="button @(ProcessManager.Instance.IsProcessing?"primary":"secondary") media-buttons" @onclick=@TryStartProcess>
+                @if (ProcessManager.Instance.IsProcessing)
+                {
+                    <img src="/images/stop.svg" alt="" class="button secondary media-buttons" @onclick=@(()=>{ ProcessManager.Instance.CancelProcessing(); ProcessManager.Instance.IsProcessing=false;StateHasChanged();})>
+                }
             </div>
         </div>
         <div id="file-items" class="row list fill">
@@ -32,10 +35,16 @@
 {
     <FileDetailsComponent File=ProcessManager.Instance.Files[SelectedFileId] />
 }
+@if (ShowStartAlert)
+{
+    <AlertComponent Title="alert" Message="Make sure you review all the settings before you start.<br>Some settings might not be appropriate for your system.<br>Are you sure you want to continue?" OnClickOkay=@(async ()=>{ShowStartAlert=false;StartProcessing();}) OnClickCancel=@(()=>ShowStartAlert=false) />
+}
 
 @code {
 
     private Guid SelectedFileId { get; set; } = Guid.Empty;
+    private bool ShowStartAlert { get; set; } = false;
+
 
     protected override async Task OnInitializedAsync()
     {
@@ -44,15 +53,28 @@
         await base.OnInitializedAsync();
     }
 
+    private async Task TryStartProcess()
+    {
+        if (!ClientAppConfig.Instance.CurrentUser.Files.Any() && !ProcessManager.Instance.IsProcessing)
+        {
+            ShowStartAlert = true;
+        }
+        else
+        {
+            await StartProcessing();
+        }
+    }
+
     private async Task StartProcessing()
     {
         if (ProcessManager.Instance.IsProcessing = !ProcessManager.Instance.IsProcessing)
         {
             StateHasChanged();
             Guid fileId = await ProcessManager.Instance.DownloadNextFile();
+            Stopwatch watch = Stopwatch.StartNew();
             if (fileId != Guid.Empty && await ProcessManager.Instance.ProcessFile(fileId))
             {
-                await ProcessManager.Instance.UploadFile(fileId);
+                await ProcessManager.Instance.UploadFile(fileId, watch.Elapsed);
             }
         }
     }
