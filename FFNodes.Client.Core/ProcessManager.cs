@@ -167,7 +167,7 @@ public class ProcessManager
         OnUpdateEvent?.Invoke(this, EventArgs.Empty);
     }
 
-    public async Task UploadFile(Guid fileId, EventHandler<FileItemProgressUpdateEventArgs>? fileItemProgress = null)
+    public async Task UploadFile(Guid fileId, TimeSpan duration, EventHandler<FileItemProgressUpdateEventArgs>? fileItemProgress = null)
     {
         if (IsProcessing)
         {
@@ -176,7 +176,7 @@ public class ProcessManager
             string? file = Directory.GetFiles(Path.Combine(ClientAppConfig.Instance.WorkingDirectory, "output"), Path.GetFileNameWithoutExtension(Files[fileId].FileName) + ".*", SearchOption.TopDirectoryOnly).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(file) && File.Exists(file))
             {
-                await Client.CheckinFile(file, (s, e) =>
+                await Client.CheckinFile(file, duration, (s, e) =>
                 {
                     Files[fileId].CurrentOperation = Operation.Uploading;
                     Files[fileId].Percentage = (float)e.Percentage;
