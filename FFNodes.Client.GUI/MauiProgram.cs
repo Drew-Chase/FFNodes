@@ -21,6 +21,7 @@ public static class MauiProgram
 {
     public static MauiApp CreateMauiApp()
     {
+        ClientAppConfig.Instance.Initialize(Files.Config);
         MutexHandler.HandleMutex("FFNodes.Client.GUI");
 
         TimeSpan flushTime = TimeSpan.FromSeconds(30);
@@ -68,7 +69,6 @@ public static class MauiProgram
         builder.Logging.AddDebug();
 #endif
 
-        ClientAppConfig.Instance.Initialize(Files.Config);
         Cleanup();
         return builder.Build();
     }
