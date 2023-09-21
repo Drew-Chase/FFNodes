@@ -57,9 +57,9 @@ nav {
             text-transform: capitalize;
         }
 
-        nav .nav-item svg.icon {
-            width: 2rem;
-            height: 2rem;
+        nav .nav-item img.icon {
+            width: 2.375rem;
+            height: 2.375rem;
             margin: auto;
         }
 
