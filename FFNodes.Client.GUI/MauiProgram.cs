@@ -14,6 +14,7 @@ using FFNodes.Core.Data;
 using Microsoft.Extensions.Logging;
 using Serilog;
 using Serilog.Events;
+using System.IO.Compression;
 
 namespace FFNodes.Client.GUI;
 
@@ -23,6 +24,17 @@ public static class MauiProgram
     {
         ClientAppConfig.Instance.Initialize(Files.Config);
         MutexHandler.HandleMutex("FFNodes.Client.GUI");
+
+        string[] logs = Directory.GetFiles(Directories.Logs, "*.log");
+        if (logs.Any())
+        {
+            using ZipArchive archive = ZipFile.Open(Path.Combine(Directories.Logs, $"logs-{DateTime.Now:MM-dd-yyyy HH-mm-ss.ffff}.zip"), ZipArchiveMode.Create);
+            foreach (string log in logs)
+            {
+                archive.CreateEntryFromFile(log, Path.GetFileName(log));
+                File.Delete(log);
+            }
+        }
 
         TimeSpan flushTime = TimeSpan.FromSeconds(30);
         Log.Logger = new LoggerConfiguration()
