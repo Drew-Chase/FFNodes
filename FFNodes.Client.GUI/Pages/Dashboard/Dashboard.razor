@@ -35,15 +35,21 @@
 {
     <FileDetailsComponent File=ProcessManager.Instance.Files[SelectedFileId] />
 }
+
 @if (ShowStartAlert)
 {
     <AlertComponent Title="alert" Message="Make sure you review all the settings before you start.<br>Some settings might not be appropriate for your system.<br>Are you sure you want to continue?" OnClickOkay=@(async ()=>{ShowStartAlert=false;StartProcessing();}) OnClickCancel=@(()=>ShowStartAlert=false) />
+}
+@if (ShowStopAlert)
+{
+    <AlertComponent Title="alert" Message="This will kill any of the current processes and killing any progress gained and yet to be uploaded.<br>Are you sure you want to continue?" OnClickOkay=@(async ()=>{ShowStartAlert=false;ProcessManager.Instance.CancelProcessing();}) OnClickCancel=@(()=>ShowStopAlert=false) />
 }
 
 @code {
 
     private Guid SelectedFileId { get; set; } = Guid.Empty;
     private bool ShowStartAlert { get; set; } = false;
+    private bool ShowStopAlert { get; set; } = false;
 
 
     protected override async Task OnInitializedAsync()
@@ -70,12 +76,32 @@
         if (ProcessManager.Instance.IsProcessing = !ProcessManager.Instance.IsProcessing)
         {
             StateHasChanged();
-            Guid fileId = await ProcessManager.Instance.DownloadNextFile();
-            Stopwatch watch = Stopwatch.StartNew();
+
+            Task[] tasks = new Task[ClientAppConfig.Instance.ConcurrentConnections];
+
+            for (int i = 0; i < tasks.Length; i++)
+            {
+                tasks[i] = ProcessNext();
+            }
+
+            await Task.WhenAll(tasks);
+        }
+    }
+
+    private async Task ProcessNext()
+    {
+        Guid fileId = await ProcessManager.Instance.DownloadNextFile();
+        Stopwatch watch = Stopwatch.StartNew();
+        if (ProcessManager.Instance.IsProcessing)
+        {
             if (fileId != Guid.Empty && await ProcessManager.Instance.ProcessFile(fileId))
             {
                 await ProcessManager.Instance.UploadFile(fileId, watch.Elapsed);
             }
+        }
+        if (ProcessManager.Instance.IsProcessing)
+        {
+            await ProcessNext();
         }
     }
 

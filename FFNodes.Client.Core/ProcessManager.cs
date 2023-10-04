@@ -79,6 +79,10 @@ public class ProcessManager
     {
         try
         {
+            if (!IsProcessing)
+            {
+                return false;
+            }
             Log.Debug("Starting to process file: {FILE}.", Files[fileId].FileName);
             SystemStatusModel? status = await Client.GetSystemStatus();
             Files[fileId].CurrentOperation = Operation.Processing;
@@ -176,12 +180,15 @@ public class ProcessManager
             string? file = Directory.GetFiles(Path.Combine(ClientAppConfig.Instance.WorkingDirectory, "output"), Path.GetFileNameWithoutExtension(Files[fileId].FileName) + ".*", SearchOption.TopDirectoryOnly).FirstOrDefault();
             if (!string.IsNullOrWhiteSpace(file) && File.Exists(file))
             {
-                await Client.CheckinFile(file, duration, (s, e) =>
+                await Task.Run(async () =>
                 {
-                    Files[fileId].CurrentOperation = Operation.Uploading;
-                    Files[fileId].Percentage = (float)e.Percentage;
-                    fileItemProgress?.Invoke(this, new FileItemProgressUpdateEventArgs(Files[fileId]));
-                    OnUpdateEvent?.Invoke(this, EventArgs.Empty);
+                    await Client.CheckinFile(file, duration, (s, e) =>
+                    {
+                        Files[fileId].CurrentOperation = Operation.Uploading;
+                        Files[fileId].Percentage = (float)e.Percentage;
+                        fileItemProgress?.Invoke(this, new FileItemProgressUpdateEventArgs(Files[fileId]));
+                        OnUpdateEvent?.Invoke(this, EventArgs.Empty);
+                    });
                 });
                 File.Delete(file);
             }

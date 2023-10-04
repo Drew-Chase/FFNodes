@@ -12,12 +12,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="bin\**" />
     <Compile Remove="logs\**" />
     <Compile Remove="obj\**" />
+    <Content Remove="bin\**" />
     <Content Remove="logs\**" />
     <Content Remove="obj\**" />
+    <EmbeddedResource Remove="bin\**" />
     <EmbeddedResource Remove="logs\**" />
     <EmbeddedResource Remove="obj\**" />
+    <None Remove="bin\**" />
     <None Remove="logs\**" />
     <None Remove="obj\**" />
   </ItemGroup>
