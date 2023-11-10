@@ -1,0 +1,30 @@
+﻿/*
+    FFNodes - LFInteractive LLC. 2021-2024
+    FFNodes is a client/server solution for batch processing ffmpeg operations from multiple systems across the internet.
+    Licensed under GPL-3.0
+    https://www.gnu.org/licenses/gpl-3.0.en.html#license-text
+*/
+
+using System.Net;
+using System.Reflection;
+
+namespace FFNodes.Core.Data;
+
+public static class ApplicationData
+{
+    private static IPAddress? _publicIPAddress = null;
+    public static string Executable { get; } = Path.Combine(Directory.GetParent(Assembly.GetEntryAssembly()?.Location ?? "")?.FullName ?? "", Path.GetFileNameWithoutExtension(Assembly.GetEntryAssembly()?.Location ?? "") + ".exe");
+
+    public static IPAddress PublicIPAddress
+    {
+        get
+        {
+            if (_publicIPAddress == null)
+            {
+                using var client = new HttpClient();
+                _publicIPAddress = IPAddress.Parse(client.GetStringAsync("https://api.ipify.org").Result.Trim()); ;
+            }
+            return _publicIPAddress;
+        }
+    }
+}
