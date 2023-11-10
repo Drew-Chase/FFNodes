@@ -65,12 +65,21 @@ public sealed class FileSystemHandler
     /// <param name="user"></param>
     public void MarkUsersActiveProcessesAsAbandoned(User user)
     {
-        foreach (ProcessedFile file in checkedOutFiles[user])
+        try
         {
-            processedFiles.Add(file);
-            checkedOutFiles[user].Remove(file);
+            if (checkedOutFiles.ContainsKey(user))
+            {
+                foreach (ProcessedFile file in checkedOutFiles[user])
+                {
+                    processedFiles.Add(file);
+                    checkedOutFiles[user].Remove(file);
+                }
+                Sort();
+            }
         }
-        Sort();
+        catch
+        {
+        }
     }
 
     /// <summary>
