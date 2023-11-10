@@ -77,6 +77,7 @@ public class ProcessManager
 
     public async Task<bool> ProcessFile(Guid fileId, EventHandler<FileItemProgressUpdateEventArgs>? fileItemProgress = null)
     {
+        string cmd = "";
         try
         {
             if (!IsProcessing)
@@ -96,23 +97,24 @@ public class ProcessManager
                 codec = ClientHandler.GetVendorSpecificCodec();
             }
 
-            string cmd = status.Value.FFMpegCommand
+            cmd = status.Value.FFMpegCommand
             .Replace("{INPUT}", $"{filePath}")
             .Replace("{CODEC}", codec)
             .Replace("{OUTPUT}", outputFile)
             .Replace("{EXTENSION}", Path.GetExtension(filePath)[1..]);
+
+            string? newFileName = cmd.Split('"')[^2].TrimEnd('"');
 
             Log.Debug("Running FFMPEG with Command: {FILE}.", cmd);
             OnUpdateEvent?.Invoke(this, EventArgs.Empty);
             return await Task.Run(() =>
              {
                  FFMediaInfo info = new(filePath);
-                 string newFileName = "";
                  Process process = Chase.FFmpeg.FFProcessHandler.ExecuteFFmpeg(cmd, info: info, updated: (s, e) =>
                  {
                      if (string.IsNullOrWhiteSpace(newFileName))
                      {
-                         newFileName = Directory.GetFiles(outputDirectory, Path.GetFileNameWithoutExtension(outputFile) + ".*", SearchOption.TopDirectoryOnly).First();
+                         newFileName = cmd.Split('"')[^2].TrimEnd('"');
                      }
                      long currentSize = new FileInfo(newFileName).Length;
                      if (currentSize >= (long)info.Size)
@@ -138,7 +140,7 @@ public class ProcessManager
         catch (Exception e)
         {
             Log.Error(e, "Unable to process file");
-            CrashHandler.HandleCrash(e);
+            CrashHandler.HandleCrash(e, new { ffmpeg_command = cmd });
             Environment.Exit(1);
         }
         OnUpdateEvent?.Invoke(this, EventArgs.Empty);
