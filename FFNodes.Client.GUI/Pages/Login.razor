@@ -1,5 +1,7 @@
 ﻿@page "/login"
+@using FFNodes.Client.Core.Handlers;
 @using FFNodes.Client.Core.Networking;
+@using FFNodes.Core.Data;
 @using FFNodes.Core.Model;
 @using Serilog;
 <link href="/css/login.css" rel="stylesheet" />
@@ -27,12 +29,17 @@
 </div>
 
 <LoadingComponent Message="Loading..." IsFullscreen=true Active=IsLoading />
+@if (!ProtocolRegistered)
+{
+    <AlertComponent Title="URL Protocol Error" OnClickCancel=@(()=>ProtocolRegistered=true) Message="The ffnodes URL Protocol is not setup correctly, this could cause issues.<br />Would you like to fix it now?" OnClickOkay=@(()=>{RegistryHandler.RegisterProtocol();ProtocolRegistered=true;}) />
+}
 
 @code {
     private string Username { get; set; } = "";
     private string ConnectionLink { get; set; } = "";
     private string Error { get; set; } = "";
     private bool IsLoading { get; set; } = true;
+    private bool ProtocolRegistered { get; set; } = true;
 
 
     protected async override Task OnInitializedAsync()
@@ -43,6 +50,9 @@
 
         await base.OnInitializedAsync();
         IsLoading = false;
+        if (!RegistryHandler.IsProtocolRegistered())
+            RegistryHandler.RegisterProtocol();
+        ProtocolRegistered = RegistryHandler.IsProtocolExecutableValid();
     }
 
     private async Task Update()
