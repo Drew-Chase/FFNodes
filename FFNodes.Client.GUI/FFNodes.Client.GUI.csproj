@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
-    <TargetFrameworks>net7.0-maccatalyst</TargetFrameworks>
-    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net7.0-windows10.0.19041.0</TargetFrameworks>
+	  <TargetFrameworks>net7.0-maccatalyst</TargetFrameworks>
+	  <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net7.0-windows10.0.19041.0</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <RootNamespace>FFNodes.Client.GUI</RootNamespace>
     <UseMaui>true</UseMaui>
@@ -12,10 +12,6 @@
 
     <!-- Display name -->
     <ApplicationTitle>FFNodes</ApplicationTitle>
-
-    <!-- App Identifier -->
-    <ApplicationId>net.lfinteractive.ffnodes.client.gui</ApplicationId>
-    <ApplicationIdGuid>2DD7F472-3FB4-4C3E-B500-1561A5D255DB</ApplicationIdGuid>
 
     <!-- Versions -->
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
@@ -61,7 +57,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="CommunityToolkit.Maui" Version="5.3.0" />
+    <PackageReference Include="CommunityToolkit.Maui" Version="6.1.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="7.0.0" />
   </ItemGroup>
 
