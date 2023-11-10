@@ -6,19 +6,21 @@
 */
 
 using FFNodes.Core.Data;
+using Newtonsoft.Json;
 using Serilog;
 
 namespace FFNodes.Core;
 
 public static class CrashHandler
 {
-    public static void HandleCrash(Exception exception)
+    public static void HandleCrash(Exception exception, params object[] data)
     {
         using (StreamWriter writer = File.CreateText(Path.Combine(Directories.CrashReports, $"crash-{DateTime.Now:MMM dd, yyyy - HH-mm-ss.fff}.log")))
         {
             writer.WriteLine($"FFNodes Crash Report - {DateTime.Now:MMM dd, yyyy - HH-mm-ss.fff}");
             writer.WriteLine(new string('=', 81));
             writer.WriteLine($"\nTL;DR: {exception.Source} - {exception.Message}\n");
+            writer.WriteLine($"Data: {JsonConvert.SerializeObject(data, Formatting.Indented)}");
             writer.WriteLine($"Stack Trace: {exception.StackTrace}");
             if (exception.Data != null && exception.Data.Count > 0)
             {
