@@ -6,6 +6,7 @@
 */
 
 using Chase.CommonLib.FileSystem.Configuration;
+using FFNodes.Core.Data;
 using Newtonsoft.Json;
 using Serilog.Events;
 
@@ -26,7 +27,7 @@ public sealed class ServerAppConfig : AppConfigBase<ServerAppConfig>
     public Guid AuthorizationToken { get; set; } = Guid.NewGuid();
 
     [JsonProperty("host")]
-    public string Host { get; set; } = "localhost";
+    public string Host { get; set; } = ApplicationData.PublicIPAddress.ToString();
 
     [JsonProperty("ffmpeg_command")]
     public string FFmpegCommand { get; set; } = @"-y -hwaccel auto -i ""{INPUT}"" -c:v {CODEC} -c:a aac -filter_complex ""[0:a]dialoguenhance=original=0.5:enhance=2:voice=8, dynaudnorm[aout]"" -map ""[aout]"" -map 0:v ""{OUTPUT}.{EXTENSION}""";
