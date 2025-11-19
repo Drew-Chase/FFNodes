@@ -8,6 +8,10 @@ license = "MIT"
 repository = "https://github.com/Drew-Chase/FFNodes.git"
 build = "build.rs"
 
+[lib]
+name = "ffnodes_server_lib"
+path = "src/lib.rs"
+
 [dependencies]
 actix-web = "4"
 serde = { version = "1.0", features = ["derive"] }
