@@ -1,0 +1,33 @@
+[package]
+name = "ffnodes_server"
+version = "0.1.0"
+edition = "2024"
+description = ""
+authors = ["Drew Chase"]
+license = "MIT"
+repository = "https://github.com/Drew-Chase/FFNodes.git"
+build = "build.rs"
+
+[dependencies]
+actix-web = "4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+env_logger = "0.11.6"
+log = "0.4.22"
+walkdir = "2.5.0"
+pretty_env_logger = "0.5.0"
+anyhow = "1.0.100"
+thiserror = {version = "2.0.17"}
+clap = {version = "4.5.52", features = ["derive", "unicode", "string", "usage", "error-context", "wrap_help", "suggestions", "help", "color"]}
+sqlx = "0.8.6"
+
+
+[build-dependencies]
+walkdir = "2.5.0"
+
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
