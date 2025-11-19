@@ -151,3 +151,6 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
+# Tools
+.claude
+CLAUDE.MD
