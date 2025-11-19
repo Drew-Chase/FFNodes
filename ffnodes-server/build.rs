@@ -7,5 +7,5 @@ fn main() {
 			println!("cargo:rerun-if-changed={}", entry.path().display());
 		}
 	}
-	fs::create_dir_all("../target/dev-env").expect("failed to create target directory");
+	fs::create_dir_all("../target/dev-env/server").expect("failed to create target directory");
 }
