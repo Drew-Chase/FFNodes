@@ -9,8 +9,7 @@ pub async fn initialize() -> Result<()> {
 	pool.execute(
 		r#"CREATE TABLE IF NOT EXISTS `media_files`
 (
-    id               INTEGER PRIMARY KEY,
-    path             TEXT    NOT NULL,
+    path             TEXT    PRIMARY KEY NOT NULL UNIQUE,
     scanned_size     INTEGER NOT NULL,
     size             INTEGER          DEFAULT NULL,
     scanned_bit_rate INTEGER NOT NULL,

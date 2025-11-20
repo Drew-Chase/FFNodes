@@ -13,9 +13,6 @@ pub use scanner::Scanner;
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow, HashIds)]
 /// A video media file.
 pub struct MediaFile {
-    #[hash]
-    /// The database id of the file.
-    pub id: Option<u64>,
     /// The path to the file on disk.
     pub path: PathBuf,
     /// The original file size at the point of scanning.
@@ -94,7 +91,6 @@ impl MediaFile {
         debug!("Parsed ffprobe output successfully");
 
         Ok(Self {
-            id: None,
             path: file_path.as_ref().to_path_buf(),
             scanned_size: format
                 .size
