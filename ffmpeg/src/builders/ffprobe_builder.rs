@@ -140,9 +140,9 @@ impl FFprobeBuilder {
     }
 
     /// Set log level
-    pub fn log_level(mut self, level: impl Into<String>) -> Self {
+    pub fn log_level(mut self, level: impl Into<u8>) -> Self {
         self.args.push("-loglevel".to_string());
-        self.args.push(level.into());
+        self.args.push(level.into().to_string());
         self
     }
 
@@ -210,11 +210,6 @@ impl FFprobeCommand {
         &self.args
     }
 
-    /// Get the command as a string (for debugging/logging)
-    pub fn to_string(&self) -> String {
-        format!("ffprobe {}", self.args.join(" "))
-    }
-
     /// Execute the command and return raw output
     pub async fn execute(&self, working_dir: Option<PathBuf>) -> Result<String> {
         let working_dir = working_dir.unwrap_or_else(|| PathBuf::from("."));
@@ -249,6 +244,12 @@ impl FFprobeCommand {
             .map_err(|e| BuilderError::ParseError(format!("Failed to parse JSON: {}", e)))?;
 
         Ok(result)
+    }
+}
+
+impl std::fmt::Display for FFprobeCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ffprobe {}", self.args.join(" "))
     }
 }
 

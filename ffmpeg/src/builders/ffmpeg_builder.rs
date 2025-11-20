@@ -553,15 +553,13 @@ impl FFmpegBuilder {
                 output.options.push("-af".to_string());
                 output.options.push(filter);
             }
-        } else {
-            if let Some(pos) = self.post_input_args.iter().position(|s| s == "-af") {
-                if let Some(existing) = self.post_input_args.get_mut(pos + 1) {
-                    existing.push_str(&format!(",{}", filter));
-                }
-            } else {
-                self.post_input_args.push("-af".to_string());
-                self.post_input_args.push(filter);
+        } else if let Some(pos) = self.post_input_args.iter().position(|s| s == "-af") {
+            if let Some(existing) = self.post_input_args.get_mut(pos + 1) {
+                existing.push_str(&format!(",{}", filter));
             }
+        } else {
+            self.post_input_args.push("-af".to_string());
+            self.post_input_args.push(filter);
         }
         self
     }
@@ -734,11 +732,6 @@ impl FFmpegCommand {
         &self.args
     }
 
-    /// Get the command as a string (for debugging/logging)
-    pub fn to_string(&self) -> String {
-        format!("ffmpeg {}", self.args.join(" "))
-    }
-
     /// Execute the command
     pub async fn execute(
         &self,
@@ -783,6 +776,12 @@ impl FFmpegCommand {
         })?;
 
         Ok(output)
+    }
+}
+
+impl std::fmt::Display for FFmpegCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ffmpeg {}", self.args.join(" "))
     }
 }
 
