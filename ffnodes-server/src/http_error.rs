@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use actix_web::error::HttpError;
 use actix_web::http::header::ToStrError;
 use actix_web::http::StatusCode;
@@ -10,7 +12,6 @@ use std::path::Path;
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     // Represents unspecified internal errors
-    #[allow(dead_code)]
     #[error(
         "an unspecified internal error occurred: * `lib.rs` sibling file text :*:
 ```rust
@@ -20,10 +21,9 @@ pub mod http_error;
 
 ```"
     )]
-    InternalError(anyhow::Error),
+    Internal(anyhow::Error),
 
     // Generic error type for miscellaneous errors
-    #[allow(dead_code)]
     #[error(transparent)]
     Other(anyhow::Error),
 
@@ -39,7 +39,7 @@ pub mod http_error;
 impl ResponseError for Error {
     fn status_code(&self) -> StatusCode {
         match &self {
-            Self::InternalError(_) | Self::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::Internal(_) | Self::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
             _ => StatusCode::BAD_REQUEST,
         }
     }
@@ -75,13 +75,13 @@ impl ResponseError for Error {
             // Parse backtrace into a structured format
             let frames = parse_backtrace(&backtrace_str);
 
-            return HttpResponse::build(status_code)
+            HttpResponse::build(status_code)
                 .content_type("application/json")
                 .json(json!({
                     "message": error_message,
                     "status": status_code.as_u16(),
                     "stacktrace": frames
-                }));
+                }))
         }
 
         #[cfg(not(debug_assertions))]
@@ -185,11 +185,10 @@ fn parse_backtrace(backtrace_str: &str) -> Vec<serde_json::Value> {
 
 /// Extract file path and line number from string
 fn extract_line_number(location: &str) -> (String, i32) {
-    if let Some((path, line_number_str)) = location.rsplit_once(':') {
-        if let Ok(line_number) = line_number_str.parse::<i32>() {
+    if let Some((path, line_number_str)) = location.rsplit_once(':')
+        && let Ok(line_number) = line_number_str.parse::<i32>() {
             return (path.to_string(), line_number);
         }
-    }
     (location.to_string(), -1)
 }
 
