@@ -3,6 +3,7 @@ use anyhow::{Result, anyhow};
 use ffmpeg::builders::ProbeFormat;
 use serde_hash::HashIds;
 use std::path::{Path, PathBuf};
+use log::{debug, error, info};
 
 mod media_file_db;
 mod scanner;
@@ -37,32 +38,60 @@ pub struct MediaFile {
 }
 
 impl MediaFile {
+    #[allow(dead_code)]
     pub async fn new(file_path: impl AsRef<Path>) -> Result<Self> {
+        info!("Loading media file {:?}", file_path.as_ref());
         let config = Configuration::load().await?;
+        Self::from_path_with_config(file_path, &config).await
+    }
+
+    pub async fn from_path_with_config(file_path: impl AsRef<Path>, config: &Configuration) -> Result<Self> {
+        info!("Probing media file {:?}", file_path.as_ref());
         let probe = config
             .ffmpeg
             .ffprobe_command_builder()
-            .log_level(0)
+            .input(file_path.as_ref().to_string_lossy().to_string())?
+            .show_streams()
+            .log_level(1)
             .output_format(ProbeFormat::JSON)
             .show_format()
-            .build()?
+            .build()
+            .map_err(|e| {
+                error!("Failed to build ffprobe command: {}", e);
+                e
+            })?
             .execute_json()
-            .await?;
+            .await
+            .map_err(|e| {
+                error!("Failed to execute ffprobe command: {}", e);
+                e
+            })?;
 
         let format = probe
             .format
             .as_ref()
-            .ok_or_else(|| anyhow!("Failed to parse ffprobe output"))?;
+            .ok_or_else(|| {
+                error!("Failed to parse ffprobe output - missing format data");
+                anyhow!("Failed to parse ffprobe output")
+            })?;
         let (width, height) = probe
             .video_resolution()
-            .ok_or_else(|| anyhow!("Failed to parse ffprobe output"))?;
+            .ok_or_else(|| {
+                error!("Failed to parse ffprobe output - missing video resolution");
+                anyhow!("Failed to parse ffprobe output")
+            })?;
         let frames = probe
             .first_video_stream()
-            .ok_or_else(|| anyhow!("Failed to parse ffprobe output"))?
+            .ok_or_else(|| {
+                error!("Failed to parse ffprobe output - missing video stream");
+                anyhow!("Failed to parse ffprobe output")
+            })?
             .nb_frames
             .as_ref()
             .map(|s| s.parse().unwrap_or(0))
             .unwrap_or(0);
+
+        debug!("Parsed ffprobe output successfully");
 
         Ok(Self {
             id: None,

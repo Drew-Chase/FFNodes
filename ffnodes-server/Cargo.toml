@@ -36,7 +36,7 @@ pretty_env_logger = "0.5.0"
 anyhow = "1.0.100"
 thiserror = { version = "2.0.17" }
 clap = { version = "4.5.52", features = ["derive", "unicode", "string", "usage", "error-context", "wrap_help", "suggestions", "help", "color"] }
-sqlx = { version = "0.8.6", features = ["sqlite", "macros", "derive", "time", "chrono"] }
+sqlx = { version = "0.8.6", features = ["sqlite", "macros", "derive", "time", "chrono", "runtime-tokio"] }
 serde_hash = { version = "0.1.3" }
 ffmpeg = { path = "../ffmpeg" }
-rayon = { version = "1.11.0" }
+futures = { version = "0.3" }

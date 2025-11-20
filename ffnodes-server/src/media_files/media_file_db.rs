@@ -51,7 +51,7 @@ impl MediaFile{
 }
 
 
-pub async fn open_pool() -> Result<sqlx::SqlitePool> {
+pub async fn open_pool() -> Result<SqlitePool> {
 	let options = SqliteConnectOptions::new()
 		.journal_mode(SqliteJournalMode::Wal)
 		.foreign_keys(true)

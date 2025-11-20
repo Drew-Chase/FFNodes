@@ -3,6 +3,7 @@ use anyhow::Result;
 use log::*;
 use serde_json::json;
 use std::env::set_current_dir;
+use std::sync::Arc;
 
 mod configuration;
 mod http_error;
@@ -12,12 +13,7 @@ pub static DEBUG: bool = cfg!(debug_assertions);
 
 pub async fn run() -> Result<()> {
     pretty_env_logger::env_logger::builder()
-        .filter_level(if DEBUG {
-            LevelFilter::Debug
-        } else {
-            LevelFilter::Info
-        })
-        .format_timestamp(None)
+        .filter_level(LevelFilter::Debug)
         .init();
     serde_hash::hashids::SerdeHashOptions::new()
         .with_min_length(16)
@@ -28,15 +24,16 @@ pub async fn run() -> Result<()> {
         set_current_dir("target/dev-env/server")?;
     }
 
-    let configuration = configuration::Configuration::load().await?;
+    let configuration = Arc::new(configuration::Configuration::load().await?);
     let port: u16 = configuration.port;
     let watch_directories = configuration.watch_directories.clone();
 
     media_files::initialize().await?;
 
     tokio::spawn({
+        let config = Arc::clone(&configuration);
         async move {
-            if let Err(e) = media_files::Scanner::scan(watch_directories).await {
+            if let Err(e) = media_files::Scanner::scan(watch_directories, config).await {
                 error!("Media file scanner error: {}", e);
             }
         }

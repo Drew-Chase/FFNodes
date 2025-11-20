@@ -1,9 +1,12 @@
+use crate::configuration::Configuration;
 use crate::media_files::MediaFile;
-use anyhow::Result;
-use rayon::prelude::*;
-use std::path::PathBuf;
-use walkdir::WalkDir;
 use crate::media_files::media_file_db::open_pool;
+use anyhow::Result;
+use log::{debug, info, trace};
+use std::path::PathBuf;
+use std::sync::Arc;
+use walkdir::WalkDir;
+use futures::stream::{self, StreamExt};
 
 const VIDEO_EXTENSIONS: [&str; 47] = [
     "webm", "mkv", "flv", "flv", "vob", "ogv", "ogg", "drc", "gif", "gifv", "mng", "avi", "mts",
@@ -14,8 +17,9 @@ const VIDEO_EXTENSIONS: [&str; 47] = [
 
 pub struct Scanner;
 impl Scanner {
-    pub async fn scan(watch_directories: Vec<PathBuf>) -> Result<()> {
-        let files = Self::find_media_files(watch_directories).await?;
+    pub async fn scan(watch_directories: Vec<PathBuf>, config: Arc<Configuration>) -> Result<()> {
+        info!("Scanning files");
+        let files = Self::find_media_files(watch_directories, config).await?;
         let pool = open_pool().await?;
         let mut transaction = pool.begin().await?;
         for file in files {
@@ -26,28 +30,38 @@ impl Scanner {
         Ok(())
     }
 
-    pub async fn find_media_files(dirs: Vec<PathBuf>) -> Result<Vec<MediaFile>> {
+    pub async fn find_media_files(dirs: Vec<PathBuf>, config: Arc<Configuration>) -> Result<Vec<MediaFile>> {
         let mut files: Vec<PathBuf> = vec![];
 
         for dir in dirs {
+            debug!("Scanning directory {:?}", dir);
             for entry in WalkDir::new(dir) {
                 let entry = entry?;
                 if let Some(extension) = entry.path().extension()
                     && VIDEO_EXTENSIONS.contains(&extension.to_string_lossy().to_string().as_str())
                 {
+                    debug!("Found video file: {:?}", entry.path());
                     files.push(entry.into_path());
                 }
             }
         }
 
-        let items: Vec<MediaFile> = files
-            .into_par_iter()
-            .filter_map(|file| {
-                tokio::runtime::Handle::current()
-                    .block_on(async { MediaFile::new(&file).await.ok() })
+        // Process files concurrently using Tokio's async runtime
+        // buffer_unordered allows up to 10 concurrent ffprobe operations
+        let items: Vec<MediaFile> = stream::iter(files)
+            .map(|file| {
+                let config = Arc::clone(&config);
+                async move {
+                    trace!("Probing video file: {:?}", file);
+                    MediaFile::from_path_with_config(&file, &config).await.ok()
+                }
             })
-            .collect();
+            .buffer_unordered(10)
+            .filter_map(|result| async move { result })
+            .collect()
+            .await;
 
+        info!("Found {} media files", items.len());
         Ok(items)
     }
 }
