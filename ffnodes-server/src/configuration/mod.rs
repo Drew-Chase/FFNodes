@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use ffmpeg::FFMpeg;
@@ -9,6 +10,7 @@ pub struct Configuration {
     pub port: u16,
     #[serde(flatten)]
     pub ffmpeg: FFMpeg,
+    pub watch_directories: Vec<PathBuf>,
 }
 
 impl Default for Configuration {
@@ -16,6 +18,7 @@ impl Default for Configuration {
         Self {
             port: 8080,
             ffmpeg: FFMpeg::default(),
+            watch_directories: vec![],
         }
     }
 }

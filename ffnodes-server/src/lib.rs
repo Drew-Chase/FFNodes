@@ -1,12 +1,12 @@
-use std::env::set_current_dir;
-use actix_web::{middleware, web, App, HttpResponse, HttpServer};
+use actix_web::{App, HttpResponse, HttpServer, middleware, web};
 use anyhow::Result;
 use log::*;
 use serde_json::json;
+use std::env::set_current_dir;
 
+mod configuration;
 mod http_error;
 mod media_files;
-mod configuration;
 
 pub static DEBUG: bool = cfg!(debug_assertions);
 
@@ -19,16 +19,28 @@ pub async fn run() -> Result<()> {
         })
         .format_timestamp(None)
         .init();
-    serde_hash::hashids::SerdeHashOptions::new().with_min_length(16).build();
+    serde_hash::hashids::SerdeHashOptions::new()
+        .with_min_length(16)
+        .build();
 
-    if DEBUG{
+    if DEBUG {
         info!("Debug mode enabled");
         set_current_dir("target/dev-env/server")?;
     }
 
-
     let configuration = configuration::Configuration::load().await?;
     let port: u16 = configuration.port;
+    let watch_directories = configuration.watch_directories.clone();
+
+    media_files::initialize().await?;
+
+    tokio::spawn({
+        async move {
+            if let Err(e) = media_files::Scanner::scan(watch_directories).await {
+                error!("Media file scanner error: {}", e);
+            }
+        }
+    });
 
     let server = HttpServer::new(move || {
         App::new()
