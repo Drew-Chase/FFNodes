@@ -38,7 +38,7 @@ async fn probe_example(ffmpeg: Arc<FFMpeg>) -> Result<(), Box<dyn std::error::Er
         .hide_banner()
         .build()?;
 
-    println!("Command: {}", cmd.to_string());
+    println!("Command: {}", cmd);
 
     // Uncomment to execute:
     // let metadata = cmd.execute_json().await?;
@@ -84,7 +84,7 @@ async fn basic_conversion_example(ffmpeg: Arc<FFMpeg>) -> Result<(), Box<dyn std
         .hide_banner()
         .build()?;
 
-    println!("Command: {}", cmd.to_string());
+    println!("Command: {}", cmd);
 
     // Uncomment to execute:
     // cmd.execute(None, None).await?;
@@ -106,7 +106,7 @@ async fn hardware_accel_example(ffmpeg: Arc<FFMpeg>) -> Result<(), Box<dyn std::
         .overwrite(true)
         .build()?;
 
-    println!("Command: {}", cmd.to_string());
+    println!("Command: {}", cmd);
 
     // Uncomment to execute:
     // cmd.execute(None, None).await?;
@@ -130,7 +130,7 @@ async fn filter_example(ffmpeg: Arc<FFMpeg>) -> Result<(), Box<dyn std::error::E
         .overwrite(true)
         .build()?;
 
-    println!("Command: {}", cmd.to_string());
+    println!("Command: {}", cmd);
 
     // Uncomment to execute:
     // cmd.execute(None, None).await?;
@@ -157,7 +157,7 @@ async fn streaming_example(ffmpeg: Arc<FFMpeg>) -> Result<(), Box<dyn std::error
         .overwrite(true)
         .build()?;
 
-    println!("Command: {}", cmd.to_string());
+    println!("Command: {}", cmd);
 
     // Uncomment to execute:
     // cmd.execute(None, None).await?;
