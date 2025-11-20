@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use encoding_rs::UTF_16LE;
 
 /// FFprobe command builder with fluent API
 ///
@@ -221,12 +222,45 @@ impl FFprobeCommand {
             .await
             .map_err(|e| BuilderError::ExecutionError(e.to_string()))?;
 
-        // Collect all output
-        let mut output = String::new();
-        while let Some(line) = rx.recv().await {
-            output.push_str(&line);
-            output.push('\n');
+        // Collect all output chunks as bytes first
+        let mut raw_bytes = Vec::new();
+        while let Some(chunk) = rx.recv().await {
+            raw_bytes.extend_from_slice(chunk.as_bytes());
         }
+
+        // Detect and handle encoding
+        let output = if raw_bytes.len() >= 2 && raw_bytes[0] == 0xFF && raw_bytes[1] == 0xFE {
+            // UTF-16 LE with BOM
+            let (decoded, _encoding, had_errors) = UTF_16LE.decode(&raw_bytes[2..]); // Skip BOM
+            if had_errors {
+                eprintln!("Warning: UTF-16 LE decoding had errors");
+            }
+            decoded.into_owned()
+        } else if raw_bytes.len() >= 2 && raw_bytes[0] == 0xFE && raw_bytes[1] == 0xFF {
+            // UTF-16 BE with BOM
+            let (decoded, _encoding, had_errors) = encoding_rs::UTF_16BE.decode(&raw_bytes[2..]);
+            if had_errors {
+                eprintln!("Warning: UTF-16 BE decoding had errors");
+            }
+            decoded.into_owned()
+        } else if raw_bytes.len() >= 4 && raw_bytes[0] == b'{' && raw_bytes[1] == 0 && raw_bytes[2] == b' ' && raw_bytes[3] == 0 {
+            // UTF-16 LE without BOM (detected by pattern: '{' 0x00 ' ' 0x00 for "{ ")
+            let (decoded, _encoding, had_errors) = UTF_16LE.decode(&raw_bytes);
+            if had_errors {
+                eprintln!("Warning: UTF-16 LE (no BOM) decoding had errors");
+            }
+            decoded.into_owned()
+        } else {
+            // Try UTF-8
+            match String::from_utf8(raw_bytes.clone()) {
+                Ok(s) => s,
+                Err(_) => {
+                    // UTF-8 failed, try UTF-16 LE as last resort
+                    let (decoded, _encoding, _) = UTF_16LE.decode(&raw_bytes);
+                    decoded.into_owned()
+                }
+            }
+        };
 
         Ok(output)
     }
@@ -240,8 +274,19 @@ impl FFprobeCommand {
         }
 
         let output = self.execute(None).await?;
+
         let result: ProbeResult = serde_json::from_str(&output)
-            .map_err(|e| BuilderError::ParseError(format!("Failed to parse JSON: {}", e)))?;
+            .map_err(|e| {
+                eprintln!("=== FFprobe JSON Parse Error ===");
+                eprintln!("Error: {}", e);
+                eprintln!("Output length: {} bytes", output.len());
+                eprintln!("First 500 chars: {}",
+                    if output.len() > 500 { &output[..500] } else { &output });
+                if output.len() > 500 {
+                    eprintln!("Last 100 chars: {}", &output[output.len().saturating_sub(100)..]);
+                }
+                BuilderError::ParseError(format!("Failed to parse JSON: {}", e))
+            })?;
 
         Ok(result)
     }
@@ -294,7 +339,7 @@ pub struct Stream {
     pub color_space: Option<String>,
     pub color_transfer: Option<String>,
     pub color_primaries: Option<String>,
-    pub field_order: Option<String>,
+    pub field_order: serde_json::Value,
     pub refs: Option<u32>,
 
     // Audio-specific
@@ -308,7 +353,7 @@ pub struct Stream {
     pub r_frame_rate: Option<String>,
     pub avg_frame_rate: Option<String>,
     pub time_base: Option<String>,
-    pub start_pts: Option<i64>,
+    pub start_pts: serde_json::Value,
     pub start_time: Option<String>,
     pub duration_ts: Option<i64>,
     pub duration: Option<String>,
@@ -325,7 +370,7 @@ pub struct Stream {
 
     // Disposition
     #[serde(default)]
-    pub disposition: HashMap<String, i32>,
+    pub disposition: serde_json::Value,
 }
 
 /// Format/container information
