@@ -13,7 +13,7 @@ pub static DEBUG: bool = cfg!(debug_assertions);
 
 pub async fn run() -> Result<()> {
     pretty_env_logger::env_logger::builder()
-        .filter_level(LevelFilter::Debug)
+        .filter_level(LevelFilter::Trace)
         .init();
     serde_hash::hashids::SerdeHashOptions::new()
         .with_min_length(16)
