@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use encoding_rs::UTF_16LE;
+use log::info;
 
 /// FFprobe command builder with fluent API
 ///
@@ -330,17 +331,23 @@ pub struct Stream {
     pub height: Option<u32>,
     pub coded_width: Option<u32>,
     pub coded_height: Option<u32>,
+    pub closed_captions: Option<u32>,
+    pub film_grain: Option<u32>,
     pub has_b_frames: Option<u32>,
     pub sample_aspect_ratio: Option<String>,
     pub display_aspect_ratio: Option<String>,
     pub pix_fmt: Option<String>,
     pub level: Option<i32>,
+    pub chroma_location: Option<String>,
     pub color_range: Option<String>,
     pub color_space: Option<String>,
     pub color_transfer: Option<String>,
     pub color_primaries: Option<String>,
-    pub field_order: serde_json::Value,
+    #[serde(default)]
+    pub field_order: Option<serde_json::Value>,
     pub refs: Option<u32>,
+    pub is_avc: Option<String>,
+    pub nal_length_size: Option<String>,
 
     // Audio-specific
     pub sample_fmt: Option<String>,
@@ -348,12 +355,14 @@ pub struct Stream {
     pub channels: Option<u32>,
     pub channel_layout: Option<String>,
     pub bits_per_sample: Option<u32>,
+    pub initial_padding: Option<u32>,
 
     // Common
     pub r_frame_rate: Option<String>,
     pub avg_frame_rate: Option<String>,
     pub time_base: Option<String>,
-    pub start_pts: serde_json::Value,
+    #[serde(default)]
+    pub start_pts: Option<serde_json::Value>,
     pub start_time: Option<String>,
     pub duration_ts: Option<i64>,
     pub duration: Option<String>,
@@ -363,6 +372,7 @@ pub struct Stream {
     pub nb_frames: Option<String>,
     pub nb_read_frames: Option<String>,
     pub nb_read_packets: Option<String>,
+    pub extradata_size: Option<u32>,
 
     // Tags
     #[serde(default)]
@@ -379,6 +389,7 @@ pub struct Format {
     pub filename: String,
     pub nb_streams: u32,
     pub nb_programs: Option<u32>,
+    pub nb_stream_groups: Option<u32>,
     pub format_name: String,
     pub format_long_name: Option<String>,
     pub start_time: Option<String>,
