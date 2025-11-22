@@ -5,6 +5,7 @@
       <sourceFolder url="file://$MODULE_DIR$/ffmpeg/examples" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/ffmpeg/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/ffnodes-server/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ffmpeg/tests" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />
