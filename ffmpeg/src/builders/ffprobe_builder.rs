@@ -6,7 +6,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use encoding_rs::UTF_16LE;
-use log::info;
 
 /// FFprobe command builder with fluent API
 ///

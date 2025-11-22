@@ -18,6 +18,7 @@ pub async fn initialize() -> Result<()> {
     width            INTEGER NOT NULL,
     height           INTEGER NOT NULL,
     frames           INTEGER NOT NULL,
+    last_modified    INTEGER NOT NULL,
     processed        INTEGER NOT NULL DEFAULT 0
 )"#,
 	)
@@ -31,18 +32,40 @@ impl MediaFile{
 	pub async fn insert(&self, transaction: &mut Transaction<'_,sqlx::sqlite::Sqlite>) -> Result<()> {
 		sqlx::query(
 			r#"INSERT INTO media_files
-			(path, scanned_size, scanned_bit_rate, duration, width, height, frames, processed)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)"#
+			(path, scanned_size, scanned_bit_rate, duration, width, height, frames, last_modified, processed)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"#
 		)
 			.bind(self.path.to_string_lossy().to_string())
 			.bind(self.scanned_size as i64)
 			.bind(self.scanned_bit_rate as i64)
-			.bind(self.duration as i64)
+			.bind(self.duration as f64)
 			.bind(self.width as i64)
 			.bind(self.height as i64)
 			.bind(self.frames as i64)
+			.bind(self.last_modified as i64)
 			.bind(self.processed)
 			.execute(&mut **transaction)
+			.await?;
+
+		Ok(())
+	}
+
+	pub async fn insert_direct(&self, pool: &SqlitePool) -> Result<()> {
+		sqlx::query(
+			r#"INSERT INTO media_files
+			(path, scanned_size, scanned_bit_rate, duration, width, height, frames, last_modified, processed)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"#
+		)
+			.bind(self.path.to_string_lossy().to_string())
+			.bind(self.scanned_size as i64)
+			.bind(self.scanned_bit_rate as i64)
+			.bind(self.duration as f64)
+			.bind(self.width as i64)
+			.bind(self.height as i64)
+			.bind(self.frames as i64)
+			.bind(self.last_modified as i64)
+			.bind(self.processed)
+			.execute(pool)
 			.await?;
 
 		Ok(())

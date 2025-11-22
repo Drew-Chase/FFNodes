@@ -2,7 +2,7 @@ use crate::configuration::Configuration;
 use crate::media_files::MediaFile;
 use crate::media_files::media_file_db::open_pool;
 use anyhow::Result;
-use log::{debug, info, trace};
+use log::{debug, error, info, trace};
 use std::path::PathBuf;
 use std::sync::Arc;
 use walkdir::WalkDir;
@@ -19,21 +19,13 @@ pub struct Scanner;
 impl Scanner {
     pub async fn scan(watch_directories: Vec<PathBuf>, config: Arc<Configuration>) -> Result<()> {
         info!("Scanning files");
-        let files = Self::find_media_files(watch_directories, config).await?;
+
+        // Open database pool once for all inserts
         let pool = open_pool().await?;
-        let mut transaction = pool.begin().await?;
-        for file in files {
-            file.insert(&mut transaction).await?;
-        }
-        transaction.commit().await?;
 
-        Ok(())
-    }
-
-    pub async fn find_media_files(dirs: Vec<PathBuf>, config: Arc<Configuration>) -> Result<Vec<MediaFile>> {
+        // Collect all video file paths first
         let mut files: Vec<PathBuf> = vec![];
-
-        for dir in dirs {
+        for dir in watch_directories {
             debug!("Scanning directory {:?}", dir);
             for entry in WalkDir::new(dir) {
                 let entry = entry?;
@@ -46,22 +38,40 @@ impl Scanner {
             }
         }
 
-        // Process files concurrently using Tokio's async runtime
+        // Process and insert files concurrently as they're probed
         // buffer_unordered allows up to 10 concurrent ffprobe operations
-        let items: Vec<MediaFile> = stream::iter(files)
+        let insert_count = stream::iter(files)
             .map(|file| {
                 let config = Arc::clone(&config);
+                let pool = pool.clone();
                 async move {
                     trace!("Probing video file: {:?}", file);
-                    MediaFile::from_path_with_config(&file, &config).await.ok()
+                    match MediaFile::from_path_with_config(&file, &config).await {
+                        Ok(media_file) => {
+                            // Insert immediately after probing
+                            match media_file.insert_direct(&pool).await {
+                                Ok(_) => {
+                                    debug!("Inserted {:?} into database", file);
+                                    1
+                                }
+                                Err(e) => {
+                                    error!("Failed to insert {:?}: {:#}", file, e);
+                                    0
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            error!("Failed to probe {:?}: {:#}", file, e);
+                            0
+                        }
+                    }
                 }
             })
-            .buffer_unordered(10)
-            .filter_map(|result| async move { result })
-            .collect()
+            .buffer_unordered(100)
+            .fold(0, |acc, count| async move { acc + count })
             .await;
 
-        info!("Found {} media files", items.len());
-        Ok(items)
+        info!("Successfully inserted {} media files into database", insert_count);
+        Ok(())
     }
 }
