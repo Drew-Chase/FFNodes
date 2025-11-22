@@ -300,16 +300,21 @@ impl FFMpeg {
 			.start()
 			.await?;
 		if let Some(mut process) = AsynchronousInteractiveProcess::get_process_by_pid(pid).await {
-			tokio::spawn(async move {
-				while process.is_process_running().await {
-					match process.receive_output().await {
-						Ok(Some(output)) => sender.send(output).await?,
-						Err(e) => return Err(e),
-						_ => continue,
-					};
-				}
-				Ok(())
-			});
+			// Wait for process to complete and collect all output
+			while process.is_process_running().await {
+				match process.receive_output().await {
+					Ok(Some(output)) => {
+						sender.send(output).await?;
+					},
+					Err(e) => return Err(e),
+					_ => continue,
+				};
+			}
+
+			// Collect any remaining output after process exits
+			while let Ok(Some(output)) = process.receive_output().await {
+				sender.send(output).await?;
+			}
 		}
 		Ok(())
 	}
