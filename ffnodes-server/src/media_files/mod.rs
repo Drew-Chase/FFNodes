@@ -6,10 +6,12 @@ use serde_hash::HashIds;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
-mod media_file_db;
+pub mod media_file_db;
 mod scanner;
+mod watcher;
 pub use media_file_db::initialize;
 pub use scanner::Scanner;
+pub use watcher::FileWatcher;
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow, HashIds)]
 /// A video media file.
@@ -34,6 +36,10 @@ pub struct MediaFile {
     pub frames: u64,
     /// The last modified timestamp of the file
     pub last_modified: u64,
+    /// Encoding complexity score (resolution × bitrate × duration)
+    pub encoding_complexity: u64,
+    /// Number of times encoding has failed for this file
+    pub retry_count: u32,
     /// Whether the file has been processed.
     pub processed: bool,
 }
@@ -43,105 +49,151 @@ impl MediaFile {
     pub async fn new(file_path: impl AsRef<Path>) -> Result<Self> {
         info!("Loading media file {:?}", file_path.as_ref());
         let config = Configuration::load().await?;
-        Self::from_path_with_config(file_path, &config).await
+        Self::from_path_with_config(file_path, &config, false).await
     }
 
     pub async fn from_path_with_config(
         file_path: impl AsRef<Path>,
         config: &Configuration,
+        slow_calc_frames: bool,
     ) -> Result<Self> {
         info!("Probing media file {:?}", file_path.as_ref());
-        let probe = config
-            .ffmpeg
-            .ffprobe_command_builder()
-            .input(file_path.as_ref().to_string_lossy().to_string())?
-            .show_streams()
-            .log_level(1)
-            .output_format(ProbeFormat::JSON)
-            .show_format()
-            .build()
-            .map_err(|e| {
-                error!("Failed to build ffprobe command: {}", e);
-                e
-            })?
-            .execute_json()
-            .await
-            .map_err(|e| {
-                error!("Failed to execute ffprobe command: {}", e);
-                e
+
+        // Try fast probe first, then retry with slow frame counting if needed
+        let mut current_slow_calc = slow_calc_frames;
+
+        loop {
+            let mut builder = config
+                .ffmpeg
+                .ffprobe_command_builder()
+                .input(file_path.as_ref().to_string_lossy().to_string())?
+                .show_streams()
+                .log_level(1)
+                .output_format(ProbeFormat::JSON)
+                .show_format();
+
+            if current_slow_calc {
+                builder = builder.count_frames();
+            }
+
+            let probe = builder
+                .build()
+                .map_err(|e| {
+                    error!("Failed to build ffprobe command: {}", e);
+                    e
+                })?
+                .execute_json()
+                .await
+                .map_err(|e| {
+                    error!("Failed to execute ffprobe command: {}", e);
+                    e
+                })?;
+
+            let format = probe.format.as_ref().ok_or_else(|| {
+                error!("Failed to parse ffprobe output - missing format data");
+                anyhow!("Failed to parse ffprobe output")
+            })?;
+            let (width, height) = probe.video_resolution().ok_or_else(|| {
+                error!("Failed to parse ffprobe output - missing video resolution");
+                anyhow!("Failed to parse ffprobe output")
             })?;
 
-        let format = probe.format.as_ref().ok_or_else(|| {
-            error!("Failed to parse ffprobe output - missing format data");
-            anyhow!("Failed to parse ffprobe output")
-        })?;
-        let (width, height) = probe.video_resolution().ok_or_else(|| {
-            error!("Failed to parse ffprobe output - missing video resolution");
-            anyhow!("Failed to parse ffprobe output")
-        })?;
+            // Try to extract frame count from various sources
+            let frames_result = Self::extract_frame_count(&probe);
 
-        let frames = {
-            if let Some(stream) = probe.first_video_stream() {
-                if let Some(nb_frames_s) = stream.nb_frames.as_ref() {
-                    if let Ok(nb_frames) = nb_frames_s.parse::<u64>() {
-                        nb_frames
+            let frames = match frames_result {
+                Some(frames) => frames,
+                None => {
+                    // If we haven't tried slow counting yet, retry with it
+                    if !current_slow_calc {
+                        debug!("Frame count not available, retrying with count_frames enabled");
+                        current_slow_calc = true;
+                        continue;
                     } else {
-                        return Err(anyhow!("Failed to parse nb frames"));
+                        // Even with slow counting, couldn't get frame count
+                        return Err(anyhow!("Failed to determine frame count"));
                     }
-                } else if let Some(nb_frames_s) = stream.tags.get("NUMBER_OF_FRAMES") {
-                    if let Ok(nb_frames) = nb_frames_s.parse::<u64>() {
-                        nb_frames
+                }
+            };
+
+            let duration: f32 = {
+                if let Some(duration) = format.duration.as_ref() {
+                    if let Ok(duration) = duration.parse::<f32>() {
+                        duration
                     } else {
-                        return Err(anyhow!("Failed to parse nb frames"));
+                        return Err(anyhow!("Failed to parse duration"));
                     }
                 } else {
-                    return Err(anyhow!("Failed to parse nb frames"));
+                    0.0f32
                 }
-            } else {
-                0u64
-            }
-        };
+            };
 
-        let duration: f32 = {
-            if let Some(duration) = format.duration.as_ref() {
-                if let Ok(duration) = duration.parse::<f32>() {
-                    duration
-                } else {
-                    return Err(anyhow!("Failed to parse duration"));
-                }
-            } else {
-                0.0f32
-            }
-        };
+            let last_modified = tokio::fs::metadata(&file_path)
+                .await?
+                .modified()?
+                .duration_since(UNIX_EPOCH)?
+                .as_secs();
 
-        let last_modified = tokio::fs::metadata(&file_path)
-            .await?
-            .modified()?
-            .duration_since(UNIX_EPOCH)?
-            .as_secs();
-
-        debug!("Parsed ffprobe output successfully");
-
-        Ok(Self {
-            path: file_path.as_ref().to_path_buf(),
-            scanned_size: format
-                .size
-                .as_ref()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(0),
-            size: None,
-            scanned_bit_rate: format
+            let scanned_bit_rate = format
                 .bit_rate
                 .as_ref()
                 .map(|bit_rate| bit_rate.parse().unwrap_or(0))
-                .unwrap_or(0),
-            bit_rate: None,
-            duration,
-            width: width as u64,
-            height: height as u64,
-            frames,
-            last_modified,
-            processed: false,
-        })
+                .unwrap_or(0);
+
+            // Calculate encoding complexity: (width × height) × bitrate × duration
+            let encoding_complexity = ((width as u64 * height as u64) as f64
+                * scanned_bit_rate as f64
+                * duration as f64) as u64;
+
+            debug!("Parsed ffprobe output successfully");
+
+            return Ok(Self {
+                path: file_path.as_ref().to_path_buf(),
+                scanned_size: format
+                    .size
+                    .as_ref()
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(0),
+                size: None,
+                scanned_bit_rate,
+                bit_rate: None,
+                duration,
+                width: width as u64,
+                height: height as u64,
+                frames,
+                last_modified,
+                encoding_complexity,
+                retry_count: 0,
+                processed: false,
+            });
+        }
+    }
+
+    /// Extract frame count from probe output, trying multiple sources
+    fn extract_frame_count(probe: &ffmpeg::builders::ProbeResult) -> Option<u64> {
+        let stream = probe.first_video_stream()?;
+
+        // Try nb_frames field
+        if let Some(nb_frames_s) = stream.nb_frames.as_ref()
+            && let Ok(nb_frames) = nb_frames_s.parse::<u64>()
+        {
+            return Some(nb_frames);
+        }
+
+        // Try NUMBER_OF_FRAMES tag
+        if let Some(nb_frames_s) = stream.tags.get("NUMBER_OF_FRAMES")
+            && let Ok(nb_frames) = nb_frames_s.parse::<u64>()
+        {
+            return Some(nb_frames);
+        }
+
+        // Try NUMBER_OF_FRAMES-eng tag
+        if let Some(nb_frames_s) = stream.tags.get("NUMBER_OF_FRAMES-eng")
+            && let Ok(nb_frames) = nb_frames_s.parse::<u64>()
+        {
+            return Some(nb_frames);
+        }
+
+        None
     }
 }

@@ -23,7 +23,7 @@ impl Scanner {
         // Open database pool once for all inserts
         let pool = open_pool().await?;
 
-        // Collect all video file paths first
+        // Collect all video file paths that need probing
         let mut files: Vec<PathBuf> = vec![];
         for dir in watch_directories {
             debug!("Scanning directory {:?}", dir);
@@ -32,8 +32,22 @@ impl Scanner {
                 if let Some(extension) = entry.path().extension()
                     && VIDEO_EXTENSIONS.contains(&extension.to_string_lossy().to_string().as_str())
                 {
-                    debug!("Found video file: {:?}", entry.path());
-                    files.push(entry.into_path());
+                    // Check if file needs probing using smart re-probing logic
+                    match MediaFile::does_path_need_probing(entry.path(), &pool).await {
+                        Ok(needs_probing) => {
+                            if needs_probing {
+                                debug!("File needs probing: {:?}", entry.path());
+                                files.push(entry.into_path());
+                            } else {
+                                trace!("File already up-to-date: {:?}", entry.path());
+                            }
+                        }
+                        Err(_) => {
+                            // File doesn't exist in database, needs probing
+                            debug!("New file found: {:?}", entry.path());
+                            files.push(entry.into_path());
+                        }
+                    }
                 }
             }
         }
@@ -46,7 +60,7 @@ impl Scanner {
                 let pool = pool.clone();
                 async move {
                     trace!("Probing video file: {:?}", file);
-                    match MediaFile::from_path_with_config(&file, &config).await {
+                    match MediaFile::from_path_with_config(&file, &config, false).await {
                         Ok(media_file) => {
                             // Insert immediately after probing
                             match media_file.insert_direct(&pool).await {

@@ -145,6 +145,21 @@ impl From<HttpResponse> for Error {
 // Type alias for Result using custom Error type
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Convenience constructors for common HTTP errors
+impl Error {
+    pub fn unauthorized(message: impl Into<String>) -> Self {
+        Error::Anyhow(anyhow!(message.into()))
+    }
+
+    pub fn not_found(message: impl Into<String>) -> Self {
+        Error::Anyhow(anyhow!(message.into()))
+    }
+
+    pub fn internal_server_error(message: impl Into<String>) -> Self {
+        Error::Internal(anyhow!(message.into()))
+    }
+}
+
 /// Helper to parse the backtrace into structured JSON data
 fn parse_backtrace(backtrace_str: &str) -> Vec<serde_json::Value> {
     let lines: Vec<&str> = backtrace_str.lines().collect();

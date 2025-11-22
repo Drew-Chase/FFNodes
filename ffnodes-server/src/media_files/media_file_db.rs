@@ -8,20 +8,77 @@ use std::time::UNIX_EPOCH;
 
 pub async fn initialize() -> Result<()> {
     let pool = open_pool().await?;
+
+    // Media files table
     pool.execute(
         r#"CREATE TABLE IF NOT EXISTS `media_files`
 (
-    path             TEXT    PRIMARY KEY NOT NULL UNIQUE,
-    scanned_size     INTEGER NOT NULL,
-    size             INTEGER          DEFAULT NULL,
-    scanned_bit_rate INTEGER NOT NULL,
-    bit_rate         INTEGER          DEFAULT NULL,
-    duration         INTEGER NOT NULL,
-    width            INTEGER NOT NULL,
-    height           INTEGER NOT NULL,
-    frames           INTEGER NOT NULL,
-    last_modified    INTEGER NOT NULL,
-    processed        INTEGER NOT NULL DEFAULT 0
+    path                 TEXT    PRIMARY KEY NOT NULL UNIQUE,
+    scanned_size         INTEGER NOT NULL,
+    size                 INTEGER          DEFAULT NULL,
+    scanned_bit_rate     INTEGER NOT NULL,
+    bit_rate             INTEGER          DEFAULT NULL,
+    duration             INTEGER NOT NULL,
+    width                INTEGER NOT NULL,
+    height               INTEGER NOT NULL,
+    frames               INTEGER NOT NULL,
+    last_modified        INTEGER NOT NULL,
+    encoding_complexity  INTEGER NOT NULL DEFAULT 0,
+    retry_count          INTEGER NOT NULL DEFAULT 0,
+    processed            INTEGER NOT NULL DEFAULT 0
+)"#,
+    )
+    .await?;
+
+    // Encoding jobs table
+    pool.execute(
+        r#"CREATE TABLE IF NOT EXISTS `encoding_jobs`
+(
+    id              TEXT    PRIMARY KEY NOT NULL,
+    media_file_path TEXT    NOT NULL,
+    status          TEXT    NOT NULL,
+    priority        INTEGER NOT NULL,
+    assigned_client TEXT             DEFAULT NULL,
+    assigned_at     INTEGER          DEFAULT NULL,
+    started_at      INTEGER          DEFAULT NULL,
+    completed_at    INTEGER          DEFAULT NULL,
+    error_message   TEXT             DEFAULT NULL,
+    output_path     TEXT             DEFAULT NULL,
+    output_size     INTEGER          DEFAULT NULL,
+    output_bitrate  INTEGER          DEFAULT NULL,
+    created_at      INTEGER NOT NULL,
+    FOREIGN KEY (media_file_path) REFERENCES media_files(path) ON DELETE CASCADE,
+    FOREIGN KEY (assigned_client) REFERENCES clients(id) ON DELETE SET NULL
+)"#,
+    )
+    .await?;
+
+    // Clients table
+    pool.execute(
+        r#"CREATE TABLE IF NOT EXISTS `clients`
+(
+    id             TEXT    PRIMARY KEY NOT NULL,
+    display_name   TEXT    NOT NULL,
+    computer_name  TEXT    NOT NULL,
+    connected_at   INTEGER NOT NULL,
+    last_heartbeat INTEGER NOT NULL,
+    disconnected_at INTEGER         DEFAULT NULL
+)"#,
+    )
+    .await?;
+
+    // Encoding progress table
+    pool.execute(
+        r#"CREATE TABLE IF NOT EXISTS `encoding_progress`
+(
+    job_id         TEXT    NOT NULL,
+    frame          INTEGER NOT NULL,
+    fps            REAL    NOT NULL,
+    bitrate        TEXT    NOT NULL,
+    speed          TEXT    NOT NULL,
+    updated_at     INTEGER NOT NULL,
+    PRIMARY KEY (job_id),
+    FOREIGN KEY (job_id) REFERENCES encoding_jobs(id) ON DELETE CASCADE
 )"#,
     )
     .await?;
@@ -36,8 +93,8 @@ impl MediaFile {
     ) -> Result<()> {
         sqlx::query(
             r#"INSERT INTO media_files
-			(path, scanned_size, scanned_bit_rate, duration, width, height, frames, last_modified, processed)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+			(path, scanned_size, scanned_bit_rate, duration, width, height, frames, last_modified, encoding_complexity, retry_count, processed)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
         )
         .bind(self.path.to_string_lossy().to_string())
         .bind(self.scanned_size as i64)
@@ -47,6 +104,8 @@ impl MediaFile {
         .bind(self.height as i64)
         .bind(self.frames as i64)
         .bind(self.last_modified as i64)
+        .bind(self.encoding_complexity as i64)
+        .bind(self.retry_count as i64)
         .bind(self.processed)
         .execute(&mut **transaction)
         .await?;
@@ -57,8 +116,8 @@ impl MediaFile {
     pub async fn insert_direct(&self, pool: &SqlitePool) -> Result<()> {
         sqlx::query(
             r#"INSERT INTO media_files
-			(path, scanned_size, scanned_bit_rate, duration, width, height, frames, last_modified, processed)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+			(path, scanned_size, scanned_bit_rate, duration, width, height, frames, last_modified, encoding_complexity, retry_count, processed)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
         )
         .bind(self.path.to_string_lossy().to_string())
         .bind(self.scanned_size as i64)
@@ -68,6 +127,8 @@ impl MediaFile {
         .bind(self.height as i64)
         .bind(self.frames as i64)
         .bind(self.last_modified as i64)
+        .bind(self.encoding_complexity as i64)
+        .bind(self.retry_count as i64)
         .bind(self.processed)
         .execute(pool)
         .await?;

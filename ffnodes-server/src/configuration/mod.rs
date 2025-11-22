@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use ffmpeg::FFMpeg;
+use uuid::Uuid;
 
 const CONFIG_FILE_NAME: &str = "config.json";
 
@@ -11,6 +12,11 @@ pub struct Configuration {
     #[serde(flatten)]
     pub ffmpeg: FFMpeg,
     pub watch_directories: Vec<PathBuf>,
+    pub server_guid: String,
+    pub ffmpeg_template: String,
+    pub client_timeout_seconds: u64,
+    pub notify_batch_interval_seconds: u64,
+    pub max_concurrent_jobs_per_client: u32,
 }
 
 impl Default for Configuration {
@@ -19,6 +25,11 @@ impl Default for Configuration {
             port: 8080,
             ffmpeg: FFMpeg::default(),
             watch_directories: vec![],
+            server_guid: Uuid::new_v4().to_string(),
+            ffmpeg_template: "-c:v h264{HWACCEL_CODE} -preset medium -crf 23 -i {INPUT} {OUTPUT}".to_string(),
+            client_timeout_seconds: 300,
+            notify_batch_interval_seconds: 30,
+            max_concurrent_jobs_per_client: 4,
         }
     }
 }
