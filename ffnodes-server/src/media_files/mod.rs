@@ -9,9 +9,11 @@ use std::time::UNIX_EPOCH;
 pub mod media_file_db;
 mod scanner;
 mod watcher;
+pub mod progress;
 pub use media_file_db::initialize;
 pub use scanner::Scanner;
 pub use watcher::FileWatcher;
+pub use progress::{ProgressBroadcaster, ScanProgress};
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow, HashIds)]
 /// A video media file.

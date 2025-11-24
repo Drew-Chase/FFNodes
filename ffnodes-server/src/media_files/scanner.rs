@@ -1,12 +1,15 @@
 use crate::configuration::Configuration;
 use crate::media_files::MediaFile;
 use crate::media_files::media_file_db::open_pool;
+use crate::media_files::progress::{self, ScanProgress};
 use anyhow::Result;
-use log::{debug, error, info, trace};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use tracing::{debug, error, info, trace};
 use walkdir::WalkDir;
 use futures::stream::{self, StreamExt};
+use indicatif::{ProgressBar, ProgressStyle};
 
 const VIDEO_EXTENSIONS: [&str; 47] = [
     "webm", "mkv", "flv", "flv", "vob", "ogv", "ogg", "drc", "gif", "gifv", "mng", "avi", "mts",
@@ -19,6 +22,9 @@ pub struct Scanner;
 impl Scanner {
     pub async fn scan(watch_directories: Vec<PathBuf>, config: Arc<Configuration>) -> Result<()> {
         info!("Scanning files");
+
+        // Broadcast scan start
+        progress::send_progress(ScanProgress::new("Scanning directories"));
 
         // Open database pool once for all inserts
         let pool = open_pool().await?;
@@ -52,15 +58,73 @@ impl Scanner {
             }
         }
 
+        let total_files = files.len();
+        info!("Found {} files to process", total_files);
+
+        if total_files == 0 {
+            progress::send_progress(ScanProgress {
+                total_files: 0,
+                completed_files: 0,
+                current_file: None,
+                operation: "Complete".to_string(),
+            });
+            return Ok(());
+        }
+
+        // Broadcast total count
+        progress::send_progress(ScanProgress::with_total("Probing files", total_files));
+
+        // Create progress bar
+        let pb = ProgressBar::new(total_files as u64);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} {msg}")
+                .expect("Invalid progress bar template")
+                .progress_chars("█▓▒░ "),
+        );
+
+        // Atomic counter for completed files
+        let completed = Arc::new(AtomicUsize::new(0));
+
         // Process and insert files concurrently as they're probed
-        // buffer_unordered allows up to 10 concurrent ffprobe operations
+        // buffer_unordered allows up to 100 concurrent ffprobe operations
         let insert_count = stream::iter(files)
             .map(|file| {
                 let config = Arc::clone(&config);
                 let pool = pool.clone();
+                let pb = pb.clone();
+                let completed = Arc::clone(&completed);
                 async move {
+                    // Get filename for display
+                    let filename = file
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("unknown")
+                        .to_string();
+
+                    // Truncate filename if too long
+                    let display_name = if filename.len() > 50 {
+                        format!("{}...", &filename[..47])
+                    } else {
+                        filename.clone()
+                    };
+
+                    // Update progress bar message
+                    pb.set_message(format!("{} ({:.1}%)",
+                        display_name,
+                        (completed.load(Ordering::Relaxed) as f64 / total_files as f64) * 100.0
+                    ));
+
+                    // Broadcast current file
+                    progress::send_progress(ScanProgress {
+                        total_files,
+                        completed_files: completed.load(Ordering::Relaxed),
+                        current_file: Some(file.to_string_lossy().to_string()),
+                        operation: "Probing files".to_string(),
+                    });
+
                     trace!("Probing video file: {:?}", file);
-                    match MediaFile::from_path_with_config(&file, &config, false).await {
+                    let result = match MediaFile::from_path_with_config(&file, &config, false).await {
                         Ok(media_file) => {
                             // Insert immediately after probing
                             match media_file.insert_direct(&pool).await {
@@ -78,12 +142,29 @@ impl Scanner {
                             error!("Failed to probe {:?}: {:#}", file, e);
                             0
                         }
-                    }
+                    };
+
+                    // Update counters
+                    completed.fetch_add(1, Ordering::Relaxed);
+                    pb.inc(1);
+
+                    result
                 }
             })
             .buffer_unordered(100)
             .fold(0, |acc, count| async move { acc + count })
             .await;
+
+        // Finish progress bar and clear it
+        pb.finish_and_clear();
+
+        // Broadcast completion
+        progress::send_progress(ScanProgress {
+            total_files,
+            completed_files: total_files,
+            current_file: None,
+            operation: "Complete".to_string(),
+        });
 
         info!("Successfully inserted {} media files into database", insert_count);
         Ok(())
