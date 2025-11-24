@@ -147,6 +147,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// Convenience constructors for common HTTP errors
 impl Error {
+    pub fn bad_request(message: impl Into<String>) -> Self {
+        Error::Anyhow(anyhow!(message.into()))
+    }
+
     pub fn unauthorized(message: impl Into<String>) -> Self {
         Error::Anyhow(anyhow!(message.into()))
     }

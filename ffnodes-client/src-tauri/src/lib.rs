@@ -1,14 +1,105 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
+mod api;
+mod commands;
+mod config;
+mod encoder;
+mod gpu;
+mod job_manager;
+
+use commands::*;
+use job_manager::JobManager;
+use std::sync::Arc;
+use tauri::Manager;
+use tokio::sync::Mutex;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![greet])
+        .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_fs::init())
+        .setup(|app| {
+            // Create and store JobManager
+            let job_manager = JobManager::new(app.handle().clone())
+                .expect("Failed to create JobManager");
+            app.manage(Arc::new(Mutex::new(job_manager)));
+
+            // Setup system tray
+            let _tray = tauri::tray::TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .tooltip("FFNodes Client")
+                .on_menu_event(|app, event| {
+                    match event.id.as_ref() {
+                        "show" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                        "hide" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.hide();
+                            }
+                        }
+                        "pause" => {
+                            let job_manager = app.state::<Arc<Mutex<JobManager>>>().inner().clone();
+                            tauri::async_runtime::spawn(async move {
+                                let manager = job_manager.lock().await;
+                                let _ = manager.pause().await;
+                            });
+                        }
+                        "resume" => {
+                            let job_manager = app.state::<Arc<Mutex<JobManager>>>().inner().clone();
+                            tauri::async_runtime::spawn(async move {
+                                let manager = job_manager.lock().await;
+                                let _ = manager.resume().await;
+                            });
+                        }
+                        "quit" => {
+                            app.exit(0);
+                        }
+                        _ => {}
+                    }
+                })
+                .menu(
+                    &tauri::menu::MenuBuilder::new(app)
+                        .item(&tauri::menu::MenuItemBuilder::new("Show").id("show").build(app)?)
+                        .item(&tauri::menu::MenuItemBuilder::new("Hide").id("hide").build(app)?)
+                        .separator()
+                        .item(&tauri::menu::MenuItemBuilder::new("Pause").id("pause").build(app)?)
+                        .item(&tauri::menu::MenuItemBuilder::new("Resume").id("resume").build(app)?)
+                        .separator()
+                        .item(&tauri::menu::MenuItemBuilder::new("Quit").id("quit").build(app)?)
+                        .build()?,
+                )
+                .build(app)?;
+
+            // Handle window close event - minimize to tray instead
+            if let Some(window) = app.get_webview_window("main") {
+                let window_clone = window.clone();
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        // Prevent window from closing, hide it instead
+                        api.prevent_close();
+                        let _ = window_clone.hide();
+                    }
+                });
+            }
+
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            load_config,
+            save_config,
+            test_connection,
+            get_gpu_info,
+            extract_frame,
+            get_active_jobs,
+            start_job_processing,
+            stop_job_processing,
+            pause_job_processing,
+            resume_job_processing,
+            get_job_manager_state
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

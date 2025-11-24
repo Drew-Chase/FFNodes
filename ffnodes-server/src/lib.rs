@@ -155,6 +155,15 @@ pub async fn run() -> Result<()> {
                     )
                     .route("/jobs/{job_id}/fail", web::post().to(api::jobs::fail_job))
                     .route("/jobs/active", web::get().to(api::jobs::get_active_jobs))
+                    // File transfer
+                    .route(
+                        "/files/{job_id}/input",
+                        web::get().to(api::files::download_input),
+                    )
+                    .route(
+                        "/files/{job_id}/output",
+                        web::post().to(api::files::upload_output),
+                    )
                     // Heartbeat
                     .route(
                         "/heartbeat/{client_id}",
