@@ -3,4 +3,5 @@ resolver = "3"
 members = [
     "ffmpeg",
     "ffnodes-server",
+    "ffnodes-client/src-tauri"
 ]
