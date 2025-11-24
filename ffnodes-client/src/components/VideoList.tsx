@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { useJobStore } from '../../stores/useJobStore';
+import { useJobStore } from '../stores/useJobStore';
 import { NeonCard } from './NeonCard';
 import { GlowText } from './GlowText';
 

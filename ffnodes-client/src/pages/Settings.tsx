@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
 import { useNavigate } from 'react-router-dom';
 import toast, { Toaster } from 'react-hot-toast';
-import { useConfigStore } from '../../stores/useConfigStore';
+import {ClientConfig, useConfigStore} from "../stores/useConfigStore";
 import { NeonCard } from '../components/NeonCard';
 import { NeonButton } from '../components/NeonButton';
 import { NeonInput } from '../components/NeonInput';
@@ -99,7 +99,7 @@ export function Settings() {
     setIsSaving(true);
 
     try {
-      const newConfig = await invoke('test_connection', {
+      const newConfig: ClientConfig = await invoke('test_connection', {
         input: {
           server_url: formData.serverUrl,
           server_guid: formData.serverGuid,

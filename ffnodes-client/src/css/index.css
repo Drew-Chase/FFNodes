@@ -39,7 +39,6 @@
   overflow: auto;
   scrollbar-color: var(--scrollbar-thumb-color) var(--scrollbar-background-color);
   scrollbar-width: thin;
-  scrollbar-gutter: stable;
 }
 
 body {
@@ -51,8 +50,8 @@ body {
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
@@ -410,4 +409,9 @@ body {
 .toast-neon.info {
   border-color: rgba(var(--neon-accent-rgb), 0.5);
   box-shadow: var(--glow-sm) rgba(var(--neon-accent-rgb), 0.6);
+}
+
+
+input:focus-visible,textarea:focus-visible {
+  outline: none !important;
 }

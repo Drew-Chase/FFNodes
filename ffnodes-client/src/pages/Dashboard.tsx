@@ -4,8 +4,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useNavigate } from 'react-router-dom';
 import toast, { Toaster } from 'react-hot-toast';
-import { useConfigStore } from '../../stores/useConfigStore';
-import { useJobStore } from '../../stores/useJobStore';
+import {ClientConfig, useConfigStore} from "../stores/useConfigStore";
+import {EncodingJob, useJobStore} from "../stores/useJobStore";
 import { VideoBackground } from '../components/VideoBackground';
 import { CurrentJob } from '../components/CurrentJob';
 import { VideoList } from '../components/VideoList';
@@ -15,7 +15,7 @@ import { NeonButton } from '../components/NeonButton';
 export function Dashboard() {
   const navigate = useNavigate();
   const { config, setConfig } = useConfigStore();
-  const { setJobQueue, setCurrentJob, updateProgress, setIsProcessing } = useJobStore();
+  const { setJobQueue, setCurrentJob, updateProgress, setProcessing } = useJobStore();
   const [isLoading, setIsLoading] = useState(true);
   const [gpuInfo, setGpuInfo] = useState<any>(null);
   const [isPaused, setIsPaused] = useState(false);
@@ -25,7 +25,7 @@ export function Dashboard() {
     const loadInitialData = async () => {
       try {
         // Load saved config
-        const savedConfig = await invoke('load_config');
+        const savedConfig: ClientConfig = await invoke('load_config');
         if (!savedConfig) {
           // No config found, redirect to setup
           navigate('/setup');
@@ -38,12 +38,12 @@ export function Dashboard() {
         setGpuInfo(gpu);
 
         // Load active jobs
-        const jobs = await invoke('get_active_jobs', { config: savedConfig });
+        const jobs: EncodingJob[] = await invoke('get_active_jobs', { config: savedConfig });
         setJobQueue(jobs || []);
 
         // Start job processing
         await invoke('start_job_processing', { config: savedConfig, gpu });
-        setIsProcessing(true);
+        setProcessing(true);
 
         toast.success('Connected to server! Job processing started.', {
           className: 'toast-neon success',
@@ -63,7 +63,7 @@ export function Dashboard() {
     return () => {
       invoke('stop_job_processing').catch(console.error);
     };
-  }, [navigate, setConfig, setJobQueue, setIsProcessing]);
+  }, [navigate, setConfig, setJobQueue, setProcessing]);
 
   // Set up event listeners for job updates
   useEffect(() => {

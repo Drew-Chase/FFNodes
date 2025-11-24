@@ -24,7 +24,7 @@ interface JobStore {
   isProcessing: boolean;
 
   setCurrentJob: (job: EncodingJob | null) => void;
-  updateProgress: (progress: Partial<CurrentJobProgress>) => void;
+  updateProgress: (progress: Partial<CurrentJobProgress|null>) => void;
   setJobQueue: (jobs: EncodingJob[]) => void;
   addToQueue: (job: EncodingJob) => void;
   removeFromQueue: (jobId: string) => void;
