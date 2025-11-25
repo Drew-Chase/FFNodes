@@ -2,10 +2,8 @@ import {useState} from "react";
 import {motion} from "framer-motion";
 import {invoke} from "@tauri-apps/api/core";
 import {useNavigate} from "react-router-dom";
-import toast from "react-hot-toast";
-import {NeonCard} from "../components/NeonCard";
-import {NeonButton} from "../components/NeonButton";
-import {NeonInput} from "../components/NeonInput";
+import {addToast} from "@heroui/toast";
+import {Button, Input, Card} from "../components/ui";
 
 interface FormData
 {
@@ -63,7 +61,11 @@ export function Setup()
     {
         if (!validateForm())
         {
-            toast.error("Please fix the errors before testing connection");
+            addToast({
+                title: "Error",
+                description: "Please fix the errors before testing connection",
+                color: "danger"
+            });
             return;
         }
 
@@ -78,10 +80,18 @@ export function Setup()
                     display_name: formData.displayName
                 }
             });
-            toast.success("Connection successful!");
+            addToast({
+                title: "Success",
+                description: "Connection successful!",
+                color: "success"
+            });
         } catch (error)
         {
-            toast.error(`Connection failed: ${error}`);
+            addToast({
+                title: "Error",
+                description: `Connection failed: ${error}`,
+                color: "danger"
+            });
         } finally
         {
             setTestingConnection(false);
@@ -107,28 +117,30 @@ export function Setup()
                 }
             });
 
-            toast.success("Setup complete! Redirecting to dashboard...");
+            addToast({
+                title: "Success",
+                description: "Setup complete! Redirecting to dashboard...",
+                color: "success"
+            });
             setTimeout(() =>
             {
                 navigate("/dashboard");
             }, 1500);
         } catch (error)
         {
-            toast.error(`Setup failed: ${error}`);
+            addToast({
+                title: "Error",
+                description: `Setup failed: ${error}`,
+                color: "danger"
+            });
             setIsLoading(false);
         }
     };
 
     return (
         <div className="flex items-center justify-center p-8 relative">
-            {/* Animated Background */}
-            <div className="absolute inset-0 z-0">
-                <div className="absolute top-20 left-20 w-96 h-96 bg-[var(--neon-primary)] opacity-10 rounded-full blur-[100px] animate-pulse"/>
-                <div className="absolute bottom-20 right-20 w-96 h-96 bg-[var(--neon-accent)] opacity-10 rounded-full blur-[100px] animate-pulse" style={{animationDelay: "1s"}}/>
-            </div>
-
             <div className="w-full max-w-2xl z-10">
-                <NeonCard variant="gradient" className="!p-0">
+                <Card variant="gradient" className="!p-0">
                     <div className="p-12">
                         {/* Header */}
                         <div className="text-center mb-12">
@@ -148,7 +160,7 @@ export function Setup()
 
                         {/* Form */}
                         <div className="space-y-6">
-                            <NeonInput
+                            <Input
                                 label="Server URL"
                                 value={formData.serverUrl}
                                 onChange={(value) => setFormData({...formData, serverUrl: value})}
@@ -158,7 +170,7 @@ export function Setup()
                                 required
                             />
 
-                            <NeonInput
+                            <Input
                                 label="Server GUID"
                                 value={formData.serverGuid}
                                 onChange={(value) => setFormData({...formData, serverGuid: value})}
@@ -167,7 +179,7 @@ export function Setup()
                                 required
                             />
 
-                            <NeonInput
+                            <Input
                                 label="Display Name"
                                 value={formData.displayName}
                                 onChange={(value) => setFormData({...formData, displayName: value})}
@@ -178,37 +190,37 @@ export function Setup()
 
                             {/* Info Box */}
                             <motion.div
-                                className="glass p-4 rounded-lg border-l-4 border-[var(--neon-accent)]"
+                                className="bg-default-100 p-4 rounded-lg border-l-4 border-primary"
                                 initial={{opacity: 0}}
                                 animate={{opacity: 1}}
                                 transition={{delay: 0.5}}
                             >
-                                <p className="text-sm text-gray-300">
-                                    <span className="neon-text-accent font-bold">Tip:</span> You can find the Server GUID in your FFNodes server's config.json file or in the server logs at startup.
+                                <p className="text-sm text-default-700">
+                                    <span className="text-primary font-bold">Tip:</span> You can find the Server GUID in your FFNodes server's config.json file or in the server logs at startup.
                                 </p>
                             </motion.div>
                         </div>
 
                         {/* Actions */}
                         <div className="flex gap-4 mt-10">
-                            <NeonButton
+                            <Button
                                 variant="accent"
                                 onClick={testConnection}
                                 loading={testingConnection}
-                                disabled={isLoading}
+                                isDisabled={isLoading}
                                 className="flex-1"
                             >
                                 Test Connection
-                            </NeonButton>
-                            <NeonButton
+                            </Button>
+                            <Button
                                 variant="primary"
                                 onClick={handleSubmit}
                                 loading={isLoading}
-                                disabled={testingConnection}
+                                isDisabled={testingConnection}
                                 className="flex-1"
                             >
                                 Continue
-                            </NeonButton>
+                            </Button>
                         </div>
 
                         {/* Footer */}
@@ -218,12 +230,12 @@ export function Setup()
                             animate={{opacity: 1}}
                             transition={{delay: 0.7}}
                         >
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-default-500">
                                 This configuration will be saved and you can change it later in settings
                             </p>
                         </motion.div>
                     </div>
-                </NeonCard>
+                </Card>
             </div>
         </div>
     );

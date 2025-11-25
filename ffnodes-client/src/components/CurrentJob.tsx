@@ -1,22 +1,20 @@
 import { motion } from 'framer-motion';
 import { useJobStore } from '../stores/useJobStore';
-import { NeonCard } from './NeonCard';
-import { NeonProgress } from './NeonProgress';
-import { GlowText } from './GlowText';
+import { Card, Progress } from './ui';
 
 export function CurrentJob() {
   const { currentJob, currentProgress, isProcessing } = useJobStore();
 
   if (!currentJob || !currentProgress) {
     return (
-      <NeonCard className="text-center py-16">
+      <Card className="text-center py-16">
         <div className="flex flex-col items-center gap-4">
           <div className="neon-spinner" />
-          <p className="text-gray-400">
+          <p className="text-default-500">
             {isProcessing ? 'Waiting for job assignment...' : 'No active encoding job'}
           </p>
         </div>
-      </NeonCard>
+      </Card>
     );
   }
 
@@ -29,50 +27,50 @@ export function CurrentJob() {
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5 }}
     >
-      <NeonCard variant="gradient" className="overflow-hidden">
+      <Card variant="gradient" className="overflow-hidden">
         {/* File Name Header */}
         <div className="mb-6">
-          <GlowText size="xl" className="block mb-2">
+          <h2 className="text-xl font-bold mb-2">
             {filename}
-          </GlowText>
-          <p className="text-sm text-gray-400">Job ID: {currentJob.id}</p>
+          </h2>
+          <p className="text-sm text-default-500">Job ID: {currentJob.id}</p>
         </div>
 
         {/* Progress Bar */}
         <div className="mb-8">
-          <NeonProgress value={percentage} height="lg" />
+          <Progress value={percentage} height="lg" />
         </div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {/* Frame Progress */}
-          <div className="stat-card">
-            <div className="stat-label">Frame</div>
-            <div className="stat-value">
+          <div className="bg-default-50 rounded-lg p-4">
+            <div className="text-sm text-default-500 mb-1">Frame</div>
+            <div className="text-2xl font-bold">
               {frame.toLocaleString()}
-              <span className="text-sm text-gray-400 ml-1">/ {totalFrames.toLocaleString()}</span>
+              <span className="text-sm text-default-500 ml-1">/ {totalFrames.toLocaleString()}</span>
             </div>
           </div>
 
           {/* FPS */}
-          <div className="stat-card">
-            <div className="stat-label">FPS</div>
-            <div className="stat-value neon-text-accent">{fps.toFixed(2)}</div>
+          <div className="bg-default-50 rounded-lg p-4">
+            <div className="text-sm text-default-500 mb-1">FPS</div>
+            <div className="text-2xl font-bold text-secondary">{fps.toFixed(2)}</div>
           </div>
 
           {/* Bitrate */}
-          <div className="stat-card">
-            <div className="stat-label">Bitrate</div>
-            <div className="stat-value">
+          <div className="bg-default-50 rounded-lg p-4">
+            <div className="text-sm text-default-500 mb-1">Bitrate</div>
+            <div className="text-2xl font-bold">
               {(bitrate / 1000).toFixed(1)}
-              <span className="text-sm text-gray-400 ml-1">kbps</span>
+              <span className="text-sm text-default-500 ml-1">kbps</span>
             </div>
           </div>
 
           {/* Speed */}
-          <div className="stat-card">
-            <div className="stat-label">Speed</div>
-            <div className="stat-value" style={{ color: speed >= 1 ? 'var(--neon-green)' : 'var(--neon-primary)' }}>
+          <div className="bg-default-50 rounded-lg p-4">
+            <div className="text-sm text-default-500 mb-1">Speed</div>
+            <div className={`text-2xl font-bold ${speed >= 1 ? 'text-success' : 'text-primary'}`}>
               {speed.toFixed(2)}x
             </div>
           </div>
@@ -80,28 +78,19 @@ export function CurrentJob() {
 
         {/* ETA */}
         {speed > 0 && totalFrames > frame && (
-          <motion.div
-            className="mt-6 text-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-          >
-            <span className="text-sm text-gray-400">Estimated Time Remaining: </span>
-            <span className="neon-text-accent font-bold">
+          <div className="mt-6 text-center">
+            <span className="text-sm text-default-500">Estimated Time Remaining: </span>
+            <span className="text-secondary font-bold">
               {calculateETA(totalFrames - frame, fps, speed)}
             </span>
-          </motion.div>
+          </div>
         )}
 
         {/* Processing Indicator */}
-        <motion.div
-          className="absolute top-4 right-4"
-          animate={{ scale: [1, 1.2, 1] }}
-          transition={{ duration: 2, repeat: Infinity }}
-        >
-          <div className="w-3 h-3 rounded-full bg-[var(--neon-green)]" style={{ boxShadow: 'var(--glow-md) rgba(var(--neon-green-rgb), 0.8)' }} />
-        </motion.div>
-      </NeonCard>
+        <div className="absolute top-4 right-4">
+          <div className="w-3 h-3 rounded-full bg-success" />
+        </div>
+      </Card>
     </motion.div>
   );
 }

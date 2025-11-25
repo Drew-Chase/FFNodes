@@ -22,7 +22,7 @@ export function VideoBackground() {
     // Default gradient background when no video is processing
     return (
       <div className="video-background">
-        <div className="absolute inset-0 bg-gradient-to-br from-[var(--bg-dark)] via-[var(--bg-dark-secondary)] to-[var(--bg-dark-tertiary)]" />
+        <div className="absolute inset-0 bg-gradient-to-br from-background via-default-100 to-default-200" />
       </div>
     );
   }
@@ -73,11 +73,9 @@ export function VideoBackground() {
 
       {/* Progress Indicator Line */}
       <motion.div
-        className="absolute top-0 bottom-0 w-1 z-10 pointer-events-none"
+        className="absolute top-0 bottom-0 w-1 z-10 pointer-events-none bg-primary"
         style={{
           left: `${progress}%`,
-          background: 'linear-gradient(to bottom, var(--neon-primary), var(--neon-accent))',
-          boxShadow: 'var(--glow-lg) rgba(var(--neon-primary-rgb), 0.8)',
         }}
         initial={{ opacity: 0 }}
         animate={{ opacity: progress > 0 && progress < 100 ? 1 : 0 }}

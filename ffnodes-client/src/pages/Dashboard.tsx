@@ -3,14 +3,13 @@ import { motion } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { useNavigate } from 'react-router-dom';
-import toast, { Toaster } from 'react-hot-toast';
+import { addToast } from '@heroui/toast';
 import {ClientConfig, useConfigStore} from "../stores/useConfigStore";
 import {EncodingJob, useJobStore} from "../stores/useJobStore";
 import { VideoBackground } from '../components/VideoBackground';
 import { CurrentJob } from '../components/CurrentJob';
 import { VideoList } from '../components/VideoList';
-import { GlowText } from '../components/GlowText';
-import { NeonButton } from '../components/NeonButton';
+import { Button } from '../components/ui';
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -45,12 +44,16 @@ export function Dashboard() {
         await invoke('start_job_processing', { config: savedConfig, gpu });
         setProcessing(true);
 
-        toast.success('Connected to server! Job processing started.', {
-          className: 'toast-neon success',
+        addToast({
+          title: 'Success',
+          description: 'Connected to server! Job processing started.',
+          color: 'success'
         });
       } catch (error) {
-        toast.error(`Failed to load: ${error}`, {
-          className: 'toast-neon error',
+        addToast({
+          title: 'Error',
+          description: `Failed to load: ${error}`,
+          color: 'danger'
         });
       } finally {
         setIsLoading(false);
@@ -74,8 +77,10 @@ export function Dashboard() {
       listen('job-started', (event: any) => {
         console.log('Job started:', event.payload);
         setCurrentJob(event.payload);
-        toast.success(`Started encoding: ${event.payload.file_name}`, {
-          className: 'toast-neon',
+        addToast({
+          title: 'Info',
+          description: `Started encoding: ${event.payload.file_name}`,
+          color: 'primary'
         });
       })
     );
@@ -106,8 +111,10 @@ export function Dashboard() {
     unlistenPromises.push(
       listen('job-completed', (event: any) => {
         console.log('Job completed:', event.payload);
-        toast.success('Job completed successfully!', {
-          className: 'toast-neon success',
+        addToast({
+          title: 'Success',
+          description: 'Job completed successfully!',
+          color: 'success'
         });
         setCurrentJob(null);
         updateProgress(null);
@@ -118,9 +125,11 @@ export function Dashboard() {
     unlistenPromises.push(
       listen('job-error', (event: any) => {
         console.error('Job error:', event.payload);
-        toast.error(`Error: ${event.payload}`, {
-          className: 'toast-neon error',
-          duration: 6000,
+        addToast({
+          title: 'Error',
+          description: `Error: ${event.payload}`,
+          color: 'danger',
+          timeout: 6000
         });
       })
     );
@@ -139,19 +148,25 @@ export function Dashboard() {
       if (isPaused) {
         await invoke('resume_job_processing');
         setIsPaused(false);
-        toast.success('Job processing resumed', {
-          className: 'toast-neon success',
+        addToast({
+          title: 'Success',
+          description: 'Job processing resumed',
+          color: 'success'
         });
       } else {
         await invoke('pause_job_processing');
         setIsPaused(true);
-        toast('Job processing paused', {
-          className: 'toast-neon',
+        addToast({
+          title: 'Info',
+          description: 'Job processing paused',
+          color: 'primary'
         });
       }
     } catch (error) {
-      toast.error(`Failed to ${isPaused ? 'resume' : 'pause'}: ${error}`, {
-        className: 'toast-neon error',
+      addToast({
+        title: 'Error',
+        description: `Failed to ${isPaused ? 'resume' : 'pause'}: ${error}`,
+        color: 'danger'
       });
     }
   };
@@ -161,7 +176,7 @@ export function Dashboard() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="neon-spinner mx-auto mb-4" />
-          <GlowText>Loading Dashboard...</GlowText>
+          <p className="text-lg">Loading Dashboard...</p>
         </div>
       </div>
     );
@@ -169,18 +184,6 @@ export function Dashboard() {
 
   return (
     <>
-      {/* Toast Notifications */}
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: 'transparent',
-            boxShadow: 'none',
-          },
-        }}
-      />
-
       {/* Dynamic Video Background */}
       <VideoBackground />
 
@@ -194,24 +197,24 @@ export function Dashboard() {
           transition={{ duration: 0.5 }}
         >
           <div>
-            <GlowText size="2xl" className="mb-2">
+            <h1 className="text-2xl font-bold text-primary mb-2">
               FFNodes Client
-            </GlowText>
-            <p className="text-gray-400 text-sm">
+            </h1>
+            <p className="text-default-500 text-sm">
               {config?.display_name || 'Encoding Client'} • {gpuInfo?.vendor || 'Unknown GPU'}
             </p>
           </div>
 
           <div className="flex gap-3">
-            <NeonButton
+            <Button
               variant={isPaused ? 'success' : 'accent'}
               onClick={handlePauseResume}
             >
               {isPaused ? 'Resume' : 'Pause'}
-            </NeonButton>
-            <NeonButton variant="accent" onClick={() => navigate('/settings')}>
+            </Button>
+            <Button variant="accent" onClick={() => navigate('/settings')}>
               Settings
-            </NeonButton>
+            </Button>
           </div>
         </motion.header>
 
@@ -247,14 +250,10 @@ export function Dashboard() {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
         >
-          <div className="glass inline-block px-6 py-3 rounded-full">
+          <div className="bg-default-100/50 backdrop-blur-md inline-block px-6 py-3 rounded-full">
             <div className="flex items-center gap-3">
-              <motion.div
-                className="w-2 h-2 rounded-full bg-[var(--neon-green)]"
-                animate={{ scale: [1, 1.5, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              />
-              <span className="text-sm text-gray-300">
+              <div className="w-2 h-2 rounded-full bg-success" />
+              <span className="text-sm text-default-700">
                 Connected to {config?.server_url || 'Server'}
               </span>
             </div>

@@ -2,12 +2,9 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
 import { useNavigate } from 'react-router-dom';
-import toast, { Toaster } from 'react-hot-toast';
+import { addToast } from '@heroui/toast';
 import {ClientConfig, useConfigStore} from "../stores/useConfigStore";
-import { NeonCard } from '../components/NeonCard';
-import { NeonButton } from '../components/NeonButton';
-import { NeonInput } from '../components/NeonInput';
-import { GlowText } from '../components/GlowText';
+import { Button, Input, Card } from '../components/ui';
 
 interface FormData {
   serverUrl: string;
@@ -55,8 +52,10 @@ export function Settings() {
 
   const handleTestConnection = async () => {
     if (!formData.serverUrl || !formData.serverGuid || !formData.displayName) {
-      toast.error('All fields are required', {
-        className: 'toast-neon error',
+      addToast({
+        title: 'Error',
+        description: 'All fields are required',
+        color: 'danger'
       });
       return;
     }
@@ -74,14 +73,18 @@ export function Settings() {
       });
 
       setConnectionStatus('success');
-      toast.success('Connection successful!', {
-        className: 'toast-neon success',
+      addToast({
+        title: 'Success',
+        description: 'Connection successful!',
+        color: 'success'
       });
     } catch (error) {
       setConnectionStatus('error');
-      toast.error(`Connection failed: ${error}`, {
-        className: 'toast-neon error',
-        duration: 6000,
+      addToast({
+        title: 'Error',
+        description: `Connection failed: ${error}`,
+        color: 'danger',
+        timeout: 6000
       });
     } finally {
       setIsTesting(false);
@@ -90,8 +93,10 @@ export function Settings() {
 
   const handleSave = async () => {
     if (!formData.serverUrl || !formData.serverGuid || !formData.displayName) {
-      toast.error('All fields are required', {
-        className: 'toast-neon error',
+      addToast({
+        title: 'Error',
+        description: 'All fields are required',
+        color: 'danger'
       });
       return;
     }
@@ -108,8 +113,10 @@ export function Settings() {
       });
 
       setConfig(newConfig);
-      toast.success('Settings saved successfully!', {
-        className: 'toast-neon success',
+      addToast({
+        title: 'Success',
+        description: 'Settings saved successfully!',
+        color: 'success'
       });
 
       // Wait a bit before navigating
@@ -117,9 +124,11 @@ export function Settings() {
         navigate('/dashboard');
       }, 1000);
     } catch (error) {
-      toast.error(`Failed to save: ${error}`, {
-        className: 'toast-neon error',
-        duration: 6000,
+      addToast({
+        title: 'Error',
+        description: `Failed to save: ${error}`,
+        color: 'danger',
+        timeout: 6000
       });
     } finally {
       setIsSaving(false);
@@ -127,19 +136,7 @@ export function Settings() {
   };
 
   return (
-    <>
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: 'transparent',
-            boxShadow: 'none',
-          },
-        }}
-      />
-
-      <div className="min-h-screen p-8 bg-[var(--bg-dark)]">
+      <div className="min-h-screen p-8">
         <div className="max-w-3xl mx-auto">
           {/* Header */}
           <motion.div
@@ -148,10 +145,10 @@ export function Settings() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <GlowText size="2xl" className="mb-2">
+            <h1 className="text-2xl font-bold text-primary mb-2">
               Settings
-            </GlowText>
-            <p className="text-gray-400">Configure your FFNodes client</p>
+            </h1>
+            <p className="text-default-500">Configure your FFNodes client</p>
           </motion.div>
 
           <div className="space-y-6">
@@ -161,13 +158,13 @@ export function Settings() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
             >
-              <NeonCard variant="glass">
+              <Card variant="glass">
                 <div className="space-y-4">
-                  <GlowText variant="accent" className="mb-4">
+                  <h2 className="text-lg font-semibold text-secondary mb-4">
                     Server Configuration
-                  </GlowText>
+                  </h2>
 
-                  <NeonInput
+                  <Input
                     label="Server URL"
                     placeholder="http://localhost:8080"
                     value={formData.serverUrl}
@@ -175,7 +172,7 @@ export function Settings() {
                     required
                   />
 
-                  <NeonInput
+                  <Input
                     label="Server GUID"
                     placeholder="Enter server secret code"
                     value={formData.serverGuid}
@@ -183,7 +180,7 @@ export function Settings() {
                     required
                   />
 
-                  <NeonInput
+                  <Input
                     label="Display Name"
                     placeholder="My Encoding Client"
                     value={formData.displayName}
@@ -192,39 +189,31 @@ export function Settings() {
                   />
 
                   <div className="flex gap-3 mt-6">
-                    <NeonButton
+                    <Button
                       onClick={handleTestConnection}
                       loading={isTesting}
-                      disabled={isTesting || !formData.serverUrl || !formData.serverGuid || !formData.displayName}
+                      isDisabled={isTesting || !formData.serverUrl || !formData.serverGuid || !formData.displayName}
                       variant="accent"
                     >
                       Test Connection
-                    </NeonButton>
+                    </Button>
 
                     {connectionStatus === 'success' && (
-                      <motion.div
-                        className="flex items-center gap-2"
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                      >
-                        <div className="w-2 h-2 rounded-full bg-[var(--neon-green)]" />
-                        <span className="text-[var(--neon-green)] text-sm">Connected</span>
-                      </motion.div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-success" />
+                        <span className="text-success text-sm">Connected</span>
+                      </div>
                     )}
 
                     {connectionStatus === 'error' && (
-                      <motion.div
-                        className="flex items-center gap-2"
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                      >
-                        <div className="w-2 h-2 rounded-full bg-[var(--neon-primary)]" />
-                        <span className="text-[var(--neon-primary)] text-sm">Failed</span>
-                      </motion.div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-danger" />
+                        <span className="text-danger text-sm">Failed</span>
+                      </div>
                     )}
                   </div>
                 </div>
-              </NeonCard>
+              </Card>
             </motion.div>
 
             {/* GPU Information */}
@@ -234,32 +223,32 @@ export function Settings() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.2 }}
               >
-                <NeonCard variant="glass">
+                <Card variant="glass">
                   <div className="space-y-4">
-                    <GlowText variant="purple" className="mb-4">
+                    <h2 className="text-lg font-semibold text-purple-500 mb-4">
                       GPU Information
-                    </GlowText>
+                    </h2>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="text-gray-400 text-sm mb-1">Vendor</p>
-                        <p className="text-white font-medium">{gpuInfo.vendor}</p>
+                        <p className="text-default-500 text-sm mb-1">Vendor</p>
+                        <p className="text-foreground font-medium">{gpuInfo.vendor}</p>
                       </div>
                       <div>
-                        <p className="text-gray-400 text-sm mb-1">GPU Model</p>
-                        <p className="text-white font-medium">{gpuInfo.name}</p>
+                        <p className="text-default-500 text-sm mb-1">GPU Model</p>
+                        <p className="text-foreground font-medium">{gpuInfo.name}</p>
                       </div>
                       <div>
-                        <p className="text-gray-400 text-sm mb-1">H.264 Encoder</p>
-                        <p className="text-[var(--neon-accent)] font-mono text-sm">{gpuInfo.encoder_h264}</p>
+                        <p className="text-default-500 text-sm mb-1">H.264 Encoder</p>
+                        <p className="text-secondary font-mono text-sm">{gpuInfo.encoder_h264}</p>
                       </div>
                       <div>
-                        <p className="text-gray-400 text-sm mb-1">H.265 Encoder</p>
-                        <p className="text-[var(--neon-accent)] font-mono text-sm">{gpuInfo.encoder_h265}</p>
+                        <p className="text-default-500 text-sm mb-1">H.265 Encoder</p>
+                        <p className="text-secondary font-mono text-sm">{gpuInfo.encoder_h265}</p>
                       </div>
                     </div>
                   </div>
-                </NeonCard>
+                </Card>
               </motion.div>
             )}
 
@@ -270,30 +259,30 @@ export function Settings() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.3 }}
               >
-                <NeonCard variant="glass">
+                <Card variant="glass">
                   <div className="space-y-3">
-                    <GlowText variant="primary" className="mb-4">
+                    <h2 className="text-lg font-semibold text-primary mb-4">
                       Current Session
-                    </GlowText>
+                    </h2>
 
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-gray-400">Client ID:</span>
-                        <span className="text-white font-mono">{config.client_id || 'Not set'}</span>
+                        <span className="text-default-500">Client ID:</span>
+                        <span className="text-foreground font-mono">{config.client_id || 'Not set'}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-400">Computer Name:</span>
-                        <span className="text-white">{config.computer_name}</span>
+                        <span className="text-default-500">Computer Name:</span>
+                        <span className="text-foreground">{config.computer_name}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-400">Auth Status:</span>
-                        <span className={config.auth_token ? 'text-[var(--neon-green)]' : 'text-gray-400'}>
+                        <span className="text-default-500">Auth Status:</span>
+                        <span className={config.auth_token ? 'text-success' : 'text-default-500'}>
                           {config.auth_token ? 'Authenticated' : 'Not authenticated'}
                         </span>
                       </div>
                     </div>
                   </div>
-                </NeonCard>
+                </Card>
               </motion.div>
             )}
 
@@ -304,21 +293,20 @@ export function Settings() {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.5, delay: 0.4 }}
             >
-              <NeonButton variant="accent" onClick={() => navigate('/dashboard')}>
+              <Button variant="accent" onClick={() => navigate('/dashboard')}>
                 Cancel
-              </NeonButton>
-              <NeonButton
+              </Button>
+              <Button
                 variant="primary"
                 onClick={handleSave}
                 loading={isSaving}
-                disabled={isSaving || !formData.serverUrl || !formData.serverGuid || !formData.displayName}
+                isDisabled={isSaving || !formData.serverUrl || !formData.serverGuid || !formData.displayName}
               >
                 Save & Apply
-              </NeonButton>
+              </Button>
             </motion.div>
           </div>
         </div>
       </div>
-    </>
   );
 }
