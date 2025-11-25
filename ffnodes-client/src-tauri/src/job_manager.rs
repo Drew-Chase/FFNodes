@@ -166,9 +166,9 @@ impl JobManager {
 
         // Request a job
         let client_id = config
-            .client_id
+            .auth_token
             .as_ref()
-            .ok_or_else(|| anyhow!("No client ID"))?;
+            .ok_or_else(|| anyhow!("No auth token"))?;
 
         log::debug!("Requesting job from server");
         let job_response = client.request_job(client_id).await?;
