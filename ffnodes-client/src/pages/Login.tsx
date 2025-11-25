@@ -5,16 +5,28 @@ import {Button, Input} from "../components/ui";
 import {MoviePosterBackground} from "../components/MoviePosterScroll";
 import {OAuthService} from "../services/oauth";
 import {QRCodeSVG} from "qrcode.react";
+import {invoke} from "@tauri-apps/api/core";
+import {addToast} from "@heroui/toast";
+import {useConfigStore} from "../stores/useConfigStore";
+
+type LoginStep = 'auth' | 'display-name' | 'server-setup';
 
 export const Login: React.FC = () =>
 {
     const navigate = useNavigate();
+    const {setConfig} = useConfigStore();
+
+    // State
+    const [step, setStep] = useState<LoginStep>('auth');
     const [email, setEmail] = useState("");
     const [displayName, setDisplayName] = useState("");
+    const [serverUrl, setServerUrl] = useState("");
+    const [serverGuid, setServerGuid] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [showQR, setShowQR] = useState(false);
-    const [showDisplayNameLogin, setShowDisplayNameLogin] = useState(false);
+    const [authProvider, setAuthProvider] = useState<string | null>(null);
+    const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
 
     const handleOAuthLogin = async (provider: "google" | "github" | "microsoft" | "facebook") =>
     {
@@ -24,7 +36,9 @@ export const Login: React.FC = () =>
         try
         {
             await OAuthService.login(provider);
-            navigate("/dashboard");
+            setAuthProvider(provider);
+            // Move to server setup step
+            setStep('server-setup');
         } catch (err)
         {
             setError(`Failed to login with ${provider}. Please try again.`);
@@ -43,16 +57,14 @@ export const Login: React.FC = () =>
             return;
         }
 
-        setLoading(true);
         setError("");
-
-        // TODO: Implement email login with magic link or password
-        // For now, show error
-        setError("Email login not yet implemented");
-        setLoading(false);
+        setDisplayName(email);
+        setAuthProvider('email');
+        // Move to server setup step
+        setStep('server-setup');
     };
 
-    const handleDisplayNameLogin = () =>
+    const handleDisplayNameContinue = () =>
     {
         if (!displayName.trim())
         {
@@ -60,8 +72,63 @@ export const Login: React.FC = () =>
             return;
         }
 
-        OAuthService.loginWithDisplayName(displayName.trim());
-        navigate("/setup"); // Go to setup to configure server connection
+        setError("");
+        setAuthProvider('display-name');
+        // Move to server setup step
+        setStep('server-setup');
+    };
+
+    const handleServerSetup = async () =>
+    {
+        if (!serverUrl || !serverGuid)
+        {
+            setError("Please enter both server URL and GUID");
+            return;
+        }
+
+        const finalDisplayName = displayName || email || "Anonymous User";
+
+        setLoading(true);
+        setConnectionStatus('testing');
+        setError("");
+
+        try
+        {
+            // Test connection and save config
+            const config = await invoke('test_connection', {
+                input: {
+                    server_url: serverUrl,
+                    server_guid: serverGuid,
+                    display_name: finalDisplayName,
+                },
+            });
+
+            setConfig(config);
+            setConnectionStatus('success');
+
+            // Save authentication state if using display name
+            if (authProvider === 'display-name' || authProvider === 'email')
+            {
+                OAuthService.loginWithDisplayName(finalDisplayName);
+            }
+
+            addToast({
+                title: 'Success',
+                description: 'Connected to server successfully!',
+                color: 'success'
+            });
+
+            // Navigate to dashboard
+            setTimeout(() => navigate("/dashboard"), 500);
+        } catch (err)
+        {
+            setConnectionStatus('error');
+            setError(`Failed to connect: ${err}`);
+            console.error(err);
+        } finally
+        {
+            setLoading(false);
+        }
     };
 
     // Generate QR code URL for mobile login
@@ -71,7 +138,7 @@ export const Login: React.FC = () =>
         <MoviePosterBackground>
             <div className="flex items-center justify-center min-h-screen p-4">
                 <AnimatePresence mode="wait">
-                    {!showDisplayNameLogin ? (
+                    {step === 'auth' && (
                         <motion.div
                             key="oauth-login"
                             initial={{opacity: 0, scale: 0.95}}
@@ -218,7 +285,7 @@ export const Login: React.FC = () =>
 
                                 {/* Skip with Display Name */}
                                 <button
-                                    onClick={() => setShowDisplayNameLogin(true)}
+                                    onClick={() => setStep('display-name')}
                                     className="w-full text-center text-body-md text-foreground/60 hover:text-primary transition-colors underline"
                                 >
                                     Skip and use display name
@@ -232,12 +299,14 @@ export const Login: React.FC = () =>
                                 </div>
                             </div>
 
-                            {/* Matter branding (optional) */}
+                            {/* FFNodes branding */}
                             <div className="mt-4 text-center text-body-sm text-white/70">
                                 <span>Powered by FFNodes</span>
                             </div>
                         </motion.div>
-                    ) : (
+                    )}
+
+                    {step === 'display-name' && (
                         <motion.div
                             key="display-name-login"
                             initial={{opacity: 0, scale: 0.95}}
@@ -249,7 +318,7 @@ export const Login: React.FC = () =>
                             {/* Display Name Login */}
                             <div className="bg-content1/95 backdrop-blur-xl rounded-md-2xl shadow-md-6 p-8">
                                 <button
-                                    onClick={() => setShowDisplayNameLogin(false)}
+                                    onClick={() => setStep('auth')}
                                     className="mb-4 text-foreground/60 hover:text-foreground transition-colors flex items-center gap-2"
                                 >
                                     <iconify-icon icon="mdi:arrow-left" class="text-xl"/>
@@ -274,11 +343,112 @@ export const Login: React.FC = () =>
                                         className="w-full"
                                     />
                                     <Button
-                                        onPress={handleDisplayNameLogin}
+                                        onPress={handleDisplayNameContinue}
                                         disabled={!displayName.trim()}
                                         className="w-full h-12 rounded-md-lg font-medium"
                                     >
                                         Continue
+                                    </Button>
+                                </div>
+
+                                {error && (
+                                    <motion.div
+                                        initial={{opacity: 0, y: -10}}
+                                        animate={{opacity: 1, y: 0}}
+                                        className="mt-4 p-3 bg-danger/10 border border-danger rounded-md-sm text-danger text-body-sm"
+                                    >
+                                        {error}
+                                    </motion.div>
+                                )}
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {step === 'server-setup' && (
+                        <motion.div
+                            key="server-setup"
+                            initial={{opacity: 0, scale: 0.95}}
+                            animate={{opacity: 1, scale: 1}}
+                            exit={{opacity: 0, scale: 0.95}}
+                            transition={{duration: 0.3}}
+                            className="relative w-full max-w-md"
+                        >
+                            {/* Server Setup */}
+                            <div className="bg-content1/95 backdrop-blur-xl rounded-md-2xl shadow-md-6 p-8">
+                                <button
+                                    onClick={() => setStep(authProvider === 'display-name' ? 'display-name' : 'auth')}
+                                    className="mb-4 text-foreground/60 hover:text-foreground transition-colors flex items-center gap-2"
+                                    disabled={loading}
+                                >
+                                    <iconify-icon icon="mdi:arrow-left" class="text-xl"/>
+                                    <span className="text-body-md">Back</span>
+                                </button>
+
+                                <div className="text-center mb-8">
+                                    <h1 className="text-headline-lg font-normal text-foreground mb-2">
+                                        Connect to Server
+                                    </h1>
+                                    <p className="text-body-md text-foreground/70">
+                                        Enter your server details to continue
+                                    </p>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <Input
+                                        type="text"
+                                        placeholder="Server URL (e.g., http://localhost:8080)"
+                                        value={serverUrl}
+                                        onChange={(value) => setServerUrl(value)}
+                                        className="w-full"
+                                        disabled={loading}
+                                    />
+                                    <Input
+                                        type="text"
+                                        placeholder="Server GUID"
+                                        value={serverGuid}
+                                        onChange={(value) => setServerGuid(value)}
+                                        className="w-full"
+                                        disabled={loading}
+                                    />
+
+                                    {/* Connection Status Indicator */}
+                                    {connectionStatus !== 'idle' && (
+                                        <motion.div
+                                            initial={{opacity: 0, y: -10}}
+                                            animate={{opacity: 1, y: 0}}
+                                            className={`p-3 rounded-md-sm text-body-sm flex items-center gap-2 ${
+                                                connectionStatus === 'testing' ? 'bg-warning/10 border border-warning text-warning' :
+                                                connectionStatus === 'success' ? 'bg-success/10 border border-success text-success' :
+                                                'bg-danger/10 border border-danger text-danger'
+                                            }`}
+                                        >
+                                            {connectionStatus === 'testing' && (
+                                                <>
+                                                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-warning"></div>
+                                                    <span>Testing connection...</span>
+                                                </>
+                                            )}
+                                            {connectionStatus === 'success' && (
+                                                <>
+                                                    <iconify-icon icon="mdi:check-circle" class="text-lg"/>
+                                                    <span>Connected successfully!</span>
+                                                </>
+                                            )}
+                                            {connectionStatus === 'error' && (
+                                                <>
+                                                    <iconify-icon icon="mdi:alert-circle" class="text-lg"/>
+                                                    <span>Connection failed</span>
+                                                </>
+                                            )}
+                                        </motion.div>
+                                    )}
+
+                                    <Button
+                                        onPress={handleServerSetup}
+                                        disabled={loading || !serverUrl || !serverGuid}
+                                        className="w-full h-12 rounded-md-lg font-medium"
+                                    >
+                                        {loading ? 'Connecting...' : 'Connect to Server'}
                                     </Button>
                                 </div>
 

@@ -149,7 +149,7 @@ export function Settings() {
       <div className="min-h-screen p-6 md:p-8">
         {/* Header */}
         <motion.header
-          className="mb-6 max-w-7xl mx-auto"
+          className="mb-6 mt-8 max-w-7xl mx-auto"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}

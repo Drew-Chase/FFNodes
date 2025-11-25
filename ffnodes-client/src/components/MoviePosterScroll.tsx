@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from "react";
+import React, {useEffect, useRef, useState, memo} from "react";
 import {TMDBService} from "../services/tmdb";
 import {TMDBPosterItem} from "../types/tmdb";
 import {motion} from "framer-motion";
@@ -11,7 +11,7 @@ interface MoviePosterScrollProps
     columnIndex?: number;
 }
 
-export const MoviePosterScroll: React.FC<MoviePosterScrollProps> = ({
+export const MoviePosterScroll: React.FC<MoviePosterScrollProps> = memo(({
                                                                         side,
                                                                         blur = false,
                                                                         speed = 30,
@@ -92,7 +92,9 @@ export const MoviePosterScroll: React.FC<MoviePosterScrollProps> = ({
             <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black to-transparent z-20 pointer-events-none"/>
         </div>
     );
-};
+});
+
+MoviePosterScroll.displayName = 'MoviePosterScroll';
 
 interface PosterCardProps
 {
@@ -100,7 +102,7 @@ interface PosterCardProps
     side: "left" | "right";
 }
 
-const PosterCard: React.FC<PosterCardProps> = ({poster, side}) =>
+const PosterCard: React.FC<PosterCardProps> = memo(({poster, side}) =>
 {
     const [imageLoaded, setImageLoaded] = useState(false);
     const [imageError, setImageError] = useState(false);
@@ -155,7 +157,9 @@ const PosterCard: React.FC<PosterCardProps> = ({poster, side}) =>
             </div>
         </motion.div>
     );
-};
+});
+
+PosterCard.displayName = 'PosterCard';
 
 interface MoviePosterBackgroundProps
 {
@@ -163,7 +167,7 @@ interface MoviePosterBackgroundProps
     className?: string;
 }
 
-export const MoviePosterBackground: React.FC<MoviePosterBackgroundProps> = ({
+export const MoviePosterBackground: React.FC<MoviePosterBackgroundProps> = memo(({
                                                                                 children,
                                                                                 className = ""
                                                                             }) =>
@@ -216,4 +220,6 @@ export const MoviePosterBackground: React.FC<MoviePosterBackgroundProps> = ({
             </div>
         </div>
     );
-};
+});
+
+MoviePosterBackground.displayName = 'MoviePosterBackground';

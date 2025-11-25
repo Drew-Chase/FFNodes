@@ -19,7 +19,7 @@ function App() {
 
     return (
         <HeroUIProvider>
-            <ToastProvider placement="top-right" maxVisibleToasts={3} />
+            <ToastProvider placement="bottom-right" maxVisibleToasts={3} />
             <BrowserRouter>
                 <TitleBar/>
                 <main className={"max-h-screen h-screen overflow-auto"}>

@@ -189,10 +189,10 @@ export function Dashboard() {
       <VideoBackground />
 
       {/* Main Content */}
-      <div className="min-h-screen p-6 md:p-8 relative z-10">
+      <div className="min-h-screen p-6 md:p-8 relative z-10 max-h-screen overflow-y-auto bg-base-200 dark:bg-base-100">
         {/* Header */}
         <motion.header
-          className="mb-6"
+          className="mb-6 mt-8"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
