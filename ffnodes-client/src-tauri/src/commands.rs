@@ -89,7 +89,7 @@ pub async fn get_active_jobs(config: ClientConfig) -> Result<Vec<crate::api::Enc
 pub async fn start_job_processing(
     job_manager: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<crate::job_manager::JobManager>>>,
     config: ClientConfig,
-    gpu: crate::gpu::GpuInfo,
+    gpu: GpuInfo,
 ) -> Result<(), String> {
     let manager = job_manager.lock().await;
     manager.set_config(config).await;
