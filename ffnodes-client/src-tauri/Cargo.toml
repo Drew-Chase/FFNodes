@@ -2,7 +2,7 @@
 name = "ffnodes_client"
 version = "0.0.0"
 description = ""
-authors = ["Drew Chase (Home) <dcmanproductions@gmail.com>"]
+authors = ["Drew Chase"]
 edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
