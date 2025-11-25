@@ -10,6 +10,7 @@ import { VideoBackground } from '../components/VideoBackground';
 import { CurrentJob } from '../components/CurrentJob';
 import { VideoList } from '../components/VideoList';
 import { Button } from '../components/ui';
+import { BentoGrid, BentoCard, BentoCardHeader, BentoCardContent } from '../components/layout/BentoGrid';
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -188,77 +189,188 @@ export function Dashboard() {
       <VideoBackground />
 
       {/* Main Content */}
-      <div className="min-h-screen p-8 relative z-10">
+      <div className="min-h-screen p-6 md:p-8 relative z-10">
         {/* Header */}
         <motion.header
-          className="mb-8 flex items-center justify-between"
+          className="mb-6"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.3 }}
         >
-          <div>
-            <h1 className="text-2xl font-bold text-primary mb-2">
-              FFNodes Client
-            </h1>
-            <p className="text-default-500 text-sm">
-              {config?.display_name || 'Encoding Client'} • {gpuInfo?.vendor || 'Unknown GPU'}
-            </p>
-          </div>
+          <BentoCard elevation={3} background="glass" className="!p-4">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-headline-md font-medium text-primary mb-1">
+                  FFNodes Client
+                </h1>
+                <p className="text-body-md text-foreground/70">
+                  {config?.display_name || 'Encoding Client'} • {gpuInfo?.vendor || 'Unknown GPU'}
+                </p>
+              </div>
 
-          <div className="flex gap-3">
-            <Button
-              variant={isPaused ? 'success' : 'accent'}
-              onClick={handlePauseResume}
-            >
-              {isPaused ? 'Resume' : 'Pause'}
-            </Button>
-            <Button variant="accent" onClick={() => navigate('/settings')}>
-              Settings
-            </Button>
-          </div>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  color={isPaused ? 'success' : 'primary'}
+                  onClick={handlePauseResume}
+                  className="rounded-md-lg shadow-md-2"
+                >
+                  <iconify-icon icon={isPaused ? 'mdi:play' : 'mdi:pause'} class="text-lg mr-1" />
+                  {isPaused ? 'Resume' : 'Pause'}
+                </Button>
+                <Button
+                  color="secondary"
+                  onClick={() => navigate('/settings')}
+                  className="rounded-md-lg shadow-md-2"
+                >
+                  <iconify-icon icon="mdi:cog" class="text-lg mr-1" />
+                  Settings
+                </Button>
+              </div>
+            </div>
+          </BentoCard>
         </motion.header>
 
-        {/* Main Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Current Job - Takes 2 columns */}
-          <motion.div
-            className="lg:col-span-2"
-            initial={{ opacity: 0, x: -50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
+        {/* Bento Grid Layout */}
+        <BentoGrid columns={6} gap="md">
+          {/* Current Job - Large card spanning 4 columns and 2 rows */}
+          <BentoCard
+            colSpan={4}
+            rowSpan={2}
+            elevation={4}
+            background="glass"
+            className="min-h-[400px]"
           >
             <CurrentJob />
-          </motion.div>
+          </BentoCard>
 
-          {/* Video List Sidebar - Takes 1 column */}
-          <motion.div
-            className="lg:col-span-1"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
+          {/* Video Queue - Tall card on the right */}
+          <BentoCard
+            colSpan={2}
+            rowSpan={2}
+            elevation={3}
+            background="glass"
+            className="min-h-[400px]"
           >
-            <div className="sticky top-8">
-              <VideoList />
-            </div>
-          </motion.div>
-        </div>
+            <VideoList />
+          </BentoCard>
 
-        {/* Connection Status Footer */}
-        <motion.footer
-          className="mt-8 text-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-        >
-          <div className="bg-default-100/50 backdrop-blur-md inline-block px-6 py-3 rounded-full">
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-success" />
-              <span className="text-sm text-default-700">
-                Connected to {config?.server_url || 'Server'}
-              </span>
-            </div>
-          </div>
-        </motion.footer>
+          {/* Connection Status Card */}
+          <BentoCard
+            colSpan={3}
+            elevation={2}
+            background="gradient"
+            hover
+          >
+            <BentoCardHeader
+              title="Connection Status"
+              icon={<iconify-icon icon="mdi:lan-connect" class="text-2xl" />}
+            />
+            <BentoCardContent>
+              <div className="flex items-center gap-3 mt-2">
+                <div className="w-3 h-3 rounded-full bg-success animate-pulse shadow-md-2 shadow-success" />
+                <div>
+                  <p className="text-body-lg font-medium text-foreground">
+                    Connected
+                  </p>
+                  <p className="text-body-sm text-foreground/70">
+                    {config?.server_url || 'Server'}
+                  </p>
+                </div>
+              </div>
+            </BentoCardContent>
+          </BentoCard>
+
+          {/* GPU Info Card */}
+          <BentoCard
+            colSpan={3}
+            elevation={2}
+            background="gradient"
+            hover
+          >
+            <BentoCardHeader
+              title="GPU Information"
+              icon={<iconify-icon icon="mdi:memory" class="text-2xl" />}
+            />
+            <BentoCardContent>
+              <div className="mt-2 space-y-1">
+                <p className="text-body-lg font-medium text-foreground">
+                  {gpuInfo?.name || 'Unknown GPU'}
+                </p>
+                <p className="text-body-sm text-foreground/70">
+                  {gpuInfo?.vendor || 'Unknown Vendor'}
+                </p>
+                {gpuInfo?.memory && (
+                  <p className="text-body-sm text-foreground/60">
+                    {gpuInfo.memory} MB VRAM
+                  </p>
+                )}
+              </div>
+            </BentoCardContent>
+          </BentoCard>
+
+          {/* Quick Actions Card */}
+          <BentoCard
+            colSpan={2}
+            elevation={2}
+            background="solid"
+            hover
+            onClick={() => navigate('/setup')}
+          >
+            <BentoCardHeader
+              title="Quick Setup"
+              icon={<iconify-icon icon="mdi:settings-outline" class="text-2xl" />}
+            />
+            <BentoCardContent>
+              <p className="text-body-sm text-foreground/70 mt-2">
+                Update server connection and preferences
+              </p>
+            </BentoCardContent>
+          </BentoCard>
+
+          {/* Stats Card - Jobs Processed */}
+          <BentoCard
+            colSpan={2}
+            elevation={2}
+            background="gradient"
+          >
+            <BentoCardHeader
+              title="Jobs Today"
+              icon={<iconify-icon icon="mdi:chart-line" class="text-2xl" />}
+            />
+            <BentoCardContent>
+              <div className="mt-2">
+                <p className="text-display-sm font-normal text-primary">
+                  {useJobStore.getState().jobQueue.length}
+                </p>
+                <p className="text-body-sm text-foreground/70">
+                  Active in queue
+                </p>
+              </div>
+            </BentoCardContent>
+          </BentoCard>
+
+          {/* Processing Status */}
+          <BentoCard
+            colSpan={2}
+            elevation={2}
+            background="gradient"
+          >
+            <BentoCardHeader
+              title="Status"
+              icon={<iconify-icon icon="mdi:state-machine" class="text-2xl" />}
+            />
+            <BentoCardContent>
+              <div className="mt-2">
+                <p className="text-title-lg font-medium text-foreground">
+                  {isPaused ? 'Paused' : 'Processing'}
+                </p>
+                <p className="text-body-sm text-foreground/70">
+                  {isPaused ? 'Resume to continue' : 'Actively encoding'}
+                </p>
+              </div>
+            </BentoCardContent>
+          </BentoCard>
+        </BentoGrid>
       </div>
     </>
   );

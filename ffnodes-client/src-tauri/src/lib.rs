@@ -4,8 +4,10 @@ mod config;
 mod encoder;
 mod gpu;
 mod job_manager;
+mod oauth;
 
 use commands::*;
+use oauth::*;
 use job_manager::JobManager;
 use std::sync::Arc;
 use tauri::Manager;
@@ -17,6 +19,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_oauth::init())
         .setup(|app| {
             // Create and store JobManager
             let job_manager = JobManager::new(app.handle().clone())
@@ -98,7 +101,9 @@ pub fn run() {
             stop_job_processing,
             pause_job_processing,
             resume_job_processing,
-            get_job_manager_state
+            get_job_manager_state,
+            start_oauth_flow,
+            refresh_oauth_token
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

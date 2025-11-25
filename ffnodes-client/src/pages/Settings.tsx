@@ -4,7 +4,10 @@ import { invoke } from '@tauri-apps/api/core';
 import { useNavigate } from 'react-router-dom';
 import { addToast } from '@heroui/toast';
 import {ClientConfig, useConfigStore} from "../stores/useConfigStore";
-import { Button, Input, Card } from '../components/ui';
+import { Button, Input } from '../components/ui';
+import { BentoGrid, BentoCard, BentoCardHeader, BentoCardContent, BentoCardFooter } from '../components/layout/BentoGrid';
+import { useAuthStore } from '../stores/useAuthStore';
+import { OAuthService } from '../services/oauth';
 
 interface FormData {
   serverUrl: string;
@@ -135,35 +138,55 @@ export function Settings() {
     }
   };
 
+  const { user, isAuthenticated } = useAuthStore();
+
+  const handleLogout = () => {
+    OAuthService.logout();
+    navigate('/login');
+  };
+
   return (
-      <div className="min-h-screen p-8">
-        <div className="max-w-3xl mx-auto">
-          {/* Header */}
-          <motion.div
-            className="mb-8"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <h1 className="text-2xl font-bold text-primary mb-2">
-              Settings
-            </h1>
-            <p className="text-default-500">Configure your FFNodes client</p>
-          </motion.div>
-
-          <div className="space-y-6">
-            {/* Server Configuration */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
+      <div className="min-h-screen p-6 md:p-8">
+        {/* Header */}
+        <motion.header
+          className="mb-6 max-w-7xl mx-auto"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h1 className="text-headline-lg font-medium text-primary mb-1">
+                Settings
+              </h1>
+              <p className="text-body-md text-foreground/70">Configure your FFNodes client</p>
+            </div>
+            <Button
+              color="secondary"
+              onClick={() => navigate('/dashboard')}
+              className="rounded-md-lg shadow-md-2"
             >
-              <Card variant="glass">
-                <div className="space-y-4">
-                  <h2 className="text-lg font-semibold text-secondary mb-4">
-                    Server Configuration
-                  </h2>
+              <iconify-icon icon="mdi:arrow-left" class="text-lg mr-1" />
+              Back to Dashboard
+            </Button>
+          </div>
+        </motion.header>
 
+        <div className="max-w-7xl mx-auto">
+          <BentoGrid columns={6} gap="md">
+            {/* Server Configuration - Large Card */}
+            <BentoCard
+              colSpan={4}
+              elevation={3}
+              background="glass"
+            >
+              <BentoCardHeader
+                title="Server Configuration"
+                subtitle="Configure connection to your FFNodes server"
+                icon={<iconify-icon icon="mdi:server" class="text-2xl" />}
+              />
+              <BentoCardContent>
+                <div className="space-y-4 mt-4">
                   <Input
                     label="Server URL"
                     placeholder="http://localhost:8080"
@@ -187,125 +210,228 @@ export function Settings() {
                     onChange={handleInputChange('displayName')}
                     required
                   />
-
-                  <div className="flex gap-3 mt-6">
-                    <Button
-                      onClick={handleTestConnection}
-                      loading={isTesting}
-                      isDisabled={isTesting || !formData.serverUrl || !formData.serverGuid || !formData.displayName}
-                      variant="accent"
-                    >
-                      Test Connection
-                    </Button>
-
-                    {connectionStatus === 'success' && (
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-success" />
-                        <span className="text-success text-sm">Connected</span>
-                      </div>
-                    )}
-
-                    {connectionStatus === 'error' && (
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-danger" />
-                        <span className="text-danger text-sm">Failed</span>
-                      </div>
-                    )}
-                  </div>
                 </div>
-              </Card>
-            </motion.div>
+              </BentoCardContent>
+              <BentoCardFooter>
+                <div className="flex gap-3 items-center">
+                  <Button
+                    onClick={handleTestConnection}
+                    loading={isTesting}
+                    isDisabled={isTesting || !formData.serverUrl || !formData.serverGuid || !formData.displayName}
+                    color="secondary"
+                    className="rounded-md-lg"
+                  >
+                    Test Connection
+                  </Button>
+
+                  {connectionStatus === 'success' && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
+                      <span className="text-success text-body-sm font-medium">Connected</span>
+                    </div>
+                  )}
+
+                  {connectionStatus === 'error' && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-danger" />
+                      <span className="text-danger text-body-sm font-medium">Failed</span>
+                    </div>
+                  )}
+                </div>
+              </BentoCardFooter>
+            </BentoCard>
+
+            {/* Account Info */}
+            <BentoCard
+              colSpan={2}
+              elevation={3}
+              background="gradient"
+            >
+              <BentoCardHeader
+                title="Account"
+                subtitle={isAuthenticated ? 'Logged in' : 'Not logged in'}
+                icon={<iconify-icon icon="mdi:account-circle" class="text-2xl" />}
+              />
+              <BentoCardContent>
+                {user ? (
+                  <div className="mt-4 space-y-3">
+                    {user.avatar && (
+                      <img
+                        src={user.avatar}
+                        alt={user.name}
+                        className="w-16 h-16 rounded-full"
+                      />
+                    )}
+                    <div>
+                      <p className="text-title-md font-medium text-foreground">{user.name}</p>
+                      {user.email && (
+                        <p className="text-body-sm text-foreground/70">{user.email}</p>
+                      )}
+                      <p className="text-body-sm text-foreground/50 mt-1">
+                        via {user.provider}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-body-sm text-foreground/70 mt-4">
+                    No account logged in
+                  </p>
+                )}
+              </BentoCardContent>
+              {user && (
+                <BentoCardFooter>
+                  <Button
+                    onClick={handleLogout}
+                    color="danger"
+                    size="sm"
+                    className="rounded-md-sm"
+                  >
+                    Logout
+                  </Button>
+                </BentoCardFooter>
+              )}
+            </BentoCard>
 
             {/* GPU Information */}
-            {gpuInfo && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
-              >
-                <Card variant="glass">
-                  <div className="space-y-4">
-                    <h2 className="text-lg font-semibold text-purple-500 mb-4">
-                      GPU Information
-                    </h2>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-default-500 text-sm mb-1">Vendor</p>
-                        <p className="text-foreground font-medium">{gpuInfo.vendor}</p>
-                      </div>
-                      <div>
-                        <p className="text-default-500 text-sm mb-1">GPU Model</p>
-                        <p className="text-foreground font-medium">{gpuInfo.name}</p>
-                      </div>
-                      <div>
-                        <p className="text-default-500 text-sm mb-1">H.264 Encoder</p>
-                        <p className="text-secondary font-mono text-sm">{gpuInfo.encoder_h264}</p>
-                      </div>
-                      <div>
-                        <p className="text-default-500 text-sm mb-1">H.265 Encoder</p>
-                        <p className="text-secondary font-mono text-sm">{gpuInfo.encoder_h265}</p>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
-            )}
-
-            {/* Current Configuration */}
-            {config && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.3 }}
-              >
-                <Card variant="glass">
-                  <div className="space-y-3">
-                    <h2 className="text-lg font-semibold text-primary mb-4">
-                      Current Session
-                    </h2>
-
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-default-500">Client ID:</span>
-                        <span className="text-foreground font-mono">{config.client_id || 'Not set'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-default-500">Computer Name:</span>
-                        <span className="text-foreground">{config.computer_name}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-default-500">Auth Status:</span>
-                        <span className={config.auth_token ? 'text-success' : 'text-default-500'}>
-                          {config.auth_token ? 'Authenticated' : 'Not authenticated'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </motion.div>
-            )}
-
-            {/* Action Buttons */}
-            <motion.div
-              className="flex gap-4 justify-end"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5, delay: 0.4 }}
+            <BentoCard
+              colSpan={3}
+              elevation={2}
+              background="glass"
             >
-              <Button variant="accent" onClick={() => navigate('/dashboard')}>
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleSave}
-                loading={isSaving}
-                isDisabled={isSaving || !formData.serverUrl || !formData.serverGuid || !formData.displayName}
-              >
-                Save & Apply
-              </Button>
-            </motion.div>
-          </div>
+              <BentoCardHeader
+                title="GPU Information"
+                subtitle="Hardware acceleration details"
+                icon={<iconify-icon icon="mdi:chip" class="text-2xl" />}
+              />
+              <BentoCardContent>
+                {gpuInfo ? (
+                  <div className="mt-4 grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-body-sm text-foreground/60 mb-1">Vendor</p>
+                      <p className="text-body-md font-medium text-foreground">{gpuInfo.vendor}</p>
+                    </div>
+                    <div>
+                      <p className="text-body-sm text-foreground/60 mb-1">GPU Model</p>
+                      <p className="text-body-md font-medium text-foreground">{gpuInfo.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-body-sm text-foreground/60 mb-1">H.264 Encoder</p>
+                      <p className="text-body-sm font-mono text-secondary">{gpuInfo.encoder_h264}</p>
+                    </div>
+                    <div>
+                      <p className="text-body-sm text-foreground/60 mb-1">H.265 Encoder</p>
+                      <p className="text-body-sm font-mono text-secondary">{gpuInfo.encoder_h265}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-4 flex items-center justify-center h-24">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+                  </div>
+                )}
+              </BentoCardContent>
+            </BentoCard>
+
+            {/* Current Session */}
+            <BentoCard
+              colSpan={3}
+              elevation={2}
+              background="glass"
+            >
+              <BentoCardHeader
+                title="Current Session"
+                subtitle="Active client information"
+                icon={<iconify-icon icon="mdi:information-outline" class="text-2xl" />}
+              />
+              <BentoCardContent>
+                {config ? (
+                  <div className="mt-4 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-body-sm text-foreground/60">Client ID</span>
+                      <span className="text-body-sm font-mono text-foreground">{config.client_id || 'Not set'}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-body-sm text-foreground/60">Computer Name</span>
+                      <span className="text-body-sm text-foreground">{config.computer_name}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-body-sm text-foreground/60">Auth Status</span>
+                      <span className={`text-body-sm font-medium ${config.auth_token ? 'text-success' : 'text-foreground/60'}`}>
+                        {config.auth_token ? 'Authenticated' : 'Not authenticated'}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-body-sm text-foreground/70 mt-4">No active session</p>
+                )}
+              </BentoCardContent>
+            </BentoCard>
+
+            {/* Theme Settings */}
+            <BentoCard
+              colSpan={2}
+              elevation={2}
+              background="gradient"
+              hover
+            >
+              <BentoCardHeader
+                title="Appearance"
+                subtitle="Theme preferences"
+                icon={<iconify-icon icon="mdi:palette" class="text-2xl" />}
+              />
+              <BentoCardContent>
+                <div className="mt-4 flex gap-2">
+                  <button className="flex-1 p-3 rounded-md-sm bg-content2 hover:bg-content3 transition-colors">
+                    <iconify-icon icon="mdi:white-balance-sunny" class="text-xl" />
+                    <p className="text-body-sm mt-1">Light</p>
+                  </button>
+                  <button className="flex-1 p-3 rounded-md-sm bg-content2 hover:bg-content3 transition-colors">
+                    <iconify-icon icon="mdi:moon-waning-crescent" class="text-xl" />
+                    <p className="text-body-sm mt-1">Dark</p>
+                  </button>
+                </div>
+              </BentoCardContent>
+            </BentoCard>
+
+            {/* About */}
+            <BentoCard
+              colSpan={2}
+              elevation={2}
+              background="solid"
+            >
+              <BentoCardHeader
+                title="About"
+                icon={<iconify-icon icon="mdi:information" class="text-2xl" />}
+              />
+              <BentoCardContent>
+                <div className="mt-4 space-y-2">
+                  <p className="text-body-sm text-foreground/70">FFNodes Client</p>
+                  <p className="text-body-sm text-foreground/60">Version 0.1.0</p>
+                  <p className="text-body-sm text-foreground/50">Built with Tauri & React</p>
+                </div>
+              </BentoCardContent>
+            </BentoCard>
+
+            {/* Actions */}
+            <BentoCard
+              colSpan={2}
+              elevation={2}
+              background="gradient"
+            >
+              <BentoCardContent>
+                <Button
+                  onClick={handleSave}
+                  loading={isSaving}
+                  isDisabled={isSaving || !formData.serverUrl || !formData.serverGuid || !formData.displayName}
+                  color="primary"
+                  className="w-full rounded-md-lg shadow-md-3"
+                  size="lg"
+                >
+                  <iconify-icon icon="mdi:content-save" class="text-xl mr-2" />
+                  Save & Apply Changes
+                </Button>
+              </BentoCardContent>
+            </BentoCard>
+          </BentoGrid>
         </div>
       </div>
   );

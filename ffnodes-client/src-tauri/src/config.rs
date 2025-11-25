@@ -56,6 +56,7 @@ impl ClientConfig {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn delete() -> anyhow::Result<()> {
         let path = Self::config_path();
         if path.exists() {
