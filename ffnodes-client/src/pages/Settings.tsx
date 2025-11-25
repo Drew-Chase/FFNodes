@@ -8,6 +8,7 @@ import { Button, Input } from '../components/ui';
 import { BentoGrid, BentoCard, BentoCardHeader, BentoCardContent, BentoCardFooter } from '../components/layout/BentoGrid';
 import { useAuthStore } from '../stores/useAuthStore';
 import { OAuthService } from '../services/oauth';
+import { useThemeStore } from '../stores/useThemeStore';
 
 interface FormData {
   serverUrl: string;
@@ -25,6 +26,7 @@ interface GpuInfo {
 export function Settings() {
   const navigate = useNavigate();
   const { config, setConfig } = useConfigStore();
+  const { theme, setTheme } = useThemeStore();
   const [formData, setFormData] = useState<FormData>({
     serverUrl: config?.server_url || '',
     serverGuid: config?.server_guid || '',
@@ -380,11 +382,25 @@ export function Settings() {
               />
               <BentoCardContent>
                 <div className="mt-4 flex gap-2">
-                  <button className="flex-1 p-3 rounded-md-sm bg-content2 hover:bg-content3 transition-colors">
+                  <button
+                    onClick={() => setTheme('light')}
+                    className={`flex-1 p-3 rounded-md-sm transition-colors ${
+                      theme === 'light'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-content2 hover:bg-content3'
+                    }`}
+                  >
                     <iconify-icon icon="mdi:white-balance-sunny" class="text-xl" />
                     <p className="text-body-sm mt-1">Light</p>
                   </button>
-                  <button className="flex-1 p-3 rounded-md-sm bg-content2 hover:bg-content3 transition-colors">
+                  <button
+                    onClick={() => setTheme('dark')}
+                    className={`flex-1 p-3 rounded-md-sm transition-colors ${
+                      theme === 'dark'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-content2 hover:bg-content3'
+                    }`}
+                  >
                     <iconify-icon icon="mdi:moon-waning-crescent" class="text-xl" />
                     <p className="text-body-sm mt-1">Dark</p>
                   </button>

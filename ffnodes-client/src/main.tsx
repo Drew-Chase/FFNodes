@@ -1,4 +1,4 @@
-import React from "react";
+import React, {useEffect} from "react";
 import {BrowserRouter, Route, Routes, Navigate} from "react-router-dom";
 import ReactDOM from "react-dom/client";
 import $ from "jquery";
@@ -13,9 +13,20 @@ import {Login} from "./pages/Login.tsx";
 import {TitleBar} from "./components/TitleBar.tsx";
 import {ProtectedRoute} from "./components/auth/ProtectedRoute.tsx";
 import {useAuthStore} from "./stores/useAuthStore.ts";
+import {useThemeStore} from "./stores/useThemeStore.ts";
 
 function App() {
     const { isAuthenticated } = useAuthStore();
+    const { theme } = useThemeStore();
+
+    // Apply theme on mount and when it changes
+    useEffect(() => {
+        if (theme === 'dark') {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    }, [theme]);
 
     return (
         <HeroUIProvider>

@@ -7,7 +7,7 @@ import {OAuthService} from "../services/oauth";
 import {QRCodeSVG} from "qrcode.react";
 import {invoke} from "@tauri-apps/api/core";
 import {addToast} from "@heroui/toast";
-import {useConfigStore} from "../stores/useConfigStore";
+import {ClientConfig, useConfigStore} from "../stores/useConfigStore";
 
 type LoginStep = 'auth' | 'display-name' | 'server-setup';
 
@@ -95,7 +95,7 @@ export const Login: React.FC = () =>
         try
         {
             // Test connection and save config
-            const config = await invoke('test_connection', {
+            const config = await invoke<ClientConfig>('test_connection', {
                 input: {
                     server_url: serverUrl,
                     server_guid: serverGuid,
