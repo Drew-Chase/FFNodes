@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use tokio::sync::broadcast;
 
 /// Progress information for media file scanning
@@ -34,6 +34,7 @@ impl ScanProgress {
         }
     }
 
+    #[allow(dead_code)]
     pub fn percentage(&self) -> f64 {
         if self.total_files == 0 {
             0.0

@@ -1,8 +1,10 @@
 /// FFmpeg template parser for simple placeholder replacement
+#[allow(dead_code)]
 pub struct TemplateParser {
     template: String,
 }
 
+#[allow(dead_code)]
 impl TemplateParser {
     pub fn new(template: String) -> Self {
         Self { template }

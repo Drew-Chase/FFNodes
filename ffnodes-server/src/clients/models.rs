@@ -46,6 +46,7 @@ pub struct AuthResponse {
 }
 
 /// Heartbeat request
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HeartbeatRequest {
     pub client_id: String,

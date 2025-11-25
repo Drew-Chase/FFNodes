@@ -24,6 +24,7 @@ impl JobStatus {
         }
     }
 
+    #[allow(dead_code)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "pending" => Some(JobStatus::Pending),
@@ -74,16 +75,19 @@ impl EncodingJob {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_status(&self) -> JobStatus {
         JobStatus::from_str(&self.status).unwrap_or(JobStatus::Pending)
     }
 
+    #[allow(dead_code)]
     pub fn set_status(&mut self, status: JobStatus) {
         self.status = status.as_str().to_string();
     }
 }
 
 /// Job request from client
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JobRequest {
     pub client_id: String,

@@ -87,6 +87,7 @@ pub async fn initialize() -> Result<()> {
 }
 
 impl MediaFile {
+    #[allow(dead_code)]
     pub async fn insert(
         &self,
         transaction: &mut Transaction<'_, sqlx::sqlite::Sqlite>,

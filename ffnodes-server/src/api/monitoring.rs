@@ -7,7 +7,6 @@ use tracing::{debug, warn, error};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
-use futures::stream::StreamExt;
 
 /// System status response
 #[derive(Debug, Serialize, Deserialize)]
@@ -85,7 +84,7 @@ pub async fn scan_progress(_req: HttpRequest) -> Result<HttpResponse, Error> {
     let stream = async_stream::stream! {
         // Send initial connection message
         yield Ok::<_, actix_web::Error>(
-            web::Bytes::from(format!("event: connected\ndata: {{}}\n\n"))
+            web::Bytes::from("event: connected\ndata: {}\n\n".to_string())
         );
 
         // Set up heartbeat interval

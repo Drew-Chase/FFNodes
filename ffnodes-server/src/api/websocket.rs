@@ -3,11 +3,12 @@ use crate::jobs::JobQueue;
 use actix_web::{web, HttpRequest, HttpResponse};
 use actix_ws::Message as WsMessage;
 use futures::StreamExt;
-use log::{debug, warn};
+use log::debug;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 /// WebSocket event types
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum WsEvent {

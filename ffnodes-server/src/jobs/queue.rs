@@ -1,6 +1,6 @@
 use super::models::{EncodingJob, EncodingProgress, JobStatus, ProgressUpdate};
 use anyhow::{anyhow, Result};
-use sqlx::{Executor, SqlitePool};
+use sqlx::SqlitePool;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -223,6 +223,7 @@ impl JobQueue {
     }
 
     /// Get jobs assigned to a specific client
+    #[allow(dead_code)]
     pub async fn get_client_jobs(&self, client_id: &str) -> Result<Vec<EncodingJob>> {
         let jobs: Vec<EncodingJob> = sqlx::query_as(
             r#"SELECT * FROM encoding_jobs
@@ -252,6 +253,7 @@ impl JobQueue {
     }
 
     /// Get job progress
+    #[allow(dead_code)]
     pub async fn get_progress(&self, job_id: &str) -> Result<Option<EncodingProgress>> {
         let progress: Option<EncodingProgress> =
             sqlx::query_as(r#"SELECT * FROM encoding_progress WHERE job_id = ?"#)

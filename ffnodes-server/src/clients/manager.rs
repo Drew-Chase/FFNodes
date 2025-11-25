@@ -1,6 +1,6 @@
 use super::models::{Client, ClientStatus};
 use anyhow::{anyhow, Result};
-use sqlx::{Executor, SqlitePool};
+use sqlx::SqlitePool;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
@@ -76,6 +76,7 @@ impl ClientManager {
     }
 
     /// Disconnect a client
+    #[allow(dead_code)]
     pub async fn disconnect_client(&self, client_id: &str) -> Result<()> {
         let now = chrono::Utc::now().timestamp();
 
@@ -167,6 +168,7 @@ impl ClientManager {
     }
 
     /// Refresh in-memory client registry from database
+    #[allow(dead_code)]
     pub async fn refresh_registry(&self) -> Result<()> {
         let connected_clients = self.get_connected_clients().await?;
         let mut clients = self.clients.write().await;
