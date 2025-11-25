@@ -1,0 +1,15 @@
+meta {
+  name: Client heartbeat
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/heartbeat/:client_id
+  body: none
+  auth: inherit
+}
+
+params:path {
+  client_id: 
+}

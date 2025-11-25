@@ -1,0 +1,22 @@
+meta {
+  name: Complete job
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/jobs/:job_id/complete
+  body: json
+  auth: inherit
+}
+
+params:path {
+  job_id: 
+}
+
+body:json {
+  {
+    "output_size": 0,
+    "output_bitrate": 0
+  }
+}

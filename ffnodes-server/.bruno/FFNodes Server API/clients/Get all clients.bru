@@ -1,0 +1,11 @@
+meta {
+  name: Get all clients
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/clients
+  body: none
+  auth: inherit
+}

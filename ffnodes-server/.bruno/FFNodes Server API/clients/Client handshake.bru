@@ -1,0 +1,19 @@
+meta {
+  name: Client handshake
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/handshake
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "server_guid": "",
+    "display_name": "",
+    "computer_name": ""
+  }
+}

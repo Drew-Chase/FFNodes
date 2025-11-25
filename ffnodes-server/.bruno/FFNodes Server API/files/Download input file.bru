@@ -1,0 +1,15 @@
+meta {
+  name: Download input file
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/files/:job_id/input
+  body: none
+  auth: inherit
+}
+
+params:path {
+  job_id: 
+}
