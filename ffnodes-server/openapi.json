@@ -1,0 +1,946 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "FFNodes Server API",
+    "description": "REST API for distributed video encoding using FFmpeg. FFNodes allows multiple client devices to process video encoding jobs coordinated by a central server.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "FFNodes"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Development server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Authentication",
+      "description": "Client registration and authentication"
+    },
+    {
+      "name": "Jobs",
+      "description": "Encoding job management"
+    },
+    {
+      "name": "Files",
+      "description": "File upload and download"
+    },
+    {
+      "name": "Monitoring",
+      "description": "System status and monitoring"
+    },
+    {
+      "name": "WebSocket",
+      "description": "Real-time progress updates"
+    }
+  ],
+  "paths": {
+    "/api/handshake": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Client handshake",
+        "description": "Validates server GUID and registers a new client. Returns an authentication token that should be used as the client_id in subsequent requests.",
+        "operationId": "handshake",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClientRegistration"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Client successfully registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/jobs/request/{client_id}": {
+      "post": {
+        "tags": ["Jobs"],
+        "summary": "Request next job",
+        "description": "Requests the next available encoding job from the queue. Returns 204 No Content if no jobs are available.",
+        "operationId": "requestJob",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ClientIdPathParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job assigned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No jobs available"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/start": {
+      "post": {
+        "tags": ["Jobs"],
+        "summary": "Start job",
+        "description": "Marks a job as in progress. Should be called after downloading the input file and before starting encoding.",
+        "operationId": "startJob",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/JobIdPathParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job started successfully"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/progress": {
+      "post": {
+        "tags": ["Jobs"],
+        "summary": "Update job progress",
+        "description": "Updates the progress of an in-progress encoding job. Should be called periodically during encoding.",
+        "operationId": "updateProgress",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/JobIdPathParam"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProgressUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Progress updated successfully"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/complete": {
+      "post": {
+        "tags": ["Jobs"],
+        "summary": "Complete job",
+        "description": "Marks a job as completed. Should be called after successfully uploading the output file.",
+        "operationId": "completeJob",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/JobIdPathParam"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobCompletion"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Job completed successfully"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/fail": {
+      "post": {
+        "tags": ["Jobs"],
+        "summary": "Fail job",
+        "description": "Marks a job as failed with an error message. Should be called if encoding fails.",
+        "operationId": "failJob",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/JobIdPathParam"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobFailure"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Job marked as failed"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/jobs/active": {
+      "get": {
+        "tags": ["Jobs"],
+        "summary": "Get active jobs",
+        "description": "Returns a list of all currently active (assigned or in-progress) jobs.",
+        "operationId": "getActiveJobs",
+        "responses": {
+          "200": {
+            "description": "List of active jobs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EncodingJob"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/files/{job_id}/input": {
+      "get": {
+        "tags": ["Files"],
+        "summary": "Download input file",
+        "description": "Downloads the input video file for a specific job. The file is served as an octet-stream.",
+        "operationId": "downloadInput",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/JobIdPathParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Input file",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/files/{job_id}/output": {
+      "post": {
+        "tags": ["Files"],
+        "summary": "Upload output file",
+        "description": "Uploads the encoded output file for a specific job. Use multipart/form-data encoding.",
+        "operationId": "uploadOutput",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/JobIdPathParam"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Encoded video file"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "File uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "File uploaded successfully"
+                    },
+                    "size": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Size of uploaded file in bytes"
+                    },
+                    "path": {
+                      "type": "string",
+                      "description": "Path where file was saved"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequestError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/heartbeat/{client_id}": {
+      "post": {
+        "tags": ["Jobs"],
+        "summary": "Client heartbeat",
+        "description": "Updates the last heartbeat timestamp for a client. Should be called periodically to indicate the client is still alive.",
+        "operationId": "heartbeat",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ClientIdPathParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Heartbeat updated successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/status": {
+      "get": {
+        "tags": ["Monitoring"],
+        "summary": "Get system status",
+        "description": "Returns overall system status including job counts and connected clients.",
+        "operationId": "getStatus",
+        "responses": {
+          "200": {
+            "description": "System status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemStatus"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/clients": {
+      "get": {
+        "tags": ["Monitoring"],
+        "summary": "Get all clients",
+        "description": "Returns a list of all registered clients with their current status.",
+        "operationId": "getClients",
+        "responses": {
+          "200": {
+            "description": "List of clients",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ClientStatus"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/scan/progress": {
+      "get": {
+        "tags": ["Monitoring"],
+        "summary": "Scan progress (SSE)",
+        "description": "Server-Sent Events endpoint for real-time media file scanning progress updates.",
+        "operationId": "scanProgress",
+        "responses": {
+          "200": {
+            "description": "SSE stream of progress updates",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "object",
+                  "description": "Stream of server-sent events"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/ws/progress": {
+      "get": {
+        "tags": ["WebSocket"],
+        "summary": "WebSocket progress updates",
+        "description": "WebSocket endpoint for real-time job progress updates and client events.",
+        "operationId": "wsProgress",
+        "responses": {
+          "101": {
+            "description": "WebSocket connection established"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "ClientIdPathParam": {
+        "name": "client_id",
+        "in": "path",
+        "required": true,
+        "description": "Unique client identifier (auth token received from handshake)",
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "JobIdPathParam": {
+        "name": "job_id",
+        "in": "path",
+        "required": true,
+        "description": "Unique job identifier",
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "schemas": {
+      "ClientRegistration": {
+        "type": "object",
+        "required": ["server_guid", "display_name", "computer_name"],
+        "properties": {
+          "server_guid": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Server GUID from config.json"
+          },
+          "display_name": {
+            "type": "string",
+            "description": "Human-readable client name"
+          },
+          "computer_name": {
+            "type": "string",
+            "description": "Computer hostname"
+          }
+        }
+      },
+      "AuthResponse": {
+        "type": "object",
+        "required": ["auth_token", "ffmpeg_template"],
+        "properties": {
+          "auth_token": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Authentication token (client ID) to use in subsequent requests"
+          },
+          "ffmpeg_template": {
+            "type": "string",
+            "description": "FFmpeg command template for encoding",
+            "example": "-c:v h264{HWACCEL_CODE} -preset medium -crf 23 -i {INPUT} {OUTPUT}"
+          }
+        }
+      },
+      "JobResponse": {
+        "type": "object",
+        "required": ["job", "input_path", "output_template"],
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/EncodingJob"
+          },
+          "input_path": {
+            "type": "string",
+            "description": "Path to input file"
+          },
+          "output_template": {
+            "type": "string",
+            "description": "Template for output file path",
+            "example": "/path/to/video.mp4.h264.mp4"
+          }
+        }
+      },
+      "EncodingJob": {
+        "type": "object",
+        "required": ["id", "media_file_path", "status", "priority", "created_at"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique job identifier"
+          },
+          "media_file_path": {
+            "type": "string",
+            "description": "Path to media file"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "assigned", "in_progress", "completed", "failed"],
+            "description": "Current job status"
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Job priority (higher = more urgent)"
+          },
+          "assigned_client": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "ID of assigned client"
+          },
+          "assigned_at": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true,
+            "description": "Unix timestamp when job was assigned"
+          },
+          "started_at": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true,
+            "description": "Unix timestamp when job started"
+          },
+          "completed_at": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true,
+            "description": "Unix timestamp when job completed"
+          },
+          "error_message": {
+            "type": "string",
+            "nullable": true,
+            "description": "Error message if job failed"
+          },
+          "output_path": {
+            "type": "string",
+            "nullable": true,
+            "description": "Path to output file"
+          },
+          "output_size": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true,
+            "description": "Size of output file in bytes"
+          },
+          "output_bitrate": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true,
+            "description": "Bitrate of output file"
+          },
+          "created_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix timestamp when job was created"
+          }
+        }
+      },
+      "ProgressUpdate": {
+        "type": "object",
+        "required": ["frame", "fps", "bitrate", "speed"],
+        "properties": {
+          "frame": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Current frame number"
+          },
+          "fps": {
+            "type": "number",
+            "format": "double",
+            "description": "Current encoding frames per second"
+          },
+          "bitrate": {
+            "type": "string",
+            "description": "Current bitrate",
+            "example": "2500kbits/s"
+          },
+          "speed": {
+            "type": "string",
+            "description": "Encoding speed relative to playback",
+            "example": "1.5x"
+          }
+        }
+      },
+      "JobCompletion": {
+        "type": "object",
+        "required": ["output_size", "output_bitrate"],
+        "properties": {
+          "output_size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Size of output file in bytes"
+          },
+          "output_bitrate": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Bitrate of output file"
+          }
+        }
+      },
+      "JobFailure": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error message describing why the job failed"
+          }
+        }
+      },
+      "SystemStatus": {
+        "type": "object",
+        "required": ["total_media_files", "pending_jobs", "active_jobs", "connected_clients"],
+        "properties": {
+          "total_media_files": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Total number of media files in database"
+          },
+          "pending_jobs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Number of jobs waiting to be assigned"
+          },
+          "active_jobs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Number of jobs currently being processed"
+          },
+          "connected_clients": {
+            "type": "integer",
+            "description": "Number of connected clients"
+          }
+        }
+      },
+      "ClientStatus": {
+        "type": "object",
+        "required": ["id", "display_name", "computer_name", "connected_at", "last_heartbeat", "active_jobs_count"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Client identifier"
+          },
+          "display_name": {
+            "type": "string",
+            "description": "Human-readable client name"
+          },
+          "computer_name": {
+            "type": "string",
+            "description": "Computer hostname"
+          },
+          "connected_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix timestamp when client connected"
+          },
+          "last_heartbeat": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Unix timestamp of last heartbeat"
+          },
+          "active_jobs_count": {
+            "type": "integer",
+            "description": "Number of active jobs assigned to this client"
+          }
+        }
+      },
+      "WsEvent": {
+        "type": "object",
+        "discriminator": {
+          "propertyName": "type"
+        },
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "job_assigned",
+              "progress",
+              "job_completed",
+              "job_failed",
+              "client_connected",
+              "client_disconnected"
+            ]
+          }
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/JobAssignedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ProgressEvent"
+          },
+          {
+            "$ref": "#/components/schemas/JobCompletedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/JobFailedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ClientConnectedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ClientDisconnectedEvent"
+          }
+        ]
+      },
+      "JobAssignedEvent": {
+        "type": "object",
+        "required": ["type", "job_id", "client_id", "media_file"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["job_assigned"]
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "client_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "media_file": {
+            "type": "string"
+          }
+        }
+      },
+      "ProgressEvent": {
+        "type": "object",
+        "required": ["type", "job_id", "client_id", "frame", "fps", "speed"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["progress"]
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "client_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "frame": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fps": {
+            "type": "number",
+            "format": "double"
+          },
+          "speed": {
+            "type": "string"
+          }
+        }
+      },
+      "JobCompletedEvent": {
+        "type": "object",
+        "required": ["type", "job_id", "client_id"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["job_completed"]
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "client_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "JobFailedEvent": {
+        "type": "object",
+        "required": ["type", "job_id", "client_id", "error"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["job_failed"]
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "client_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "ClientConnectedEvent": {
+        "type": "object",
+        "required": ["type", "client_id", "display_name"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["client_connected"]
+          },
+          "client_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "display_name": {
+            "type": "string"
+          }
+        }
+      },
+      "ClientDisconnectedEvent": {
+        "type": "object",
+        "required": ["type", "client_id"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["client_disconnected"]
+          },
+          "client_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error message"
+          },
+          "details": {
+            "type": "string",
+            "description": "Detailed error information (only in debug mode)"
+          }
+        }
+      }
+    },
+    "responses": {
+      "BadRequestError": {
+        "description": "Bad request",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "UnauthorizedError": {
+        "description": "Unauthorized - invalid or missing authentication",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "NotFoundError": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "InternalServerError": {
+        "description": "Internal server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    }
+  }
+}
