@@ -136,6 +136,8 @@ pub enum HardwareAccel {
     AMF,
     /// CUDA
     CUDA,
+    /// Auto-detect hardware acceleration type
+    Auto,
     /// Custom hardware acceleration
     Custom(String),
 }
@@ -150,6 +152,7 @@ impl fmt::Display for HardwareAccel {
             HardwareAccel::VAAPI => write!(f, "vaapi"),
             HardwareAccel::AMF => write!(f, "amf"),
             HardwareAccel::CUDA => write!(f, "cuda"),
+            HardwareAccel::Auto => write!(f, "auto"),
             HardwareAccel::Custom(s) => write!(f, "{}", s),
         }
     }
@@ -247,6 +250,7 @@ pub enum ContainerFormat {
     MPEG,
     HLS,
     DASH,
+    NULL,
     Custom(String),
 }
 
@@ -262,6 +266,7 @@ impl fmt::Display for ContainerFormat {
             ContainerFormat::MPEG => write!(f, "mpeg"),
             ContainerFormat::HLS => write!(f, "hls"),
             ContainerFormat::DASH => write!(f, "dash"),
+            ContainerFormat::NULL => write!(f, "null"),
             ContainerFormat::Custom(s) => write!(f, "{}", s),
         }
     }
