@@ -1,19 +1,18 @@
 use crate::configuration::Configuration;
-use anyhow::{Result, anyhow};
-use ffmpeg::builders::ProbeFormat;
+use anyhow::{anyhow, Result};
+use ffmpeg::builders::{ContainerFormat, HardwareAccel, ProbeFormat, VideoCodec};
 use log::{debug, error, info};
 use serde_hash::HashIds;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 pub mod media_file_db;
+pub mod progress;
 mod scanner;
 mod watcher;
-pub mod progress;
 pub use media_file_db::initialize;
 pub use scanner::Scanner;
 pub use watcher::FileWatcher;
-pub use progress::{ProgressBroadcaster, ScanProgress};
 
 #[derive(Debug, Clone, PartialEq, sqlx::FromRow, HashIds)]
 /// A video media file.
@@ -65,7 +64,7 @@ impl MediaFile {
         let mut current_slow_calc = slow_calc_frames;
 
         loop {
-            let mut builder = config
+            let builder = config
                 .ffmpeg
                 .ffprobe_command_builder()
                 .input(file_path.as_ref().to_string_lossy().to_string())?
@@ -73,10 +72,6 @@ impl MediaFile {
                 .log_level(1)
                 .output_format(ProbeFormat::JSON)
                 .show_format();
-
-            if current_slow_calc {
-                builder = builder.count_frames();
-            }
 
             let probe = builder
                 .build()
@@ -101,7 +96,7 @@ impl MediaFile {
             })?;
 
             // Try to extract frame count from various sources
-            let frames_result = Self::extract_frame_count(&probe);
+            let frames_result = Self::extract_frame_count(&probe).await?;
 
             let frames = match frames_result {
                 Some(frames) => frames,
@@ -172,30 +167,66 @@ impl MediaFile {
     }
 
     /// Extract frame count from probe output, trying multiple sources
-    fn extract_frame_count(probe: &ffmpeg::builders::ProbeResult) -> Option<u64> {
-        let stream = probe.first_video_stream()?;
+    async fn extract_frame_count(probe: &ffmpeg::builders::ProbeResult) -> Result<Option<u64>> {
+        let stream = probe
+            .first_video_stream()
+            .ok_or_else(|| anyhow!("No video stream found"))?;
 
         // Try nb_frames field
         if let Some(nb_frames_s) = stream.nb_frames.as_ref()
             && let Ok(nb_frames) = nb_frames_s.parse::<u64>()
         {
-            return Some(nb_frames);
+            return Ok(Some(nb_frames));
         }
 
         // Try NUMBER_OF_FRAMES tag
         if let Some(nb_frames_s) = stream.tags.get("NUMBER_OF_FRAMES")
             && let Ok(nb_frames) = nb_frames_s.parse::<u64>()
         {
-            return Some(nb_frames);
+            return Ok(Some(nb_frames));
         }
 
         // Try NUMBER_OF_FRAMES-eng tag
         if let Some(nb_frames_s) = stream.tags.get("NUMBER_OF_FRAMES-eng")
             && let Ok(nb_frames) = nb_frames_s.parse::<u64>()
         {
-            return Some(nb_frames);
+            return Ok(Some(nb_frames));
         }
 
-        None
+        // If unable to get the frame count from the probe output, use ffmpeg to try to get the frame count.
+        let config = Configuration::load().await?;
+        let cmd = config
+            .ffmpeg
+            .ffmpeg_command_builder()
+            .hardware_accel(HardwareAccel::Auto)
+            .video_codec(VideoCodec::Copy)
+            .format(ContainerFormat::NULL)
+            .input(
+                probe
+                    .clone()
+                    .format
+                    .ok_or_else(|| anyhow!("Failed to get the probe format"))?
+                    .filename,
+            )?
+            .output("-")?
+            .build()?;
+        let (sender, mut receiver) = tokio::sync::mpsc::channel::<String>(5);
+        cmd.execute(None, Some(sender)).await?;
+        loop {
+            if let Some(output) = receiver.recv().await
+                && output.contains("frame=")
+                && let Some(section) = output.split("frame=").last()
+                && let Some(frame_count) = section.split_whitespace().nth(0)
+            {
+                return Ok(Some(frame_count.trim().parse::<u64>()?));
+            }
+
+            // Channel closed, no more output
+            if receiver.is_closed() {
+                break;
+            }
+        }
+
+        Ok(None)
     }
 }
