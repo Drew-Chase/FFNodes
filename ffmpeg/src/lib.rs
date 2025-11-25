@@ -176,34 +176,40 @@ impl FFMpeg {
 		let zip_path = dest_dir.join(format!("{}.zip", binary_name));
 		tokio::fs::write(&zip_path, &bytes).await?;
 
-		// Extract the zip file
-		let file = std::fs::File::open(&zip_path)?;
-		let mut archive = zip::ZipArchive::new(file)?;
+		// Extract the zip file in a blocking task to avoid Send issues
+		let dest_dir_clone = dest_dir.clone();
+		let zip_path_clone = zip_path.clone();
+		tokio::task::spawn_blocking(move || -> Result<()> {
+			let file = std::fs::File::open(&zip_path_clone)?;
+			let mut archive = zip::ZipArchive::new(file)?;
 
-		// Find and extract the binary (it should be the only file or the main executable)
-		for i in 0..archive.len() {
-			let mut file = archive.by_index(i)?;
-			let outpath = dest_dir.join(file.name());
+			// Find and extract the binary (it should be the only file or the main executable)
+			for i in 0..archive.len() {
+				let mut file = archive.by_index(i)?;
+				let outpath = dest_dir_clone.join(file.name());
 
-			if file.is_dir() {
-				tokio::fs::create_dir_all(&outpath).await?;
-			} else {
-				if let Some(parent) = outpath.parent() {
-					tokio::fs::create_dir_all(parent).await?;
-				}
-				let mut outfile = std::fs::File::create(&outpath)?;
-				std::io::copy(&mut file, &mut outfile)?;
+				if file.is_dir() {
+					std::fs::create_dir_all(&outpath)?;
+				} else {
+					if let Some(parent) = outpath.parent() {
+						std::fs::create_dir_all(parent)?;
+					}
+					let mut outfile = std::fs::File::create(&outpath)?;
+					std::io::copy(&mut file, &mut outfile)?;
 
-				// Make executable on Unix systems
-				#[cfg(unix)]
-				{
-					use std::os::unix::fs::PermissionsExt;
-					let mut permissions = outfile.metadata()?.permissions();
-					permissions.set_mode(0o755);
-					std::fs::set_permissions(&outpath, permissions)?;
+					// Make executable on Unix systems
+					#[cfg(unix)]
+					{
+						use std::os::unix::fs::PermissionsExt;
+						let mut permissions = outfile.metadata()?.permissions();
+						permissions.set_mode(0o755);
+						std::fs::set_permissions(&outpath, permissions)?;
+					}
 				}
 			}
-		}
+			Ok(())
+		})
+		.await??;
 
 		// Clean up zip file
 		tokio::fs::remove_file(&zip_path).await?;
