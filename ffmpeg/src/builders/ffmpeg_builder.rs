@@ -112,14 +112,33 @@ impl FFmpegBuilder {
     }
 
     /// Add a raw argument (escape hatch for unsupported options)
+    /// - If called after output(), adds to current output options
+    /// - If called after input(), adds to current input options
+    /// - Otherwise adds to global args
     pub fn raw_arg(mut self, arg: impl Into<String>) -> Self {
-        self.global_args.push(arg.into());
+        let arg = arg.into();
+        if let Some(output) = &mut self.current_output {
+            output.options.push(arg);
+        } else if let Some(input) = &mut self.current_input {
+            input.options.push(arg);
+        } else {
+            self.global_args.push(arg);
+        }
         self
     }
 
     /// Add multiple raw arguments
+    /// - If called after output(), adds to current output options
+    /// - If called after input(), adds to current input options
+    /// - Otherwise adds to global args
     pub fn raw_args(mut self, args: impl IntoIterator<Item = String>) -> Self {
-        self.global_args.extend(args);
+        if let Some(output) = &mut self.current_output {
+            output.options.extend(args);
+        } else if let Some(input) = &mut self.current_input {
+            input.options.extend(args);
+        } else {
+            self.global_args.extend(args);
+        }
         self
     }
 

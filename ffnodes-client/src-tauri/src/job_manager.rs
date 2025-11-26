@@ -279,7 +279,15 @@ impl JobManager {
             log::debug!("Output: {:?}", output_path);
             log::debug!("GPU: vendor={}, name={}, h264={}, h265={}",
                         gpu_info.vendor, gpu_info.name, gpu_info.encoder_h264, gpu_info.encoder_h265);
-            log::debug!("Template: {}", job_resp.output_template);
+
+            // Get FFmpeg command template from config
+            let ffmpeg_template = config
+                .ffmpeg_template
+                .as_ref()
+                .ok_or_else(|| anyhow!("No FFmpeg template configured"))?;
+            log::debug!("FFmpeg template: {}", ffmpeg_template);
+            log::debug!("Output template: {}", job_resp.output_template);
+
             let job_id_clone = job_id.clone();
             let app_handle = self.app_handle.clone();
             let client_clone = client.clone();
@@ -290,7 +298,7 @@ impl JobManager {
                     &input_path,
                     &output_path,
                     &gpu_info,
-                    &job_resp.output_template,
+                    ffmpeg_template,
                     job_resp.total_frames,
                     move |progress: EncodingProgress| {
                         // Emit progress event

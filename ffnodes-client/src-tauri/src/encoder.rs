@@ -37,7 +37,7 @@ impl Encoder {
 
     /// Extract a random frame from the video for background
     pub async fn extract_frame(&self, video_path: &Path) -> Result<String> {
-        log::info!("Extracting frame from: {}", video_path.display());
+        log::info!("Extracting random frame from: {}", video_path.display());
 
         // Get video duration first
         let duration = self.get_video_duration(video_path).await?;
@@ -45,7 +45,8 @@ impl Encoder {
 
         // Pick a random timestamp (avoid first and last 10%)
         let random_time = (duration * 0.1) + (duration * 0.8 * rand::random::<f64>());
-        log::debug!("Random timestamp selected: {:.2}s", random_time);
+        let percentage = (random_time / duration) * 100.0;
+        log::info!("Extracting frame at random position: {:.2}s ({:.1}% through video)", random_time, percentage);
 
         // Output path
         let output_path = self.temp_dir.join(format!(
@@ -59,8 +60,8 @@ impl Encoder {
 
         // Extract frame using FFmpeg builder
         let builder = self.ffmpeg.ffmpeg_command_builder()
-            .start_time(random_time.to_string())?
             .input(video_path.to_str().unwrap())?
+            .start_time(random_time.to_string())?
             .output(output_path.to_str().unwrap())?
             .raw_arg("-vframes".to_string())
             .raw_arg("1".to_string())
@@ -69,7 +70,7 @@ impl Encoder {
             .overwrite(true);
 
         let cmd = builder.build()?;
-        log::debug!("FFmpeg command: {:?}", cmd.args());
+        log::debug!("Extract frame FFmpeg command: {}", cmd);
 
         cmd.execute(None, None).await
             .map_err(|e| anyhow!("Failed to extract frame: {}", e))?;
@@ -162,7 +163,7 @@ impl Encoder {
 
         let cmd = builder.build()?;
         log::info!("Starting FFmpeg encoding process");
-        log::debug!("FFmpeg command: {:?}", cmd.args());
+        log::debug!("FFmpeg command: {}", cmd);
 
         // Execute in background and process progress
         let handle = tokio::spawn(async move {
