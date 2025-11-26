@@ -88,7 +88,6 @@ impl ServerClient {
         Ok(Some(job_response))
     }
 
-    #[allow(dead_code)]
     pub async fn start_job(&self, job_id: &str) -> Result<()> {
         let url = format!("{}/api/jobs/{}/start", self.base_url, job_id);
         self.client
@@ -121,7 +120,6 @@ impl ServerClient {
         Ok(())
     }
 
-    #[allow(dead_code)]
     pub async fn fail_job(&self, job_id: &str, error: String) -> Result<()> {
         let url = format!("{}/api/jobs/{}/fail", self.base_url, job_id);
         let body = serde_json::json!({ "error": error });

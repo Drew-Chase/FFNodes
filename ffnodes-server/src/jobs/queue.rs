@@ -1,6 +1,7 @@
 use super::models::{EncodingJob, EncodingProgress, JobStatus, ProgressUpdate};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use sqlx::SqlitePool;
+use std::cmp::{max, min};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -266,11 +267,10 @@ impl JobQueue {
 
     /// Get count of pending jobs
     pub async fn get_pending_count(&self) -> Result<i64> {
-        let count: (i64,) = sqlx::query_as(
-            r#"SELECT COUNT(*) FROM encoding_jobs WHERE status = 'pending'"#,
-        )
-        .fetch_one(&self.pool)
-        .await?;
+        let count: (i64,) =
+            sqlx::query_as(r#"SELECT COUNT(*) FROM encoding_jobs WHERE status = 'pending'"#)
+                .fetch_one(&self.pool)
+                .await?;
 
         Ok(count.0)
     }
@@ -284,5 +284,34 @@ impl JobQueue {
         .await?;
 
         Ok(count.0)
+    }
+
+    /// Create jobs for media files that have been scanned but have no encoding job yet
+    pub async fn create_jobs_for_unprocessed_files(&self) -> Result<usize> {
+        // Query all media files that are not processed and have no associated job
+        let files: Vec<(String, i64, i64)> = sqlx::query_as(
+            r#"SELECT mf.path, mf.scanned_size, mf.encoding_complexity
+            FROM media_files mf
+            LEFT JOIN encoding_jobs ej ON mf.path = ej.media_file_path
+            WHERE mf.processed = 0 AND ej.id IS NULL"#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let count = files.len();
+        for (path, size, complexity) in files {
+
+            let priority = size.saturating_add(complexity);
+            match self.create_job(path.clone(), priority).await {
+                Ok(job) => {
+                    tracing::info!("Created job {} for existing file: {}", job.id, path);
+                }
+                Err(e) => {
+                    tracing::error!("Failed to create job for {}: {:#}", path, e);
+                }
+            }
+        }
+
+        Ok(count)
     }
 }

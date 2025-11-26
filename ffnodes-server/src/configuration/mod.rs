@@ -26,7 +26,7 @@ impl Default for Configuration {
             ffmpeg: FFMpeg::default(),
             watch_directories: vec![],
             server_guid: Uuid::new_v4().to_string(),
-            ffmpeg_template: "-c:v h264{HWACCEL_CODE} -preset medium -crf 23 -i {INPUT} {OUTPUT}".to_string(),
+            ffmpeg_template: "-i {INPUT} -c:v h264{HWACCEL_CODE} -c:a aac {OUTPUT}".to_string(),
             client_timeout_seconds: 300,
             notify_batch_interval_seconds: 30,
             max_concurrent_jobs_per_client: 4,

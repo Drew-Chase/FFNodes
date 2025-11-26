@@ -10,6 +10,7 @@ pub struct ClientConfig {
     pub computer_name: String,
     pub client_id: Option<String>,
     pub auth_token: Option<String>,
+    pub ffmpeg_template: Option<String>,
 }
 
 impl ClientConfig {
@@ -26,6 +27,7 @@ impl ClientConfig {
             computer_name,
             client_id: None,
             auth_token: None,
+            ffmpeg_template: None,
         }
     }
 

@@ -1,4 +1,5 @@
 use crate::configuration::Configuration;
+use crate::jobs::JobQueue;
 use crate::media_files::MediaFile;
 use crate::media_files::media_file_db::open_pool;
 use crate::media_files::progress::{self, ScanProgress};
@@ -20,7 +21,7 @@ const VIDEO_EXTENSIONS: [&str; 47] = [
 
 pub struct Scanner;
 impl Scanner {
-    pub async fn scan(watch_directories: Vec<PathBuf>, config: Arc<Configuration>) -> Result<()> {
+    pub async fn scan(watch_directories: Vec<PathBuf>, config: Arc<Configuration>, job_queue: Arc<JobQueue>) -> Result<()> {
         info!("Scanning files");
 
         // Broadcast scan start
@@ -92,6 +93,7 @@ impl Scanner {
             .map(|file| {
                 let config = Arc::clone(&config);
                 let pool = pool.clone();
+                let job_queue = Arc::clone(&job_queue);
                 let pb = pb.clone();
                 let completed = Arc::clone(&completed);
                 async move {
@@ -130,7 +132,19 @@ impl Scanner {
                             match media_file.insert_direct(&pool).await {
                                 Ok(_) => {
                                     debug!("Inserted {:?} into database", file);
-                                    1
+
+                                    // Create encoding job for this file
+                                    let priority = media_file.scanned_size as i64 * media_file.encoding_complexity as i64;
+                                    match job_queue.create_job(media_file.path.to_string_lossy().to_string(), priority).await {
+                                        Ok(job) => {
+                                            info!("Created encoding job for {:?}: {}", file, job.id);
+                                            1
+                                        }
+                                        Err(e) => {
+                                            error!("Failed to create job for {:?}: {:#}", file, e);
+                                            0
+                                        }
+                                    }
                                 }
                                 Err(e) => {
                                     error!("Failed to insert {:?}: {:#}", file, e);

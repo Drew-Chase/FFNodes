@@ -36,6 +36,7 @@ export function Settings() {
   const [isTesting, setIsTesting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [ffmpegCommand, setFfmpegCommand] = useState<string | null>(null);
 
   useEffect(() => {
     // Load GPU info
@@ -49,6 +50,24 @@ export function Settings() {
     };
     loadGpuInfo();
   }, []);
+
+  useEffect(() => {
+    // Load FFmpeg command when config and GPU info are available
+    const loadFfmpegCommand = async () => {
+      if (config && gpuInfo && config.ffmpeg_template) {
+        try {
+          const command = await invoke<string>('get_ffmpeg_command', {
+            config,
+            gpu: gpuInfo,
+          });
+          setFfmpegCommand(command);
+        } catch (error) {
+          console.error('Failed to load FFmpeg command:', error);
+        }
+      }
+    };
+    loadFfmpegCommand();
+  }, [config, gpuInfo]);
 
   const handleInputChange = (field: keyof FormData) => (value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -361,6 +380,16 @@ export function Settings() {
                         {config.auth_token ? 'Authenticated' : 'Not authenticated'}
                       </span>
                     </div>
+                    {ffmpegCommand && (
+                      <div className="pt-3 border-t border-foreground/10">
+                        <p className="text-body-sm text-foreground/60 mb-2">FFmpeg Command</p>
+                        <div className="bg-content2 p-3 rounded-md-sm overflow-x-auto">
+                          <code className="text-body-xs font-mono text-foreground break-all whitespace-pre-wrap">
+                            {ffmpegCommand}
+                          </code>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <p className="text-body-sm text-foreground/70 mt-4">No active session</p>

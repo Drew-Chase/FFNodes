@@ -11,6 +11,7 @@ import { CurrentJob } from '../components/CurrentJob';
 import { VideoList } from '../components/VideoList';
 import { Button } from '../components/ui';
 import { BentoGrid, BentoCard, BentoCardHeader, BentoCardContent } from '../components/layout/BentoGrid';
+import { Logger } from '../utils/logger';
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -20,37 +21,72 @@ export function Dashboard() {
   const [gpuInfo, setGpuInfo] = useState<any>(null);
   const [isPaused, setIsPaused] = useState(false);
 
+  // Create logger for Dashboard
+  const logger = new Logger('Dashboard');
+
   // Load config and GPU info on mount, start job processing
   useEffect(() => {
     const loadInitialData = async () => {
+      logger.info('========== Dashboard Initialization ==========');
       try {
         // Load saved config
+        logger.info('Loading saved configuration...');
         const savedConfig: ClientConfig = await invoke('load_config');
         if (!savedConfig) {
-          // No config found, redirect to setup
+          logger.warn('No configuration found, redirecting to setup');
           navigate('/setup');
           return;
         }
+        logger.info('✓ Configuration loaded', {
+          serverUrl: savedConfig.server_url,
+          displayName: savedConfig.display_name,
+          hasAuthToken: !!savedConfig.auth_token
+        });
         setConfig(savedConfig);
 
         // Get GPU info
+        logger.info('Getting GPU information...');
         const gpu = await invoke('get_gpu_info');
+        logger.info('✓ GPU info retrieved', gpu);
         setGpuInfo(gpu);
 
         // Load active jobs
+        logger.info('Loading active jobs from server...');
         const jobs: EncodingJob[] = await invoke('get_active_jobs', { config: savedConfig });
+        logger.info(`✓ Loaded ${jobs?.length || 0} active jobs`);
         setJobQueue(jobs || []);
 
-        // Start job processing
-        await invoke('start_job_processing', { config: savedConfig, gpu });
-        setProcessing(true);
+        // Check if job processing is already running
+        logger.info('Checking job manager state...');
+        const state: any = await invoke('get_job_manager_state');
+        logger.info('Job manager state:', state);
 
-        addToast({
-          title: 'Success',
-          description: 'Connected to server! Job processing started.',
-          color: 'success'
-        });
+        if (!state.is_processing) {
+          // Start job processing only if not already running
+          logger.info('Starting job processing...');
+          await invoke('start_job_processing', { config: savedConfig, gpu });
+          setProcessing(true);
+          logger.info('✓ Job processing started successfully');
+
+          addToast({
+            title: 'Success',
+            description: 'Connected to server! Job processing started.',
+            color: 'success'
+          });
+        } else {
+          // Already running, just update state
+          logger.info('Job processing already active, skipping start');
+          setProcessing(true);
+          addToast({
+            title: 'Info',
+            description: 'Job processing already active.',
+            color: 'primary'
+          });
+        }
+
+        logger.info('========== Dashboard Initialization Complete ==========');
       } catch (error) {
+        logger.error('✗ Dashboard initialization failed:', error);
         addToast({
           title: 'Error',
           description: `Failed to load: ${error}`,
@@ -76,7 +112,7 @@ export function Dashboard() {
     // Listen for job started
     unlistenPromises.push(
       listen('job-started', (event: any) => {
-        console.log('Job started:', event.payload);
+        logger.info('📥 Received job-started event', event.payload);
         setCurrentJob(event.payload);
         addToast({
           title: 'Info',

@@ -17,6 +17,8 @@
         "title": "FFNodes",
         "width": 800,
         "height": 600,
+        "minHeight": 440,
+        "minWidth": 740,
         "decorations": false
         
       }

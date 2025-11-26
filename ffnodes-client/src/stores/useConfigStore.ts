@@ -7,6 +7,7 @@ export interface ClientConfig {
   computer_name: string;
   client_id: string | null;
   auth_token: string | null;
+  ffmpeg_template: string | null;
 }
 
 interface ConfigStore {

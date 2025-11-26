@@ -83,6 +83,21 @@ pub async fn run() -> Result<()> {
     let _progress_broadcaster = media_files::progress::init_broadcaster(100);
     info!("Progress broadcaster initialized");
 
+    // Create jobs for any existing unprocessed media files
+    info!("Checking for unprocessed media files...");
+    match job_queue.create_jobs_for_unprocessed_files().await {
+        Ok(count) => {
+            if count > 0 {
+                info!("Created {} encoding jobs for existing unprocessed files", count);
+            } else {
+                info!("No unprocessed files found");
+            }
+        }
+        Err(e) => {
+            error!("Failed to create jobs for unprocessed files: {:#}", e);
+        }
+    }
+
     // Start job scheduler
     let job_scheduler = Arc::new(jobs::JobScheduler::new(
         Arc::clone(&job_queue),
@@ -105,8 +120,9 @@ pub async fn run() -> Result<()> {
     // Initial scan
     tokio::spawn({
         let config = Arc::clone(&configuration);
+        let job_queue_clone = Arc::clone(&job_queue);
         async move {
-            if let Err(e) = media_files::Scanner::scan(watch_directories, config).await {
+            if let Err(e) = media_files::Scanner::scan(watch_directories, config, job_queue_clone).await {
                 error!("Media file scanner error: {}", e);
             }
         }
