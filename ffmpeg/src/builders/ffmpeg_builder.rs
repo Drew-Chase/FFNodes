@@ -2,6 +2,7 @@ use super::common::*;
 use super::error::{BuilderError, Result};
 use crate::FFMpeg;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 
 /// FFmpeg command builder with fluent API
@@ -41,6 +42,66 @@ pub struct FFmpegBuilder {
     global_args: Vec<String>,
     current_input: Option<InputSpec>,
     current_output: Option<OutputSpec>,
+    skip_validation: bool,
+}
+
+/// Parse FFmpeg command string into a builder
+///
+/// This implementation creates a builder with a default FFMpeg instance and parses
+/// the command string to reconstruct inputs, outputs, and arguments.
+///
+/// # Example
+/// ```no_run
+/// use ffmpeg::builders::FFmpegBuilder;
+/// use std::str::FromStr;
+///
+/// let builder = FFmpegBuilder::from_str("-i input.mp4 -c:v libx264 -crf 23 output.mp4").unwrap();
+/// ```
+///
+/// # Note
+/// This creates a default FFMpeg instance. If you need to use a specific FFmpeg binary path,
+/// create the builder using `FFmpegBuilder::new()` instead.
+impl FromStr for FFmpegBuilder {
+    type Err = BuilderError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        // Create a default FFMpeg instance for the builder
+        let ffmpeg = Arc::new(FFMpeg::default());
+        let mut builder = FFmpegBuilder::new(ffmpeg);
+
+        // Parse the command string using shlex for proper quote handling
+        let args = shlex::split(s)
+            .ok_or_else(|| BuilderError::ParseError("Failed to parse command string".to_string()))?;
+
+        // Parse arguments and build the command
+        let mut i = 0;
+        let mut has_input = false;
+
+        while i < args.len() {
+            let arg = &args[i];
+
+            // Check for input flag
+            if arg == "-i" {
+                i += 1;
+                if i < args.len() {
+                    builder = builder.input(&args[i])?;
+                    has_input = true;
+                }
+            }
+            // Check if this looks like an output file (no leading dash, comes after inputs)
+            else if !arg.starts_with('-') && has_input && builder.current_input.is_none() {
+                builder = builder.output(arg)?;
+            }
+            // All other arguments are added as raw args
+            else {
+                builder = builder.raw_arg(arg.clone());
+            }
+
+            i += 1;
+        }
+
+        Ok(builder)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -67,7 +128,17 @@ impl FFmpegBuilder {
             global_args: Vec::new(),
             current_input: None,
             current_output: None,
+            skip_validation: false,
         }
+    }
+
+    /// Skip input/output validation during build
+    ///
+    /// Useful when using raw arguments that contain input/output specifications
+    /// but aren't registered via .input() and .output() methods.
+    pub fn skip_validation(mut self) -> Self {
+        self.skip_validation = true;
+        self
     }
 
     // ==================== Global Options ====================
@@ -699,12 +770,14 @@ impl FFmpegBuilder {
             self.outputs.push(output);
         }
 
-        // Validate
-        if self.inputs.is_empty() {
-            return Err(BuilderError::NoInput);
-        }
-        if self.outputs.is_empty() {
-            return Err(BuilderError::NoOutput);
+        // Validate (unless skipped)
+        if !self.skip_validation {
+            if self.inputs.is_empty() {
+                return Err(BuilderError::NoInput);
+            }
+            if self.outputs.is_empty() {
+                return Err(BuilderError::NoOutput);
+            }
         }
 
         // Build argument list

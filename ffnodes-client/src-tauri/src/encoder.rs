@@ -139,8 +139,18 @@ impl Encoder {
         log::debug!("FFmpeg template: {}", ffmpeg_template);
 
         // Parse template and build FFmpeg command
-        let args = self.build_ffmpeg_args(input_path, output_path, gpu_info, ffmpeg_template)?;
-        log::debug!("FFmpeg args: {:?}", args);
+        let mut args = self.build_ffmpeg_args(input_path, output_path.with_extension("mp4").as_path(), gpu_info, ffmpeg_template)?;
+        log::debug!("FFmpeg args before progress: {:?}", args);
+
+        // Insert -progress pipe:2 before the last argument (output file)
+        // FFmpeg requires -progress to come before the output file
+        if !args.is_empty() {
+            let output_file = args.pop().ok_or_else(|| anyhow!("No output file in args"))?;
+            args.push("-progress".to_string());
+            args.push("pipe:2".to_string());
+            args.push(output_file);
+        }
+        log::debug!("FFmpeg args after progress: {:?}", args);
 
         // Get total frames for percentage calculation
         // Use server-provided frames if available, otherwise probe the file
@@ -161,13 +171,14 @@ impl Encoder {
         let (tx, mut rx) = tokio::sync::mpsc::channel(100);
 
         // Build and execute FFmpeg command using the builder
+        // Note: args already contain input (-i), progress, and output from template substitution
         let mut builder = self.ffmpeg.ffmpeg_command_builder();
 
-        // Add all parsed args as raw arguments
+        // Add all parsed args as raw arguments (includes input, progress, and output)
         builder = builder.raw_args(args);
 
-        // Add progress reporting
-        builder = builder.raw_arg("-progress".to_string()).raw_arg("pipe:2".to_string());
+        // Skip validation since input/output are in raw args, not registered via .input()/.output()
+        builder = builder.skip_validation();
 
         let cmd = builder.build()?;
         log::info!("Starting FFmpeg encoding process");
