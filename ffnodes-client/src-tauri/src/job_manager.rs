@@ -23,8 +23,8 @@ pub struct JobManager {
 }
 
 impl JobManager {
-    pub fn new(app_handle: AppHandle) -> Result<Self> {
-        let encoder = Encoder::new()?;
+    pub async fn new(app_handle: AppHandle) -> Result<Self> {
+        let encoder = Encoder::new().await?;
 
         Ok(Self {
             config: Arc::new(Mutex::new(None)),
@@ -291,6 +291,7 @@ impl JobManager {
                     &output_path,
                     &gpu_info,
                     &job_resp.output_template,
+                    job_resp.total_frames,
                     move |progress: EncodingProgress| {
                         // Emit progress event
                         let _ = app_handle.emit("encoding-progress", &progress);

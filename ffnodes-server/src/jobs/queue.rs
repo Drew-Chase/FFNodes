@@ -1,7 +1,6 @@
 use super::models::{EncodingJob, EncodingProgress, JobStatus, ProgressUpdate};
 use anyhow::{Result, anyhow};
 use sqlx::SqlitePool;
-use std::cmp::{max, min};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -313,5 +312,16 @@ impl JobQueue {
         }
 
         Ok(count)
+    }
+
+    /// Get frame count for a media file
+    pub async fn get_media_file_frames(&self, media_file_path: &str) -> Result<Option<i64>> {
+        let frames: Option<(i64,)> =
+            sqlx::query_as(r#"SELECT frames FROM media_files WHERE path = ?"#)
+                .bind(media_file_path)
+                .fetch_optional(&self.pool)
+                .await?;
+
+        Ok(frames.map(|f| f.0))
     }
 }

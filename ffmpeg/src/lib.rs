@@ -48,6 +48,16 @@ impl FFMpeg {
         FFprobeBuilder::new(std::sync::Arc::new(self.clone()))
     }
 
+	/// Get the path to the ffmpeg binary
+	pub fn ffmpeg_path(&self) -> &PathBuf {
+		&self.ffmpeg_path
+	}
+
+	/// Get the path to the ffprobe binary
+	pub fn ffprobe_path(&self) -> &PathBuf {
+		&self.ffprobe_path
+	}
+
 	pub async fn fetch(&mut self) -> Result<()> {
 		// Step 1: Check for local binaries in meta/ffmpeg directory
 		if let Some((ffmpeg_path, ffprobe_path)) = Self::check_local_binaries().await {
@@ -300,9 +310,11 @@ impl FFMpeg {
 
 		let working_dir: PathBuf = working_dir.into();
 
+		log::debug!("Executing: {:?} with args: {:?} in {:?}", binary_path, args, working_dir);
+
 		let mut child = Command::new(binary_path)
 			.args(args)
-			.current_dir(working_dir)
+			.current_dir(&working_dir)
 			.stdout(std::process::Stdio::piped())
 			.stderr(std::process::Stdio::piped())
 			.spawn()?;
@@ -310,38 +322,40 @@ impl FFMpeg {
 		let stdout = child.stdout.take().ok_or_else(|| anyhow::anyhow!("Failed to capture stdout"))?;
 		let stderr = child.stderr.take().ok_or_else(|| anyhow::anyhow!("Failed to capture stderr"))?;
 
-		// Spawn a single task to manage the child process and collect output
-		tokio::spawn(async move {
-			// Spawn tasks to read stdout and stderr
-			let sender_clone = sender.clone();
-			let stdout_task = tokio::spawn(async move {
-				let reader = BufReader::new(stdout);
-				let mut lines = reader.lines();
-				while let Ok(Some(line)) = lines.next_line().await {
-					if sender_clone.send(line + "\n").await.is_err() {
-						break;
-					}
+		// Read output in background
+		let sender_clone = sender.clone();
+		let stdout_task = tokio::spawn(async move {
+			let reader = BufReader::new(stdout);
+			let mut lines = reader.lines();
+			while let Ok(Some(line)) = lines.next_line().await {
+				if sender_clone.send(line + "\n").await.is_err() {
+					break;
 				}
-			});
-
-			let stderr_task = tokio::spawn(async move {
-				let reader = BufReader::new(stderr);
-				let mut lines = reader.lines();
-				while let Ok(Some(line)) = lines.next_line().await {
-					if sender.send(line + "\n").await.is_err() {
-						break;
-					}
-				}
-			});
-
-			// Wait for child process to complete
-			let _status = child.wait().await;
-
-			// Wait for output tasks to finish
-			let _ = tokio::join!(stdout_task, stderr_task);
-
-			// Channel will close when sender is dropped here
+			}
 		});
+
+		let stderr_task = tokio::spawn(async move {
+			let reader = BufReader::new(stderr);
+			let mut lines = reader.lines();
+			while let Ok(Some(line)) = lines.next_line().await {
+				if sender.send(line + "\n").await.is_err() {
+					break;
+				}
+			}
+		});
+
+		// CRITICAL FIX: Wait for process and check exit status
+		let status = child.wait().await?;
+
+		// Wait for output tasks to finish
+		let _ = tokio::join!(stdout_task, stderr_task);
+
+		// CRITICAL FIX: Check exit status
+		if !status.success() {
+			let code = status.code().unwrap_or(-1);
+			log::error!("Process exited with code: {}", code);
+			return Err(anyhow::anyhow!("Process exited with code: {}", code));
+		}
 
 		Ok(())
 	}

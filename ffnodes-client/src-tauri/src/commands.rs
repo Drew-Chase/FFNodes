@@ -66,7 +66,7 @@ pub async fn extract_frame(video_path: String) -> Result<String, String> {
     use crate::encoder::Encoder;
     use std::path::Path;
 
-    let encoder = Encoder::new().map_err(|e| e.to_string())?;
+    let encoder = Encoder::new().await.map_err(|e| e.to_string())?;
     let path = Path::new(&video_path);
 
     encoder

@@ -44,9 +44,19 @@ pub async fn request_job(
 
             job.assigned_client = Some(client_id.to_string());
 
+            // Get frame count from media_files table
+            let total_frames = job_queue
+                .get_media_file_frames(&job.media_file_path)
+                .await
+                .map_err(|e| {
+                    warn!("Error getting media file frames: {:#}", e);
+                    Error::internal_server_error("Error getting media file frames")
+                })?;
+
             let response = JobResponse {
                 input_path: job.media_file_path.clone(),
                 output_template: format!("{}.h264.mp4", job.media_file_path),
+                total_frames,
                 job,
             };
 

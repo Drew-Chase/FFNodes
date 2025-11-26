@@ -739,16 +739,37 @@ impl FFmpegCommand {
         sender: Option<tokio::sync::mpsc::Sender<String>>,
     ) -> Result<()> {
         let working_dir = working_dir.unwrap_or_else(|| PathBuf::from("."));
-        let (tx, _rx) = tokio::sync::mpsc::channel(100);
-        let sender = sender.unwrap_or(tx);
+
+        // CRITICAL FIX: Only create channel if no sender provided
+        let has_custom_sender = sender.is_some();
+        let (tx, mut rx) = tokio::sync::mpsc::channel(100);
+        let actual_sender = sender.unwrap_or(tx);
 
         let args: Vec<&str> = self.args.iter().map(|s| s.as_str()).collect();
-        self.ffmpeg
-            .exec_ffmpeg(&args, working_dir, sender)
-            .await
-            .map_err(|e| BuilderError::ExecutionError(e.to_string()))?;
 
-        Ok(())
+        // If no custom sender, spawn task to drain the channel to prevent blocking
+        let drain_handle = if !has_custom_sender {
+            Some(tokio::spawn(async move {
+                while rx.recv().await.is_some() {
+                    // Discard output if no custom receiver
+                }
+            }))
+        } else {
+            None
+        };
+
+        // Execute and wait for completion
+        let result = self.ffmpeg
+            .exec_ffmpeg(&args, working_dir, actual_sender)
+            .await
+            .map_err(|e| BuilderError::ExecutionError(e.to_string()));
+
+        // Wait for drain task if we spawned one
+        if let Some(handle) = drain_handle {
+            let _ = handle.await;
+        }
+
+        result
     }
 
     /// Execute the command and wait for completion

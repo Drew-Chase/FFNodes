@@ -39,8 +39,9 @@ pub fn run() {
 
             // Create and store JobManager
             tracing::info!("Creating JobManager...");
-            let job_manager =
-                JobManager::new(app.handle().clone()).expect("Failed to create JobManager");
+            let job_manager = tauri::async_runtime::block_on(async {
+                JobManager::new(app.handle().clone()).await
+            }).expect("Failed to create JobManager");
             app.manage(Arc::new(Mutex::new(job_manager)));
             tracing::info!("JobManager created successfully");
 

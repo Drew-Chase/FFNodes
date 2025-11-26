@@ -99,6 +99,7 @@ pub struct JobResponse {
     pub job: EncodingJob,
     pub input_path: String,
     pub output_template: String,
+    pub total_frames: Option<i64>,
 }
 
 /// Progress update from client
