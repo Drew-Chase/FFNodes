@@ -100,6 +100,7 @@ pub struct JobResponse {
     pub input_path: String,
     pub output_template: String,
     pub total_frames: Option<i64>,
+    pub ffmpeg_template: String,
 }
 
 /// Progress update from client

@@ -1,4 +1,5 @@
 use crate::clients::ClientManager;
+use crate::configuration::Configuration;
 use crate::http_error::Error;
 use crate::jobs::{JobCompletion, JobFailure, JobQueue, JobResponse, ProgressUpdate};
 use actix_web::{web, HttpResponse};
@@ -10,6 +11,7 @@ pub async fn request_job(
     client_id: web::Path<String>,
     job_queue: web::Data<Arc<JobQueue>>,
     client_manager: web::Data<Arc<ClientManager>>,
+    config: web::Data<Arc<Configuration>>,
 ) -> Result<HttpResponse, Error> {
     debug!("Job request from client: {}", client_id);
 
@@ -57,6 +59,7 @@ pub async fn request_job(
                 input_path: job.media_file_path.clone(),
                 output_template: format!("{}.h264.mp4", job.media_file_path),
                 total_frames,
+                ffmpeg_template: config.ffmpeg_template.clone(),
                 job,
             };
 

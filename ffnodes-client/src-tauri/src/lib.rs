@@ -140,7 +140,6 @@ pub fn run() {
             resume_job_processing,
             get_job_manager_state,
             log_frontend,
-            get_ffmpeg_command,
             start_oauth_flow,
             refresh_oauth_token
         ])

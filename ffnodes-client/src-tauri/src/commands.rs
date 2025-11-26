@@ -47,7 +47,7 @@ pub async fn test_connection(input: ConfigInput) -> Result<ClientConfig, String>
     let mut config = ClientConfig::new(input.server_url, input.server_guid, input.display_name);
     config.client_id = Some(client_id);
     config.auth_token = Some(response.auth_token);
-    config.ffmpeg_template = Some(response.ffmpeg_template);
+    // Note: ffmpeg_template is NOT saved to config - server sends it with each job
 
     config.save().map_err(|e| e.to_string())?;
 
@@ -138,19 +138,4 @@ pub async fn get_job_manager_state(
 #[tauri::command]
 pub fn log_frontend(level: String, message: String, source: Option<String>) {
     crate::logger::log_frontend(level, message, source);
-}
-
-/// Get the FFmpeg command with template variables filled in
-#[tauri::command]
-pub async fn get_ffmpeg_command(config: ClientConfig, gpu: GpuInfo) -> Result<String, String> {
-    let template = config.ffmpeg_template
-        .ok_or_else(|| "No FFmpeg template configured".to_string())?;
-
-    // Fill in template variables with example values
-    let command = template
-        .replace("{INPUT}", "input.mp4")
-        .replace("{OUTPUT}", "output.mp4")
-        .replace("{HWACCEL_CODE}", &format!("_{}", gpu.encoder_h264.replace("h264_", "")));
-
-    Ok(command)
 }

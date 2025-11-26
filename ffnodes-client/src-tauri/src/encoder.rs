@@ -13,6 +13,14 @@ pub struct EncodingProgress {
     pub percentage: f64,
 }
 
+#[derive(Default)]
+struct ProgressState {
+    frame: i64,
+    fps: f64,
+    bitrate: f64,
+    speed: f64,
+}
+
 pub struct Encoder {
     ffmpeg: FFMpeg,
     temp_dir: PathBuf,
@@ -170,9 +178,10 @@ impl Encoder {
             cmd.execute(None, Some(tx)).await
         });
 
-        // Process progress updates
+        // Process progress updates with stateful accumulation
+        let mut progress_state = ProgressState::default();
         while let Some(line) = rx.recv().await {
-            if let Some(progress) = self.parse_progress_line(&line, total_frames) {
+            if let Some(progress) = self.parse_progress_update(&line, &mut progress_state, total_frames) {
                 log::trace!("Progress: frame={}, fps={:.1}, speed={:.2}x, {}%",
                     progress.frame, progress.fps, progress.speed, progress.percentage);
                 progress_callback(progress);
@@ -221,16 +230,13 @@ impl Encoder {
         log::debug!("Template after substitution: {}", command);
 
         // Use proper shell-like parsing instead of split_whitespace
-        let mut args = shlex::split(&command)
+        let args = shlex::split(&command)
             .ok_or_else(|| anyhow!("Failed to parse FFmpeg command template"))?;
 
         log::info!("FFmpeg command built successfully with {} args", args.len());
         log::debug!("Full command: {:?}", args);
 
-        // Add progress reporting
-        args.push("-progress".to_string());
-        args.push("pipe:2".to_string());
-
+        // Note: -progress pipe:2 is added in encode_video(), not here
         Ok(args)
     }
 
@@ -264,44 +270,62 @@ impl Encoder {
         Ok(frames)
     }
 
-    /// Parse FFmpeg progress line
-    fn parse_progress_line(&self, line: &str, total_frames: i64) -> Option<EncodingProgress> {
-        // FFmpeg progress format: "frame=123 fps=45.6 ... bitrate=1234.5kbits/s speed=1.2x"
-        let mut frame = 0i64;
-        let mut fps = 0.0;
-        let mut bitrate = 0.0;
-        let mut speed = 0.0;
+    /// Parse FFmpeg progress update with stateful accumulation
+    /// FFmpeg with `-progress pipe:2` sends each field on a separate line:
+    /// frame=123
+    /// fps=45.6
+    /// bitrate=1234.5kbits/s
+    /// speed=1.2x
+    /// progress=continue
+    fn parse_progress_update(
+        &self,
+        line: &str,
+        state: &mut ProgressState,
+        total_frames: i64,
+    ) -> Option<EncodingProgress> {
+        let line = line.trim();
 
-        for part in line.split_whitespace() {
-            if let Some(value) = part.strip_prefix("frame=") {
-                frame = value.parse().unwrap_or(0);
-            } else if let Some(value) = part.strip_prefix("fps=") {
-                fps = value.parse().unwrap_or(0.0);
-            } else if let Some(value) = part.strip_prefix("bitrate=") {
-                let bitrate_str = value.replace("kbits/s", "");
-                bitrate = bitrate_str.parse().unwrap_or(0.0) * 1000.0; // Convert to bits/s
-            } else if let Some(value) = part.strip_prefix("speed=") {
-                let speed_str = value.replace("x", "");
-                speed = speed_str.parse().unwrap_or(0.0);
+        // Parse key=value format
+        if let Some((key, value)) = line.split_once('=') {
+            match key {
+                "frame" => {
+                    state.frame = value.parse().unwrap_or(0);
+                }
+                "fps" => {
+                    state.fps = value.parse().unwrap_or(0.0);
+                }
+                "bitrate" => {
+                    // Handle format: "1234.5kbits/s"
+                    let bitrate_str = value.replace("kbits/s", "").trim().to_string();
+                    state.bitrate = bitrate_str.parse().unwrap_or(0.0) * 1000.0; // Convert to bits/s
+                }
+                "speed" => {
+                    // Handle format: "1.2x"
+                    let speed_str = value.replace("x", "").trim().to_string();
+                    state.speed = speed_str.parse().unwrap_or(0.0);
+                }
+                "progress" => {
+                    // When we see "progress=continue" or "progress=end", emit current state
+                    if (value == "continue" || value == "end") && state.frame > 0 {
+                        let percentage = if total_frames > 0 {
+                            (state.frame as f64 / total_frames as f64) * 100.0
+                        } else {
+                            0.0
+                        };
+
+                        return Some(EncodingProgress {
+                            frame: state.frame,
+                            fps: state.fps,
+                            bitrate: state.bitrate,
+                            speed: state.speed,
+                            percentage,
+                        });
+                    }
+                }
+                _ => {} // Ignore unknown keys
             }
         }
 
-        if frame > 0 {
-            let percentage = if total_frames > 0 {
-                (frame as f64 / total_frames as f64) * 100.0
-            } else {
-                0.0
-            };
-
-            Some(EncodingProgress {
-                frame,
-                fps,
-                bitrate,
-                speed,
-                percentage,
-            })
-        } else {
-            None
-        }
+        None
     }
 }
