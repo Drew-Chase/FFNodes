@@ -41,7 +41,7 @@ export function VideoBackground() {
           alt="Video background"
           className="w-full h-full object-cover"
           style={{
-            filter: 'blur(50px) brightness(0.3) grayscale(1)',
+            filter: 'blur(10px) grayscale(1)',
           }}
         />
       </motion.div>
@@ -63,7 +63,7 @@ export function VideoBackground() {
           alt="Video background color"
           className="w-full h-full object-cover"
           style={{
-            filter: 'blur(50px) brightness(0.3)',
+            filter: 'blur(10px)',
           }}
         />
       </motion.div>
