@@ -325,30 +325,44 @@ impl FFMpeg {
 
 		let sender_clone = sender.clone();
 		let stdout_reader = async move {
-			use tokio::io::AsyncReadExt;
+			use tokio::io::AsyncBufReadExt;
 			let mut reader = BufReader::new(stdout);
-			let mut buffer = Vec::new();
+			let mut buffer = String::new();
 
-			// Read entire output into buffer
-			if reader.read_to_end(&mut buffer).await.is_ok() && !buffer.is_empty() {
-				let output = String::from_utf8_lossy(&buffer);
-				trace!("{} stdout: {}", if ffmpeg { "ffmpeg" } else { "ffprobe" }, output);
-				// Send the entire output as one message
-				let _ = sender_clone.send(output.to_string()).await;
+			// Stream output line by line for real-time progress (FFmpeg encoding)
+			loop {
+				buffer.clear();
+				match reader.read_line(&mut buffer).await {
+					Ok(0) => break, // EOF
+					Ok(_) => {
+						if !buffer.is_empty() {
+							trace!("{} stdout: {}", if ffmpeg { "ffmpeg" } else { "ffprobe" }, buffer.trim());
+							let _ = sender_clone.send(buffer.clone()).await;
+						}
+					}
+					Err(_) => break,
+				}
 			}
 		};
 
 		let stderr_reader = async move {
-			use tokio::io::AsyncReadExt;
+			use tokio::io::AsyncBufReadExt;
 			let mut reader = BufReader::new(stderr);
-			let mut buffer = Vec::new();
+			let mut buffer = String::new();
 
-			// Read entire output into buffer
-			if reader.read_to_end(&mut buffer).await.is_ok() && !buffer.is_empty() {
-				let output = String::from_utf8_lossy(&buffer);
-				trace!("{} stderr: {}", if ffmpeg { "ffmpeg" } else { "ffprobe" }, output);
-				// Send the entire output as one message
-				let _ = sender.send(output.to_string()).await;
+			// Stream output line by line for real-time progress (FFmpeg encoding)
+			loop {
+				buffer.clear();
+				match reader.read_line(&mut buffer).await {
+					Ok(0) => break, // EOF
+					Ok(_) => {
+						if !buffer.is_empty() {
+							trace!("{} stderr: {}", if ffmpeg { "ffmpeg" } else { "ffprobe" }, buffer.trim());
+							let _ = sender.send(buffer.clone()).await;
+						}
+					}
+					Err(_) => break,
+				}
 			}
 		};
 
