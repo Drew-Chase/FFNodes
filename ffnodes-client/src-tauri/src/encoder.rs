@@ -3,6 +3,7 @@ use anyhow::{Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
 use ffmpeg::FFMpeg;
 use std::path::{Path, PathBuf};
+use tokio::fs;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct EncodingProgress {
@@ -95,6 +96,9 @@ impl Encoder {
             "data:image/jpeg;base64,{}",
             general_purpose::STANDARD.encode(&frame_data)
         );
+
+        // delete the frame file
+        fs::remove_file(output_path).await?;
 
         Ok(base64_frame)
     }
