@@ -189,9 +189,12 @@ impl JobManager {
         let client = ServerClient::with_auth(config.server_url.clone(), auth_token.clone());
 
         // Request a job
-        let client_id = &auth_token;
+        let client_id = config
+            .client_id
+            .as_ref()
+            .ok_or_else(|| anyhow!("No client ID"))?;
 
-        log::info!("Requesting job from server with auth token: {}", client_id);
+        log::info!("Requesting job from server (client ID: {})", client_id);
         log::debug!(
             "API endpoint: {}/api/jobs/request/{}",
             config.server_url,

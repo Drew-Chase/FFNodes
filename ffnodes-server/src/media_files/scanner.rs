@@ -4,13 +4,13 @@ use crate::media_files::MediaFile;
 use crate::media_files::media_file_db::open_pool;
 use crate::media_files::progress::{self, ScanProgress};
 use anyhow::Result;
+use futures::stream::{self, StreamExt};
+use indicatif::{ProgressBar, ProgressStyle};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tracing::{debug, error, info, trace};
 use walkdir::WalkDir;
-use futures::stream::{self, StreamExt};
-use indicatif::{ProgressBar, ProgressStyle};
 
 const VIDEO_EXTENSIONS: [&str; 47] = [
     "webm", "mkv", "flv", "flv", "vob", "ogv", "ogg", "drc", "gif", "gifv", "mng", "avi", "mts",
@@ -21,7 +21,11 @@ const VIDEO_EXTENSIONS: [&str; 47] = [
 
 pub struct Scanner;
 impl Scanner {
-    pub async fn scan(watch_directories: Vec<PathBuf>, config: Arc<Configuration>, job_queue: Arc<JobQueue>) -> Result<()> {
+    pub async fn scan(
+        watch_directories: Vec<PathBuf>,
+        config: Arc<Configuration>,
+        job_queue: Arc<JobQueue>,
+    ) -> Result<()> {
         info!("Scanning files");
 
         // Broadcast scan start
@@ -112,7 +116,8 @@ impl Scanner {
                     };
 
                     // Update progress bar message
-                    pb.set_message(format!("{} ({:.1}%)",
+                    pb.set_message(format!(
+                        "{} ({:.1}%)",
                         display_name,
                         (completed.load(Ordering::Relaxed) as f64 / total_files as f64) * 100.0
                     ));
@@ -134,10 +139,20 @@ impl Scanner {
                                     debug!("Inserted {:?} into database", file);
 
                                     // Create encoding job for this file
-                                    let priority = media_file.scanned_size as i64 * media_file.encoding_complexity as i64;
-                                    match job_queue.create_job(media_file.path.to_string_lossy().to_string(), priority).await {
+                                    let priority = (media_file.scanned_size as i64)
+                                        .saturating_add(media_file.encoding_complexity as i64);
+                                    match job_queue
+                                        .create_job(
+                                            media_file.path.to_string_lossy().to_string(),
+                                            priority,
+                                        )
+                                        .await
+                                    {
                                         Ok(job) => {
-                                            info!("Created encoding job for {:?}: {}", file, job.id);
+                                            info!(
+                                                "Created encoding job for {:?}: {}",
+                                                file, job.id
+                                            );
                                             1
                                         }
                                         Err(e) => {
@@ -180,7 +195,10 @@ impl Scanner {
             operation: "Complete".to_string(),
         });
 
-        info!("Successfully inserted {} media files into database", insert_count);
+        info!(
+            "Successfully inserted {} media files into database",
+            insert_count
+        );
         Ok(())
     }
 }
