@@ -301,26 +301,24 @@ impl JobManager {
 
             // Track download start time
             let download_start = std::time::Instant::now();
-            let first_progress = Arc::new(Mutex::new(true));
 
             // Create progress callback for download
+            // Use a simple bool that gets captured by the mutable closure
             let app_handle_clone = self.app_handle.clone();
             let job_id_clone = job_id.clone();
-            let first_progress_clone = first_progress.clone();
             let filename_clone = filename.clone();
+            let mut first_progress = true;
 
-            let progress_callback = move |progress: TransferProgress| {
+            let mut progress_callback = move |progress: TransferProgress| {
                 // Emit download-started on first progress update
-                let mut is_first = first_progress_clone.blocking_lock();
-                if *is_first {
+                if first_progress {
                     let _ = app_handle_clone.emit("download-started", TransferStartedPayload {
                         job_id: job_id_clone.clone(),
                         filename: filename_clone.clone(),
                         total_bytes: progress.total_bytes,
                     });
-                    *is_first = false;
+                    first_progress = false;
                 }
-                drop(is_first);
 
                 // Emit download progress
                 let _ = app_handle_clone.emit("download-progress", &progress);

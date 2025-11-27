@@ -202,24 +202,36 @@ impl ServerClient {
         let mut last_update = std::time::Instant::now();
         let mut last_bytes = 0u64;
         let mut speed_ema = 0.0f64; // Exponential moving average for speed
+        let start_time = std::time::Instant::now();
 
         while let Some(chunk) = stream.next().await {
             let chunk = chunk?;
             let chunk_size = chunk.len() as u64;
 
-            // Write chunk to file
+            // Write chunk to file FIRST - this is the critical operation
             file.write_all(&chunk).await?;
 
             // Update progress tracking
             downloaded_bytes += chunk_size;
 
-            // Throttle progress updates to ~100ms intervals
+            // Throttle progress updates to ~100ms intervals, but always update on completion
             let now = std::time::Instant::now();
-            let elapsed = now.duration_since(last_update).as_secs_f64();
+            let elapsed_since_last = now.duration_since(last_update).as_secs_f64();
+            let is_complete = downloaded_bytes >= total_bytes;
 
-            if elapsed >= 0.1 || downloaded_bytes == total_bytes {
+            if elapsed_since_last >= 0.1 || is_complete {
                 let bytes_since_last = downloaded_bytes - last_bytes;
-                let current_speed = bytes_since_last as f64 / elapsed;
+                let current_speed = if elapsed_since_last > 0.0 {
+                    bytes_since_last as f64 / elapsed_since_last
+                } else {
+                    // For very fast downloads, calculate speed based on total time
+                    let total_elapsed = now.duration_since(start_time).as_secs_f64();
+                    if total_elapsed > 0.0 {
+                        downloaded_bytes as f64 / total_elapsed
+                    } else {
+                        0.0
+                    }
+                };
 
                 // Smooth speed with exponential moving average
                 let alpha = 0.3;
@@ -243,8 +255,17 @@ impl ServerClient {
             }
         }
 
+        // Ensure file is fully written
         file.flush().await?;
+        file.sync_all().await?;
+
         log::debug!("✓ Download complete: {} bytes", downloaded_bytes);
+
+        // Verify we downloaded the expected amount
+        if downloaded_bytes != total_bytes {
+            log::error!("Download incomplete: expected {} bytes, got {} bytes", total_bytes, downloaded_bytes);
+            return Err(anyhow::anyhow!("Incomplete download: expected {} bytes, got {} bytes", total_bytes, downloaded_bytes));
+        }
 
         Ok(())
     }
@@ -289,22 +310,25 @@ impl ServerClient {
             e
         })?;
 
-        // Create streaming body with progress tracking
-        let mut reader_stream = ReaderStream::new(file);
-        let uploaded_bytes = std::sync::Arc::new(std::sync::Mutex::new(0u64));
-        let last_update = std::sync::Arc::new(std::sync::Mutex::new(std::time::Instant::now()));
-        let last_bytes = std::sync::Arc::new(std::sync::Mutex::new(0u64));
-        let speed_ema = std::sync::Arc::new(std::sync::Mutex::new(0.0f64));
+        // For upload, we need to track progress differently since we're streaming the request body
+        // We'll create a simple byte counter that gets updated as chunks are yielded
+        let uploaded_bytes = std::sync::Arc::new(tokio::sync::Mutex::new(0u64));
+        let last_update = std::sync::Arc::new(tokio::sync::Mutex::new(std::time::Instant::now()));
+        let last_bytes = std::sync::Arc::new(tokio::sync::Mutex::new(0u64));
+        let speed_ema = std::sync::Arc::new(tokio::sync::Mutex::new(0.0f64));
+        let start_time = std::time::Instant::now();
 
         // Wrap callback in Arc<Mutex> for thread-safe sharing
-        let callback = std::sync::Arc::new(std::sync::Mutex::new(progress_callback));
+        let callback = std::sync::Arc::new(tokio::sync::Mutex::new(progress_callback));
 
         let uploaded_clone = uploaded_bytes.clone();
         let last_update_clone = last_update.clone();
         let last_bytes_clone = last_bytes.clone();
         let speed_ema_clone = speed_ema.clone();
         let callback_clone = callback.clone();
-        let total_bytes_clone = total_bytes;
+
+        // Create reader stream
+        let mut reader_stream = ReaderStream::new(file);
 
         let stream = async_stream::stream! {
             while let Some(chunk) = reader_stream.next().await {
@@ -313,39 +337,47 @@ impl ServerClient {
                         let chunk_size = bytes.len() as u64;
 
                         // Update uploaded bytes
-                        {
-                            let mut uploaded = uploaded_clone.lock().unwrap();
+                        let current_uploaded = {
+                            let mut uploaded = uploaded_clone.lock().await;
                             *uploaded += chunk_size;
-                        }
-
-                        // Throttle progress updates to ~100ms intervals
-                        let should_update = {
-                            let last = last_update_clone.lock().unwrap();
-                            let now = std::time::Instant::now();
-                            let elapsed = now.duration_since(*last).as_secs_f64();
-                            elapsed >= 0.1
+                            *uploaded
                         };
 
-                        let current_uploaded = *uploaded_clone.lock().unwrap();
+                        // Check if we should emit progress
+                        let now = std::time::Instant::now();
+                        let should_update = {
+                            let last = last_update_clone.lock().await;
+                            let elapsed = now.duration_since(*last).as_secs_f64();
+                            elapsed >= 0.1 || current_uploaded >= total_bytes
+                        };
 
-                        if should_update || current_uploaded == total_bytes_clone {
-                            let now = std::time::Instant::now();
-                            let elapsed = {
-                                let last = last_update_clone.lock().unwrap();
+                        if should_update {
+                            let elapsed_since_last = {
+                                let last = last_update_clone.lock().await;
                                 now.duration_since(*last).as_secs_f64()
                             };
 
                             let bytes_since_last = {
-                                let last_b = last_bytes_clone.lock().unwrap();
+                                let last_b = last_bytes_clone.lock().await;
                                 current_uploaded - *last_b
                             };
 
-                            let current_speed = bytes_since_last as f64 / elapsed;
+                            let current_speed = if elapsed_since_last > 0.0 {
+                                bytes_since_last as f64 / elapsed_since_last
+                            } else {
+                                // For very fast uploads, use total time
+                                let total_elapsed = now.duration_since(start_time).as_secs_f64();
+                                if total_elapsed > 0.0 {
+                                    current_uploaded as f64 / total_elapsed
+                                } else {
+                                    0.0
+                                }
+                            };
 
                             // Smooth speed with exponential moving average
                             let alpha = 0.3;
                             let speed = {
-                                let mut ema = speed_ema_clone.lock().unwrap();
+                                let mut ema = speed_ema_clone.lock().await;
                                 if *ema == 0.0 {
                                     *ema = current_speed;
                                 } else {
@@ -354,26 +386,27 @@ impl ServerClient {
                                 *ema
                             };
 
-                            let percentage = (current_uploaded as f64 / total_bytes_clone as f64) * 100.0;
+                            let percentage = (current_uploaded as f64 / total_bytes as f64) * 100.0;
 
-                            // Call progress callback
+                            // Call progress callback (non-blocking)
                             {
-                                let mut cb = callback_clone.lock().unwrap();
+                                let mut cb = callback_clone.lock().await;
                                 cb(TransferProgress {
                                     transferred_bytes: current_uploaded,
-                                    total_bytes: total_bytes_clone,
+                                    total_bytes,
                                     percentage,
                                     bytes_per_second: speed,
                                 });
                             }
 
-                            *last_update_clone.lock().unwrap() = now;
-                            *last_bytes_clone.lock().unwrap() = current_uploaded;
+                            *last_update_clone.lock().await = now;
+                            *last_bytes_clone.lock().await = current_uploaded;
                         }
 
                         yield Ok::<_, std::io::Error>(bytes);
                     }
                     Err(e) => {
+                        log::error!("Error reading upload chunk: {}", e);
                         yield Err(e);
                         break;
                     }
