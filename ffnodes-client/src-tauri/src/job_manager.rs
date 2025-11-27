@@ -1,4 +1,4 @@
-use crate::api::{EncodingJob, JobCompletion, ProgressUpdate, ServerClient};
+use crate::api::{EncodingJob, JobCompletion, ProgressUpdate, ServerClient, TransferProgress};
 use crate::config::ClientConfig;
 use crate::encoder::{Encoder, EncodingProgress};
 use crate::gpu::GpuInfo;
@@ -18,6 +18,21 @@ pub struct JobManagerState {
 struct JobStartedPayload {
     job: EncodingJob,
     total_frames: Option<i64>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+struct TransferStartedPayload {
+    job_id: String,
+    filename: String,
+    total_bytes: u64,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+struct TransferCompletedPayload {
+    job_id: String,
+    total_bytes: u64,
+    duration_secs: f64,
+    avg_speed_mbps: f64,
 }
 
 pub struct JobManager {
@@ -275,11 +290,61 @@ impl JobManager {
             log::debug!("Download destination: {:?}", input_path);
             log::debug!("Calling GET /api/files/{}/input", job_id);
 
-            client.download_input_file(&job_id, &input_path).await?;
+            // Prepare for download progress tracking
+            let filename = job_resp
+                .input_path
+                .split('/')
+                .last()
+                .or_else(|| job_resp.input_path.split('\\').last())
+                .unwrap_or("input_file")
+                .to_string();
 
-            log::info!("✓ Downloaded input file to {:?}", input_path);
+            // Track download start time
+            let download_start = std::time::Instant::now();
+            let first_progress = Arc::new(Mutex::new(true));
+
+            // Create progress callback for download
+            let app_handle_clone = self.app_handle.clone();
+            let job_id_clone = job_id.clone();
+            let first_progress_clone = first_progress.clone();
+            let filename_clone = filename.clone();
+
+            let progress_callback = move |progress: TransferProgress| {
+                // Emit download-started on first progress update
+                let mut is_first = first_progress_clone.blocking_lock();
+                if *is_first {
+                    let _ = app_handle_clone.emit("download-started", TransferStartedPayload {
+                        job_id: job_id_clone.clone(),
+                        filename: filename_clone.clone(),
+                        total_bytes: progress.total_bytes,
+                    });
+                    *is_first = false;
+                }
+                drop(is_first);
+
+                // Emit download progress
+                let _ = app_handle_clone.emit("download-progress", &progress);
+            };
+
+            // Download with progress tracking
+            client.download_input_file(&job_id, &input_path, progress_callback).await?;
+
+            // Emit download-completed event
+            let download_duration = download_start.elapsed().as_secs_f64();
             if let Ok(metadata) = std::fs::metadata(&input_path) {
-                log::debug!("File size: {} bytes", metadata.len());
+                let total_bytes = metadata.len();
+                let avg_speed_mbps = (total_bytes as f64 / download_duration) / 1_000_000.0;
+
+                log::info!("✓ Downloaded input file to {:?}", input_path);
+                log::debug!("File size: {} bytes", total_bytes);
+                log::debug!("Download duration: {:.2}s, avg speed: {:.2} MB/s", download_duration, avg_speed_mbps);
+
+                let _ = self.app_handle.emit("download-completed", TransferCompletedPayload {
+                    job_id: job_id.clone(),
+                    total_bytes,
+                    duration_secs: download_duration,
+                    avg_speed_mbps,
+                });
             }
 
             // Extract frame for background
@@ -366,9 +431,49 @@ impl JobManager {
             log::debug!("Upload source: {:?}", output_path);
             log::debug!("Calling POST /api/files/{}/output", job_id);
 
-            client.upload_output_file(&job_id, &output_path).await?;
+            // Get file metadata for upload progress
+            let upload_metadata = tokio::fs::metadata(&output_path).await?;
+            let upload_total_bytes = upload_metadata.len();
+            let upload_filename = output_path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("output.mp4")
+                .to_string();
+
+            // Emit upload-started event
+            self.app_handle.emit("upload-started", TransferStartedPayload {
+                job_id: job_id.clone(),
+                filename: upload_filename.clone(),
+                total_bytes: upload_total_bytes,
+            })?;
+
+            // Track upload start time
+            let upload_start = std::time::Instant::now();
+
+            // Create progress callback for upload
+            let app_handle_clone = self.app_handle.clone();
+
+            let upload_progress_callback = move |progress: TransferProgress| {
+                // Emit upload progress
+                let _ = app_handle_clone.emit("upload-progress", &progress);
+            };
+
+            // Upload with progress tracking
+            client.upload_output_file(&job_id, &output_path, upload_progress_callback).await?;
+
+            // Emit upload-completed event
+            let upload_duration = upload_start.elapsed().as_secs_f64();
+            let avg_upload_speed_mbps = (upload_total_bytes as f64 / upload_duration) / 1_000_000.0;
 
             log::info!("✓ Upload completed successfully for job {}", job_id);
+            log::debug!("Upload duration: {:.2}s, avg speed: {:.2} MB/s", upload_duration, avg_upload_speed_mbps);
+
+            self.app_handle.emit("upload-completed", TransferCompletedPayload {
+                job_id: job_id.clone(),
+                total_bytes: upload_total_bytes,
+                duration_secs: upload_duration,
+                avg_speed_mbps: avg_upload_speed_mbps,
+            })?;
 
             // Clean up temp files
             log::debug!("Cleaning up temporary files...");

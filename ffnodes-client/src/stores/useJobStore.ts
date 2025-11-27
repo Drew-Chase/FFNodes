@@ -8,6 +8,10 @@ export interface EncodingJob {
 }
 
 export interface CurrentJobProgress {
+  // Phase tracking
+  phase: 'downloading' | 'encoding' | 'uploading' | 'completing';
+
+  // Encoding fields
   frame: number;
   totalFrames: number;
   fps: number;
@@ -15,6 +19,11 @@ export interface CurrentJobProgress {
   speed: number;
   percentage: number;
   extractedFrame: string | null; // Base64 or URL to extracted frame
+
+  // Transfer fields (download/upload)
+  transferredBytes?: number;
+  totalTransferBytes?: number;
+  transferSpeed?: number;  // bytes per second
 }
 
 interface JobStore {
@@ -45,6 +54,7 @@ export const useJobStore = create<JobStore>((set) => ({
       currentProgress: state.currentProgress
         ? { ...state.currentProgress, ...progress }
         : {
+            phase: 'downloading',
             frame: 0,
             totalFrames: 0,
             fps: 0,

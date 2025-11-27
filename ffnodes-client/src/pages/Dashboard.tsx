@@ -138,9 +138,10 @@ export function Dashboard()
             {
                 logger.info("📥 Received job-started event", event.payload);
                 setCurrentJob(event.payload.job);
-                if (event.payload.total_frames) {
-                    updateProgress({ totalFrames: event.payload.total_frames });
-                }
+                updateProgress({
+                    phase: 'downloading',
+                    totalFrames: event.payload.total_frames || 0,
+                });
                 addToast({
                     title: "Info",
                     description: `Started encoding: ${event.payload.job.media_file_path}`,
@@ -164,12 +165,99 @@ export function Dashboard()
             {
                 const progress = event.payload;
                 updateProgress({
+                    phase: 'encoding',
                     frame: progress.frame,
                     fps: progress.fps,
                     bitrate: progress.bitrate,
                     speed: progress.speed,
                     percentage: progress.percentage
                 });
+            })
+        );
+
+        // Listen for download started
+        unlistenPromises.push(
+            listen("download-started", (event: any) =>
+            {
+                logger.info("📥 Download started", event.payload);
+                updateProgress({
+                    phase: 'downloading',
+                    totalTransferBytes: event.payload.total_bytes,
+                    transferredBytes: 0,
+                    transferSpeed: 0,
+                    percentage: 0,
+                });
+            })
+        );
+
+        // Listen for download progress
+        unlistenPromises.push(
+            listen("download-progress", (event: any) =>
+            {
+                const progress = event.payload;
+                updateProgress({
+                    phase: 'downloading',
+                    transferredBytes: progress.transferred_bytes,
+                    totalTransferBytes: progress.total_bytes,
+                    transferSpeed: progress.bytes_per_second,
+                    percentage: progress.percentage,
+                });
+            })
+        );
+
+        // Listen for download completed
+        unlistenPromises.push(
+            listen("download-completed", (event: any) =>
+            {
+                logger.info("✓ Download completed", event.payload);
+                // Clear transfer progress, ready for encoding phase
+                updateProgress({
+                    transferredBytes: undefined,
+                    totalTransferBytes: undefined,
+                    transferSpeed: undefined,
+                });
+            })
+        );
+
+        // Listen for upload started
+        unlistenPromises.push(
+            listen("upload-started", (event: any) =>
+            {
+                logger.info("📤 Upload started", event.payload);
+                updateProgress({
+                    phase: 'uploading',
+                    totalTransferBytes: event.payload.total_bytes,
+                    transferredBytes: 0,
+                    transferSpeed: 0,
+                    percentage: 0,
+                });
+            })
+        );
+
+        // Listen for upload progress
+        unlistenPromises.push(
+            listen("upload-progress", (event: any) =>
+            {
+                const progress = event.payload;
+                updateProgress({
+                    phase: 'uploading',
+                    transferredBytes: progress.transferred_bytes,
+                    totalTransferBytes: progress.total_bytes,
+                    transferSpeed: progress.bytes_per_second,
+                    percentage: progress.percentage,
+                });
+            })
+        );
+
+        // Listen for upload completed
+        unlistenPromises.push(
+            listen("upload-completed", (event: any) =>
+            {
+                logger.info("✓ Upload completed", event.payload);
+                // Keep stats at 100% for 2 seconds before transitioning
+                setTimeout(() => {
+                    updateProgress({ phase: 'completing' });
+                }, 2000);
             })
         );
 

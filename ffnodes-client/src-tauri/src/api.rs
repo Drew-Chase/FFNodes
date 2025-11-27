@@ -3,7 +3,9 @@ use reqwest::{Client, multipart};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tokio::fs::File;
-use tokio::io::AsyncReadExt;
+use tokio::io::AsyncWriteExt;
+use futures_util::StreamExt;
+use tokio_util::io::ReaderStream;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HandshakeRequest {
@@ -50,6 +52,14 @@ pub struct ProgressUpdate {
 pub struct JobCompletion {
     pub output_size: i64,
     pub output_bitrate: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct TransferProgress {
+    pub transferred_bytes: u64,
+    pub total_bytes: u64,
+    pub percentage: f64,
+    pub bytes_per_second: f64,
 }
 
 #[derive(Clone)]
@@ -161,17 +171,93 @@ impl ServerClient {
         Ok(())
     }
 
-    pub async fn download_input_file(&self, job_id: &str, output_path: &Path) -> Result<()> {
+    pub async fn download_input_file<F>(
+        &self,
+        job_id: &str,
+        output_path: &Path,
+        mut progress_callback: F,
+    ) -> Result<()>
+    where
+        F: FnMut(TransferProgress) + Send + 'static,
+    {
         let url = format!("{}/api/files/{}/input", self.base_url, job_id);
+        log::debug!("Starting file download for job {}", job_id);
+        log::debug!("Download URL: {}", url);
+        log::debug!("Output path: {:?}", output_path);
+
         let response = self.add_auth_header(self.client.get(&url)).send().await?.error_for_status()?;
 
-        let bytes = response.bytes().await?;
-        tokio::fs::write(output_path, bytes).await?;
+        // Get total size from Content-Length header
+        let total_bytes = response
+            .content_length()
+            .ok_or_else(|| anyhow::anyhow!("Missing Content-Length header"))?;
+        log::debug!("Total download size: {} bytes", total_bytes);
+
+        // Create output file
+        let mut file = tokio::fs::File::create(output_path).await?;
+
+        // Stream response body with progress tracking
+        let mut stream = response.bytes_stream();
+        let mut downloaded_bytes: u64 = 0;
+        let mut last_update = std::time::Instant::now();
+        let mut last_bytes = 0u64;
+        let mut speed_ema = 0.0f64; // Exponential moving average for speed
+
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk?;
+            let chunk_size = chunk.len() as u64;
+
+            // Write chunk to file
+            file.write_all(&chunk).await?;
+
+            // Update progress tracking
+            downloaded_bytes += chunk_size;
+
+            // Throttle progress updates to ~100ms intervals
+            let now = std::time::Instant::now();
+            let elapsed = now.duration_since(last_update).as_secs_f64();
+
+            if elapsed >= 0.1 || downloaded_bytes == total_bytes {
+                let bytes_since_last = downloaded_bytes - last_bytes;
+                let current_speed = bytes_since_last as f64 / elapsed;
+
+                // Smooth speed with exponential moving average
+                let alpha = 0.3;
+                speed_ema = if speed_ema == 0.0 {
+                    current_speed
+                } else {
+                    alpha * current_speed + (1.0 - alpha) * speed_ema
+                };
+
+                let percentage = (downloaded_bytes as f64 / total_bytes as f64) * 100.0;
+
+                progress_callback(TransferProgress {
+                    transferred_bytes: downloaded_bytes,
+                    total_bytes,
+                    percentage,
+                    bytes_per_second: speed_ema,
+                });
+
+                last_update = now;
+                last_bytes = downloaded_bytes;
+            }
+        }
+
+        file.flush().await?;
+        log::debug!("✓ Download complete: {} bytes", downloaded_bytes);
 
         Ok(())
     }
 
-    pub async fn upload_output_file(&self, job_id: &str, file_path: &Path) -> Result<()> {
+    pub async fn upload_output_file<F>(
+        &self,
+        job_id: &str,
+        file_path: &Path,
+        progress_callback: F,
+    ) -> Result<()>
+    where
+        F: FnMut(TransferProgress) + Send + 'static,
+    {
         let url = format!("{}/api/files/{}/output", self.base_url, job_id);
 
         log::debug!("Starting file upload for job {}", job_id);
@@ -185,21 +271,10 @@ impl ServerClient {
         }
         log::debug!("✓ File exists");
 
-        // Read file
-        log::trace!("Opening file for reading...");
-        let mut file = File::open(file_path).await.map_err(|e| {
-            log::error!("Failed to open file: {:#}", e);
-            e
-        })?;
-
-        let mut buffer = Vec::new();
-        log::trace!("Reading file contents...");
-        file.read_to_end(&mut buffer).await.map_err(|e| {
-            log::error!("Failed to read file: {:#}", e);
-            e
-        })?;
-
-        log::debug!("✓ File read successfully - size: {} bytes", buffer.len());
+        // Get file size
+        let metadata = tokio::fs::metadata(file_path).await?;
+        let total_bytes = metadata.len();
+        log::debug!("Total upload size: {} bytes", total_bytes);
 
         let filename = file_path
             .file_name()
@@ -208,9 +283,107 @@ impl ServerClient {
             .to_string();
         log::debug!("Filename for upload: {}", filename);
 
-        // Create multipart form
-        log::trace!("Creating multipart form...");
-        let file_part = multipart::Part::bytes(buffer)
+        // Open file for streaming
+        let file = File::open(file_path).await.map_err(|e| {
+            log::error!("Failed to open file: {:#}", e);
+            e
+        })?;
+
+        // Create streaming body with progress tracking
+        let mut reader_stream = ReaderStream::new(file);
+        let uploaded_bytes = std::sync::Arc::new(std::sync::Mutex::new(0u64));
+        let last_update = std::sync::Arc::new(std::sync::Mutex::new(std::time::Instant::now()));
+        let last_bytes = std::sync::Arc::new(std::sync::Mutex::new(0u64));
+        let speed_ema = std::sync::Arc::new(std::sync::Mutex::new(0.0f64));
+
+        // Wrap callback in Arc<Mutex> for thread-safe sharing
+        let callback = std::sync::Arc::new(std::sync::Mutex::new(progress_callback));
+
+        let uploaded_clone = uploaded_bytes.clone();
+        let last_update_clone = last_update.clone();
+        let last_bytes_clone = last_bytes.clone();
+        let speed_ema_clone = speed_ema.clone();
+        let callback_clone = callback.clone();
+        let total_bytes_clone = total_bytes;
+
+        let stream = async_stream::stream! {
+            while let Some(chunk) = reader_stream.next().await {
+                match chunk {
+                    Ok(bytes) => {
+                        let chunk_size = bytes.len() as u64;
+
+                        // Update uploaded bytes
+                        {
+                            let mut uploaded = uploaded_clone.lock().unwrap();
+                            *uploaded += chunk_size;
+                        }
+
+                        // Throttle progress updates to ~100ms intervals
+                        let should_update = {
+                            let last = last_update_clone.lock().unwrap();
+                            let now = std::time::Instant::now();
+                            let elapsed = now.duration_since(*last).as_secs_f64();
+                            elapsed >= 0.1
+                        };
+
+                        let current_uploaded = *uploaded_clone.lock().unwrap();
+
+                        if should_update || current_uploaded == total_bytes_clone {
+                            let now = std::time::Instant::now();
+                            let elapsed = {
+                                let last = last_update_clone.lock().unwrap();
+                                now.duration_since(*last).as_secs_f64()
+                            };
+
+                            let bytes_since_last = {
+                                let last_b = last_bytes_clone.lock().unwrap();
+                                current_uploaded - *last_b
+                            };
+
+                            let current_speed = bytes_since_last as f64 / elapsed;
+
+                            // Smooth speed with exponential moving average
+                            let alpha = 0.3;
+                            let speed = {
+                                let mut ema = speed_ema_clone.lock().unwrap();
+                                if *ema == 0.0 {
+                                    *ema = current_speed;
+                                } else {
+                                    *ema = alpha * current_speed + (1.0 - alpha) * *ema;
+                                }
+                                *ema
+                            };
+
+                            let percentage = (current_uploaded as f64 / total_bytes_clone as f64) * 100.0;
+
+                            // Call progress callback
+                            {
+                                let mut cb = callback_clone.lock().unwrap();
+                                cb(TransferProgress {
+                                    transferred_bytes: current_uploaded,
+                                    total_bytes: total_bytes_clone,
+                                    percentage,
+                                    bytes_per_second: speed,
+                                });
+                            }
+
+                            *last_update_clone.lock().unwrap() = now;
+                            *last_bytes_clone.lock().unwrap() = current_uploaded;
+                        }
+
+                        yield Ok::<_, std::io::Error>(bytes);
+                    }
+                    Err(e) => {
+                        yield Err(e);
+                        break;
+                    }
+                }
+            }
+        };
+
+        // Create multipart form with streaming body
+        log::trace!("Creating multipart form with streaming body...");
+        let file_part = multipart::Part::stream(reqwest::Body::wrap_stream(stream))
             .file_name(filename.clone())
             .mime_str("video/mp4")?;
 
