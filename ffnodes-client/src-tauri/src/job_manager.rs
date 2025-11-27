@@ -298,8 +298,8 @@ impl JobManager {
                 Err(e) => log::warn!("Failed to emit 'frame-extracted' event: {}", e),
             }
 
-            // Prepare output path
-            let output_path = temp_dir.join(format!("output_{}", job_id));
+            // Prepare output path (encoder adds .mp4 extension)
+            let output_path = temp_dir.join(format!("output_{}.mp4", job_id));
             log::debug!("Output file will be saved to: {:?}", output_path);
 
             // Start encoding

@@ -155,7 +155,7 @@ impl Encoder {
         // Parse template and build FFmpeg command
         let mut args = self.build_ffmpeg_args(
             input_path,
-            output_path.with_extension("mp4").as_path(),
+            output_path,
             gpu_info,
             ffmpeg_template,
         )?;
