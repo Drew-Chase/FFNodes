@@ -52,6 +52,12 @@ impl Configuration {
             config.save().await?;
         }
 
+        // Canonicalize watch directories for proper path comparison
+        config.watch_directories = config.watch_directories
+            .into_iter()
+            .filter_map(|p| p.canonicalize().ok())
+            .collect();
+
         Ok(config)
     }
     pub async fn save(&self) -> Result<()> {

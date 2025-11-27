@@ -33,12 +33,19 @@ pub async fn download_input(
         Error::not_found("Job not found")
     })?;
 
+    debug!("Job found - media_file_path: {}", job.media_file_path);
+
     // Verify job is assigned
     if job.assigned_client.is_none() {
+        warn!("Job not assigned to any client");
         return Err(Error::bad_request("Job not assigned"));
     }
 
+    debug!("Job assigned to client: {:?}", job.assigned_client);
+
     let input_path = Path::new(&job.media_file_path);
+    debug!("Input path: {:?}", input_path);
+    debug!("Watch directories: {:?}", config.watch_directories);
 
     // Validate path security - ensure no path traversal
     let validated_path = path_security::validate_path_within_base(
@@ -49,6 +56,8 @@ pub async fn download_input(
         warn!("Path validation failed: {:#}", e);
         Error::forbidden("Access to this path is not allowed")
     })?;
+
+    debug!("Path validated: {:?}", validated_path);
 
     // Check if file exists
     if !validated_path.exists() {
