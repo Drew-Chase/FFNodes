@@ -173,32 +173,71 @@ impl ServerClient {
     pub async fn upload_output_file(&self, job_id: &str, file_path: &Path) -> Result<()> {
         let url = format!("{}/api/files/{}/output", self.base_url, job_id);
 
+        log::debug!("Starting file upload for job {}", job_id);
+        log::debug!("Upload URL: {}", url);
+        log::debug!("File path: {:?}", file_path);
+
+        // Check if file exists
+        if !file_path.exists() {
+            log::error!("File does not exist: {:?}", file_path);
+            return Err(anyhow::anyhow!("Output file not found at {:?}", file_path));
+        }
+        log::debug!("✓ File exists");
+
         // Read file
-        let mut file = File::open(file_path).await?;
+        log::trace!("Opening file for reading...");
+        let mut file = File::open(file_path).await.map_err(|e| {
+            log::error!("Failed to open file: {:#}", e);
+            e
+        })?;
+
         let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer).await?;
+        log::trace!("Reading file contents...");
+        file.read_to_end(&mut buffer).await.map_err(|e| {
+            log::error!("Failed to read file: {:#}", e);
+            e
+        })?;
+
+        log::debug!("✓ File read successfully - size: {} bytes", buffer.len());
+
+        let filename = file_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("output.mp4")
+            .to_string();
+        log::debug!("Filename for upload: {}", filename);
 
         // Create multipart form
+        log::trace!("Creating multipart form...");
         let file_part = multipart::Part::bytes(buffer)
-            .file_name(
-                file_path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("output.mp4")
-                    .to_string(),
-            )
+            .file_name(filename.clone())
             .mime_str("video/mp4")?;
 
         let form = multipart::Form::new().part("file", file_part);
+        log::debug!("✓ Multipart form created");
 
-        self.add_auth_header(
+        log::trace!("Sending POST request...");
+        let response = self.add_auth_header(
             self.client
                 .post(&url)
                 .multipart(form)
         ).send()
-            .await?
-            .error_for_status()?;
+            .await
+            .map_err(|e| {
+                log::error!("Upload request failed: {:#}", e);
+                e
+            })?;
 
+        let status = response.status();
+        log::debug!("Response status: {}", status);
+
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_else(|_| "Could not read response body".to_string());
+            log::error!("Upload failed with status {}: {}", status, body);
+            return Err(anyhow::anyhow!("Upload failed: {} - {}", status, body));
+        }
+
+        log::debug!("✓ Upload successful");
         Ok(())
     }
 

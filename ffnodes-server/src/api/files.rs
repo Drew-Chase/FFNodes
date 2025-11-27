@@ -118,31 +118,45 @@ pub async fn upload_output(
         Error::not_found("Job not found")
     })?;
 
+    debug!("Job found - status: {}, media_file_path: {}", job.status, job.media_file_path);
+
     // Verify job is in progress
     if job.status != "in_progress" {
-        return Err(Error::bad_request("Job is not in progress"));
+        warn!("Upload rejected - job status is '{}', expected 'in_progress'", job.status);
+        return Err(Error::bad_request(format!("Job is not in progress (status: {})", job.status)));
     }
 
+    debug!("✓ Job status verified: in_progress");
+
     let output_path_str = format!("{}.h264.{}", job.media_file_path, config.output_container);
+    debug!("Calculated output path: {}", output_path_str);
     let output_path = Path::new(&output_path_str);
 
     // Validate path security - ensure no path traversal
+    debug!("Validating path security...");
     let validated_path = path_security::validate_path_security(output_path).map_err(|e| {
         warn!("Path validation failed: {:#}", e);
         Error::forbidden("Invalid output path")
     })?;
 
+    debug!("✓ Path security validated: {:?}", validated_path);
+
     // Ensure output directory is within watch directories
+    debug!("Validating output directory within watch directories...");
     if let Some(parent) = validated_path.parent() {
+        debug!("Parent directory: {:?}", parent);
+        debug!("Watch directories: {:?}", config.watch_directories);
         path_security::validate_path_within_base(parent, &config.watch_directories).map_err(
             |e| {
                 warn!("Output directory validation failed: {:#}", e);
                 Error::forbidden("Output directory is not allowed")
             },
         )?;
+        debug!("✓ Output directory validated");
     }
 
     // Process multipart stream
+    debug!("Processing multipart upload stream...");
     let mut file_data: Option<Vec<u8>> = None;
 
     while let Some(item) = payload.next().await {
@@ -151,6 +165,7 @@ pub async fn upload_output(
             Error::bad_request("Invalid multipart data")
         })?;
 
+        debug!("Reading multipart field...");
         // Read field data
         let mut data = Vec::new();
         while let Some(chunk) = field.next().await {
@@ -161,10 +176,16 @@ pub async fn upload_output(
             data.extend_from_slice(&chunk);
         }
 
+        debug!("Field data size: {} bytes", data.len());
         file_data = Some(data);
     }
 
-    let file_data = file_data.ok_or_else(|| Error::bad_request("No file provided"))?;
+    let file_data = file_data.ok_or_else(|| {
+        warn!("No file data received in multipart upload");
+        Error::bad_request("No file provided")
+    })?;
+
+    debug!("✓ Multipart upload processed - total size: {} bytes", file_data.len());
 
     // Write file
     let mut file = File::create(&validated_path).map_err(|e| {

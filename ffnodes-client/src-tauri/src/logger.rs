@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::path::PathBuf;
 use tracing_appender::rolling;
-use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt, Layer};
 
 /// Initialize file and console logging
 pub fn init() -> Result<PathBuf> {
@@ -15,21 +15,23 @@ pub fn init() -> Result<PathBuf> {
     // Create rolling file appender (daily rotation, keeps last 7 days)
     let file_appender = rolling::daily(&log_dir, "ffnodes-client");
 
-    // Create formatting layer for file
+    // Create formatting layer for file with trace level
     let file_layer = fmt::layer()
         .with_writer(file_appender)
         .with_ansi(false)
         .with_target(true)
         .with_line_number(true)
-        .with_file(true);
+        .with_file(true)
+        .with_filter(EnvFilter::new("trace"));
 
-    // Create formatting layer for console
-    let console_layer = fmt::layer().with_target(true).with_line_number(true);
-    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
+    // Create formatting layer for console with trace level
+    let console_layer = fmt::layer()
+        .with_target(true)
+        .with_line_number(true)
+        .with_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace")));
 
     // Initialize subscriber with both console and file output
     tracing_subscriber::registry()
-        .with(env_filter)
         .with(console_layer)
         .with(file_layer)
         .init();
