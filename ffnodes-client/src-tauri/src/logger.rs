@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::path::PathBuf;
 use tracing_appender::rolling;
-use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 /// Initialize file and console logging
 pub fn init() -> Result<PathBuf> {
@@ -24,9 +24,7 @@ pub fn init() -> Result<PathBuf> {
         .with_file(true);
 
     // Create formatting layer for console
-    let console_layer = fmt::layer()
-        .with_target(true)
-        .with_line_number(true);
+    let console_layer = fmt::layer().with_target(true).with_line_number(true);
 
     // Set up env filter (defaults to INFO, can be overridden with RUST_LOG env var)
     let env_filter = EnvFilter::try_from_default_env()

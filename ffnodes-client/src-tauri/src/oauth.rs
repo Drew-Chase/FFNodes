@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tauri::command;
-use tauri_plugin_oauth::{start_with_config, OauthConfig};
+use tauri_plugin_oauth::{OauthConfig, start_with_config};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OAuthFlowParams {
@@ -23,9 +23,7 @@ pub struct OAuthResponse {
 /// Start OAuth flow for the specified provider
 /// This will open the authorization URL in the default browser and wait for the callback
 #[command]
-pub async fn start_oauth_flow(
-    params: OAuthFlowParams,
-) -> Result<OAuthResponse, String> {
+pub async fn start_oauth_flow(params: OAuthFlowParams) -> Result<OAuthResponse, String> {
     // Build authorization URL based on provider
     let port_result = start_oauth_server()?;
     let port = port_result.0;
@@ -65,31 +63,28 @@ pub async fn start_oauth_flow(
     open::that(&auth_url).map_err(|e| format!("Failed to open browser: {}", e))?;
 
     // Wait for the callback URL (with timeout)
-    let url = tokio::time::timeout(
-        std::time::Duration::from_secs(120),
-        async {
-            loop {
-                // Check if URL has been received
-                let url_option = {
-                    let url_guard = received_url.lock().unwrap();
-                    url_guard.clone()
-                }; // Guard is dropped here before await
+    let url = tokio::time::timeout(std::time::Duration::from_secs(120), async {
+        loop {
+            // Check if URL has been received
+            let url_option = {
+                let url_guard = received_url.lock().unwrap();
+                url_guard.clone()
+            }; // Guard is dropped here before await
 
-                if let Some(url) = url_option {
-                    return Ok::<String, String>(url);
-                }
-
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            if let Some(url) = url_option {
+                return Ok::<String, String>(url);
             }
+
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
-    )
+    })
     .await
     .map_err(|_| "OAuth flow timed out".to_string())?
     .map_err(|e| format!("Failed to receive callback: {}", e))?;
 
     // Parse the URL to extract the authorization code
-    let parsed_url = url::Url::parse(&url)
-        .map_err(|e| format!("Failed to parse callback URL: {}", e))?;
+    let parsed_url =
+        url::Url::parse(&url).map_err(|e| format!("Failed to parse callback URL: {}", e))?;
 
     let code = parsed_url
         .query_pairs()
@@ -144,8 +139,8 @@ async fn exchange_code_for_tokens(
     // Build request body
     // NOTE: In production, the client_secret should be stored securely
     // and this exchange should happen on your backend server
-    let client_secret = std::env::var(format!("{}_CLIENT_SECRET", provider.to_uppercase()))
-        .unwrap_or_default();
+    let client_secret =
+        std::env::var(format!("{}_CLIENT_SECRET", provider.to_uppercase())).unwrap_or_default();
 
     let params = [
         ("grant_type", "authorization_code"),

@@ -1,6 +1,6 @@
 use crate::api::{HandshakeRequest, ServerClient};
 use crate::config::ClientConfig;
-use crate::gpu::{detect_gpu, GpuInfo};
+use crate::gpu::{GpuInfo, detect_gpu};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -69,26 +69,23 @@ pub async fn extract_frame(video_path: String) -> Result<String, String> {
     let encoder = Encoder::new().await.map_err(|e| e.to_string())?;
     let path = Path::new(&video_path);
 
-    encoder
-        .extract_frame(path)
-        .await
-        .map_err(|e| e.to_string())
+    encoder.extract_frame(path).await.map_err(|e| e.to_string())
 }
 
 /// Get list of active jobs from server
 #[tauri::command]
 pub async fn get_active_jobs(config: ClientConfig) -> Result<Vec<crate::api::EncodingJob>, String> {
     let client = ServerClient::new(config.server_url);
-    client
-        .get_active_jobs()
-        .await
-        .map_err(|e| e.to_string())
+    client.get_active_jobs().await.map_err(|e| e.to_string())
 }
 
 /// Start job processing
 #[tauri::command]
 pub async fn start_job_processing(
-    job_manager: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<crate::job_manager::JobManager>>>,
+    job_manager: tauri::State<
+        '_,
+        std::sync::Arc<tokio::sync::Mutex<crate::job_manager::JobManager>>,
+    >,
     config: ClientConfig,
     gpu: GpuInfo,
 ) -> Result<(), String> {
@@ -101,7 +98,10 @@ pub async fn start_job_processing(
 /// Stop job processing
 #[tauri::command]
 pub async fn stop_job_processing(
-    job_manager: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<crate::job_manager::JobManager>>>,
+    job_manager: tauri::State<
+        '_,
+        std::sync::Arc<tokio::sync::Mutex<crate::job_manager::JobManager>>,
+    >,
 ) -> Result<(), String> {
     let manager = job_manager.lock().await;
     manager.stop().await.map_err(|e| e.to_string())
@@ -110,7 +110,10 @@ pub async fn stop_job_processing(
 /// Pause job processing
 #[tauri::command]
 pub async fn pause_job_processing(
-    job_manager: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<crate::job_manager::JobManager>>>,
+    job_manager: tauri::State<
+        '_,
+        std::sync::Arc<tokio::sync::Mutex<crate::job_manager::JobManager>>,
+    >,
 ) -> Result<(), String> {
     let manager = job_manager.lock().await;
     manager.pause().await.map_err(|e| e.to_string())
@@ -119,7 +122,10 @@ pub async fn pause_job_processing(
 /// Resume job processing
 #[tauri::command]
 pub async fn resume_job_processing(
-    job_manager: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<crate::job_manager::JobManager>>>,
+    job_manager: tauri::State<
+        '_,
+        std::sync::Arc<tokio::sync::Mutex<crate::job_manager::JobManager>>,
+    >,
 ) -> Result<(), String> {
     let manager = job_manager.lock().await;
     manager.resume().await.map_err(|e| e.to_string())
@@ -128,7 +134,10 @@ pub async fn resume_job_processing(
 /// Get job manager state
 #[tauri::command]
 pub async fn get_job_manager_state(
-    job_manager: tauri::State<'_, std::sync::Arc<tokio::sync::Mutex<crate::job_manager::JobManager>>>,
+    job_manager: tauri::State<
+        '_,
+        std::sync::Arc<tokio::sync::Mutex<crate::job_manager::JobManager>>,
+    >,
 ) -> Result<crate::job_manager::JobManagerState, String> {
     let manager = job_manager.lock().await;
     Ok(manager.get_state().await)

@@ -2,7 +2,7 @@ use crate::api::{JobCompletion, ProgressUpdate, ServerClient};
 use crate::config::ClientConfig;
 use crate::encoder::{Encoder, EncodingProgress};
 use crate::gpu::GpuInfo;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::Mutex;
@@ -135,9 +135,7 @@ impl JobManager {
                 }
                 Err(e) => {
                     log::error!("Error processing job: {}", e);
-                    let _ = self
-                        .app_handle
-                        .emit("job-error", format!("Error: {}", e));
+                    let _ = self.app_handle.emit("job-error", format!("Error: {}", e));
                     tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
                 }
             }
@@ -167,8 +165,13 @@ impl JobManager {
         };
         let gpu_info = gpu_info.clone();
         drop(gpu_lock);
-        log::debug!("GPU info acquired - vendor: {}, name: {}, h264: {}, h265: {}",
-                    gpu_info.vendor, gpu_info.name, gpu_info.encoder_h264, gpu_info.encoder_h265);
+        log::debug!(
+            "GPU info acquired - vendor: {}, name: {}, h264: {}, h265: {}",
+            gpu_info.vendor,
+            gpu_info.name,
+            gpu_info.encoder_h264,
+            gpu_info.encoder_h265
+        );
 
         // Create API client
         log::debug!("Creating API client...");
@@ -181,7 +184,11 @@ impl JobManager {
             .ok_or_else(|| anyhow!("No auth token"))?;
 
         log::info!("Requesting job from server with auth token: {}", client_id);
-        log::debug!("API endpoint: {}/api/jobs/request/{}", config.server_url, client_id);
+        log::debug!(
+            "API endpoint: {}/api/jobs/request/{}",
+            config.server_url,
+            client_id
+        );
 
         let job_response = match client.request_job(client_id).await {
             Ok(resp) => {
@@ -203,7 +210,11 @@ impl JobManager {
         let job_id = job.id.clone();
 
         log::info!("✓ Received job from server: {}", job_id);
-        log::debug!("Job details - media_file_path: {}, status: {}", job.media_file_path, job.status);
+        log::debug!(
+            "Job details - media_file_path: {}, status: {}",
+            job.media_file_path,
+            job.status
+        );
         log::debug!("Output template: {}", job_resp.output_template);
 
         // Update state
@@ -222,7 +233,10 @@ impl JobManager {
         }
 
         // Start the job on server
-        log::info!("Starting job {} on server (status transition: assigned → in_progress)", job_id);
+        log::info!(
+            "Starting job {} on server (status transition: assigned → in_progress)",
+            job_id
+        );
         log::debug!("Calling POST /api/jobs/{}/start", job_id);
         match client.start_job(&job_id).await {
             Ok(_) => log::info!("✓ Job {} started successfully on server", job_id),
@@ -246,9 +260,7 @@ impl JobManager {
             log::debug!("Download destination: {:?}", input_path);
             log::debug!("Calling GET /api/files/{}/input", job_id);
 
-            client
-                .download_input_file(&job_id, &input_path)
-                .await?;
+            client.download_input_file(&job_id, &input_path).await?;
 
             log::info!("✓ Downloaded input file to {:?}", input_path);
             if let Ok(metadata) = std::fs::metadata(&input_path) {
@@ -259,7 +271,10 @@ impl JobManager {
             log::info!("---------- Frame Extraction Phase ----------");
             log::debug!("Extracting random frame for UI background...");
             let frame_base64 = self.encoder.extract_frame(&input_path).await?;
-            log::info!("✓ Frame extracted successfully (base64 length: {} chars)", frame_base64.len());
+            log::info!(
+                "✓ Frame extracted successfully (base64 length: {} chars)",
+                frame_base64.len()
+            );
 
             // Emit frame extracted event
             log::debug!("Emitting 'frame-extracted' event to frontend...");
@@ -277,8 +292,13 @@ impl JobManager {
             log::info!("Starting encoding for job {}", job_id);
             log::debug!("Input: {:?}", input_path);
             log::debug!("Output: {:?}", output_path);
-            log::debug!("GPU: vendor={}, name={}, h264={}, h265={}",
-                        gpu_info.vendor, gpu_info.name, gpu_info.encoder_h264, gpu_info.encoder_h265);
+            log::debug!(
+                "GPU: vendor={}, name={}, h264={}, h265={}",
+                gpu_info.vendor,
+                gpu_info.name,
+                gpu_info.encoder_h264,
+                gpu_info.encoder_h265
+            );
 
             // Get FFmpeg command template from job response (server provides it)
             let ffmpeg_template = &job_resp.ffmpeg_template;
@@ -318,7 +338,11 @@ impl JobManager {
                 .await?;
 
             log::info!("✓ Encoding completed successfully for job {}", job_id);
-            log::debug!("Output file size: {} bytes, bitrate: {} bps", output_size, output_bitrate);
+            log::debug!(
+                "Output file size: {} bytes, bitrate: {} bps",
+                output_size,
+                output_bitrate
+            );
 
             // Upload output file
             log::info!("---------- Upload Phase ----------");
@@ -385,7 +409,11 @@ impl JobManager {
 
                 // Fail the job on server
                 let error_message = format!("{:#}", e);
-                log::debug!("Calling POST /api/jobs/{}/fail with error: {}", job_id, error_message);
+                log::debug!(
+                    "Calling POST /api/jobs/{}/fail with error: {}",
+                    job_id,
+                    error_message
+                );
 
                 if let Err(fail_err) = client.fail_job(&job_id, error_message).await {
                     log::error!("✗ Failed to report job failure to server: {:#}", fail_err);

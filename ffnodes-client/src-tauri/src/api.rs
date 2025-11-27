@@ -1,5 +1,5 @@
 use anyhow::Result;
-use reqwest::{multipart, Client};
+use reqwest::{Client, multipart};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tokio::fs::File;
@@ -92,11 +92,7 @@ impl ServerClient {
 
     pub async fn start_job(&self, job_id: &str) -> Result<()> {
         let url = format!("{}/api/jobs/{}/start", self.base_url, job_id);
-        self.client
-            .post(&url)
-            .send()
-            .await?
-            .error_for_status()?;
+        self.client.post(&url).send().await?.error_for_status()?;
         Ok(())
     }
 
@@ -137,11 +133,7 @@ impl ServerClient {
     #[allow(dead_code)]
     pub async fn heartbeat(&self, client_id: &str) -> Result<()> {
         let url = format!("{}/api/heartbeat/{}", self.base_url, client_id);
-        self.client
-            .post(&url)
-            .send()
-            .await?
-            .error_for_status()?;
+        self.client.post(&url).send().await?.error_for_status()?;
         Ok(())
     }
 

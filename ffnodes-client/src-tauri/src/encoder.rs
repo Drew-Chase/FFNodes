@@ -1,6 +1,6 @@
 use crate::gpu::GpuInfo;
-use anyhow::{anyhow, Result};
-use base64::{engine::general_purpose, Engine as _};
+use anyhow::{Result, anyhow};
+use base64::{Engine as _, engine::general_purpose};
 use ffmpeg::FFMpeg;
 use std::path::{Path, PathBuf};
 
@@ -37,10 +37,7 @@ impl Encoder {
 
         log::info!("FFmpeg binary located at: {:?}", ffmpeg);
 
-        Ok(Self {
-            ffmpeg,
-            temp_dir,
-        })
+        Ok(Self { ffmpeg, temp_dir })
     }
 
     /// Extract a random frame from the video for background
@@ -54,7 +51,11 @@ impl Encoder {
         // Pick a random timestamp (avoid first and last 10%)
         let random_time = (duration * 0.1) + (duration * 0.8 * rand::random::<f64>());
         let percentage = (random_time / duration) * 100.0;
-        log::info!("Extracting frame at random position: {:.2}s ({:.1}% through video)", random_time, percentage);
+        log::info!(
+            "Extracting frame at random position: {:.2}s ({:.1}% through video)",
+            random_time,
+            percentage
+        );
 
         // Output path
         let output_path = self.temp_dir.join(format!(
@@ -67,7 +68,9 @@ impl Encoder {
         log::debug!("Output path: {}", output_path.display());
 
         // Extract frame using FFmpeg builder
-        let builder = self.ffmpeg.ffmpeg_command_builder()
+        let builder = self
+            .ffmpeg
+            .ffmpeg_command_builder()
             .input(video_path.to_str().unwrap())?
             .start_time(random_time.to_string())?
             .output(output_path.to_str().unwrap())?
@@ -80,7 +83,8 @@ impl Encoder {
         let cmd = builder.build()?;
         log::debug!("Extract frame FFmpeg command: {}", cmd);
 
-        cmd.execute(None, None).await
+        cmd.execute(None, None)
+            .await
             .map_err(|e| anyhow!("Failed to extract frame: {}", e))?;
 
         log::info!("Frame extracted successfully");
@@ -100,7 +104,9 @@ impl Encoder {
         log::debug!("Getting duration for: {}", video_path.display());
 
         use ffmpeg::builders::common::ProbeFormat;
-        let probe = self.ffmpeg.ffprobe_command_builder()
+        let probe = self
+            .ffmpeg
+            .ffprobe_command_builder()
             .input(video_path.to_str().unwrap())?
             .show_format()
             .output_format(ProbeFormat::JSON)
@@ -108,14 +114,18 @@ impl Encoder {
             .hide_banner();
 
         let cmd = probe.build()?;
-        let result = cmd.execute_json().await
+        let result = cmd
+            .execute_json()
+            .await
             .map_err(|e| anyhow!("Failed to probe video: {}", e))?;
 
-        let duration_str = result.format
+        let duration_str = result
+            .format
             .and_then(|f| f.duration)
             .ok_or_else(|| anyhow!("No duration found in probe result"))?;
 
-        let duration: f64 = duration_str.parse()
+        let duration: f64 = duration_str
+            .parse()
             .map_err(|e| anyhow!("Failed to parse duration: {}", e))?;
 
         log::debug!("Duration: {:.2}s", duration);
@@ -135,17 +145,28 @@ impl Encoder {
     where
         F: FnMut(EncodingProgress) + Send,
     {
-        log::info!("Starting encoding: {} -> {}", input_path.display(), output_path.display());
+        log::info!(
+            "Starting encoding: {} -> {}",
+            input_path.display(),
+            output_path.display()
+        );
         log::debug!("FFmpeg template: {}", ffmpeg_template);
 
         // Parse template and build FFmpeg command
-        let mut args = self.build_ffmpeg_args(input_path, output_path.with_extension("mp4").as_path(), gpu_info, ffmpeg_template)?;
+        let mut args = self.build_ffmpeg_args(
+            input_path,
+            output_path.with_extension("mp4").as_path(),
+            gpu_info,
+            ffmpeg_template,
+        )?;
         log::debug!("FFmpeg args before progress: {:?}", args);
 
         // Insert -progress pipe:2 before the last argument (output file)
         // FFmpeg requires -progress to come before the output file
         if !args.is_empty() {
-            let output_file = args.pop().ok_or_else(|| anyhow!("No output file in args"))?;
+            let output_file = args
+                .pop()
+                .ok_or_else(|| anyhow!("No output file in args"))?;
             args.push("-progress".to_string());
             args.push("pipe:2".to_string());
             args.push(output_file);
@@ -185,22 +206,28 @@ impl Encoder {
         log::debug!("FFmpeg command: {}", cmd);
 
         // Execute in background and process progress
-        let handle = tokio::spawn(async move {
-            cmd.execute(None, Some(tx)).await
-        });
+        let handle = tokio::spawn(async move { cmd.execute(None, Some(tx)).await });
 
         // Process progress updates with stateful accumulation
         let mut progress_state = ProgressState::default();
         while let Some(line) = rx.recv().await {
-            if let Some(progress) = self.parse_progress_update(&line, &mut progress_state, total_frames) {
-                log::trace!("Progress: frame={}, fps={:.1}, speed={:.2}x, {}%",
-                    progress.frame, progress.fps, progress.speed, progress.percentage);
+            if let Some(progress) =
+                self.parse_progress_update(&line, &mut progress_state, total_frames)
+            {
+                log::trace!(
+                    "Progress: frame={}, fps={:.1}, speed={:.2}x, {}%",
+                    progress.frame,
+                    progress.fps,
+                    progress.speed,
+                    progress.percentage
+                );
                 progress_callback(progress);
             }
         }
 
         // Wait for encoding to complete
-        handle.await?
+        handle
+            .await?
             .map_err(|e| anyhow!("Encoding failed: {}", e))?;
 
         log::info!("Encoding completed successfully");
@@ -236,7 +263,10 @@ impl Encoder {
         let command = template
             .replace("{INPUT}", &format!("\"{}\"", input_path.display()))
             .replace("{OUTPUT}", &format!("\"{}\"", output_path.display()))
-            .replace("{HWACCEL_CODE}", &format!("_{}", gpu_info.encoder_h264.replace("h264_", "")));
+            .replace(
+                "{HWACCEL_CODE}",
+                &format!("_{}", gpu_info.encoder_h264.replace("h264_", "")),
+            );
 
         log::debug!("Template after substitution: {}", command);
 
@@ -256,7 +286,9 @@ impl Encoder {
         log::debug!("Getting total frames for: {}", video_path.display());
 
         use ffmpeg::builders::common::{ProbeFormat, StreamType};
-        let probe = self.ffmpeg.ffprobe_command_builder()
+        let probe = self
+            .ffmpeg
+            .ffprobe_command_builder()
             .input(video_path.to_str().unwrap())?
             .select_streams(StreamType::Video)
             .count_packets()
@@ -266,15 +298,19 @@ impl Encoder {
             .hide_banner();
 
         let cmd = probe.build()?;
-        let result = cmd.execute_json().await
+        let result = cmd
+            .execute_json()
+            .await
             .map_err(|e| anyhow!("Failed to probe video: {}", e))?;
 
-        let frames_str = result.streams
+        let frames_str = result
+            .streams
             .first()
             .and_then(|s| s.nb_read_packets.clone())
             .ok_or_else(|| anyhow!("No packet count found in probe result"))?;
 
-        let frames: i64 = frames_str.parse()
+        let frames: i64 = frames_str
+            .parse()
             .map_err(|e| anyhow!("Failed to parse frame count: {}", e))?;
 
         log::debug!("Total frames: {}", frames);
