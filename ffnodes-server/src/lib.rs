@@ -35,12 +35,7 @@ pub async fn run() -> Result<()> {
     let indicatif_layer = IndicatifLayer::new();
 
     // Set up multi-layer logging
-    let console_filter = if DEBUG {
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"))
-    } else {
-        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"))
-    };
-
+    let console_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
     let file_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
 
     tracing_subscriber::registry()
