@@ -128,23 +128,32 @@ pub async fn upload_output(
 
     debug!("✓ Job status verified: in_progress");
 
-    let output_path_str = format!("{}.h264.{}", job.media_file_path, config.output_container);
-    debug!("Calculated output path: {}", output_path_str);
-    let output_path = Path::new(&output_path_str);
+    // Calculate output path by replacing extension with output_container
+    let original_path = Path::new(&job.media_file_path);
+    let output_path = if let Some(parent) = original_path.parent() {
+        let stem = original_path.file_stem()
+            .and_then(|s| s.to_str())
+            .ok_or_else(|| Error::internal_server_error("Invalid filename"))?;
+        parent.join(format!("{}.{}", stem, config.output_container))
+    } else {
+        // No parent directory, just use filename
+        let stem = original_path.file_stem()
+            .and_then(|s| s.to_str())
+            .ok_or_else(|| Error::internal_server_error("Invalid filename"))?;
+        Path::new(&format!("{}.{}", stem, config.output_container)).to_path_buf()
+    };
+
+    debug!("Original file path: {}", original_path.display());
+    debug!("Calculated output path: {}", output_path.display());
 
     // Validate path security - ensure no path traversal
-    // Output file is in same directory as input file, which was already validated
     debug!("Validating path security...");
-    let validated_path = path_security::validate_path_security_non_existent(output_path).map_err(|e| {
+    let validated_path = path_security::validate_path_security_non_existent(&output_path).map_err(|e| {
         warn!("Path validation failed: {:#}", e);
         Error::forbidden("Invalid output path")
     })?;
 
     debug!("✓ Path security validated: {:?}", validated_path);
-
-    // Note: Output directory validation is not needed because output is always
-    // in the same directory as the input file, which was already validated
-    // when the job was created
 
     // Process multipart stream
     debug!("Processing multipart upload stream...");
@@ -178,7 +187,7 @@ pub async fn upload_output(
 
     debug!("✓ Multipart upload processed - total size: {} bytes", file_data.len());
 
-    // Write file
+    // Write file to output path
     let mut file = File::create(&validated_path).map_err(|e| {
         warn!("Error creating output file: {:#}", e);
         Error::internal_server_error("Error creating output file")
@@ -195,9 +204,26 @@ pub async fn upload_output(
         validated_path.display()
     );
 
+    // Delete the original file if it's different from the output path
+    if original_path != validated_path && original_path.exists() {
+        debug!("Deleting original file: {}", original_path.display());
+        std::fs::remove_file(original_path).map_err(|e| {
+            warn!("Error deleting original file: {:#}", e);
+            // Don't fail the upload if deletion fails, just warn
+            // The encoded file has already been written successfully
+            warn!("Failed to delete original file, but upload was successful");
+        }).ok(); // Ignore deletion errors
+        debug!("✓ Original file deleted");
+    } else if original_path == validated_path {
+        debug!("Output path is same as original, skipping deletion (overwrite)");
+    } else {
+        debug!("Original file doesn't exist, skipping deletion");
+    }
+
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "message": "File uploaded successfully",
         "size": file_data.len(),
-        "path": validated_path.display().to_string()
+        "path": validated_path.display().to_string(),
+        "original_deleted": original_path != validated_path && !original_path.exists()
     })))
 }
