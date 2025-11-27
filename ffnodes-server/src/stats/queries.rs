@@ -5,7 +5,7 @@ use sqlx::SqlitePool;
 /// Get client history with completed jobs
 pub async fn get_client_history(pool: &SqlitePool, client_id: &str) -> Result<ClientHistoryResponse> {
     // Query all completed jobs for this client with necessary data
-    let jobs: Vec<(String, i64, Option<i64>, i64, i64, i64, String, f64)> = sqlx::query_as(
+    let jobs: Vec<(String, i64, Option<i64>, i64, i64, i64, Option<String>, Option<f64>)> = sqlx::query_as(
         r#"
         SELECT
             ej.media_file_path,
@@ -37,7 +37,7 @@ pub async fn get_client_history(pool: &SqlitePool, client_id: &str) -> Result<Cl
     let mut total_size_after = 0i64;
     let mut speed_count = 0;
 
-    for (path, scanned_size, output_size, started_at, completed_at, _frames, speed_str, _fps) in jobs {
+    for (path, scanned_size, output_size, started_at, completed_at, _frames, speed_opt, _fps) in jobs {
         let duration = completed_at - started_at;
         let size_after = output_size.unwrap_or(scanned_size);
         let size_saved = scanned_size - size_after;
@@ -47,10 +47,10 @@ pub async fn get_client_history(pool: &SqlitePool, client_id: &str) -> Result<Cl
             0.0
         };
 
-        // Parse speed (format: "2.5x")
-        let average_speed = speed_str
-            .trim_end_matches('x')
-            .parse::<f64>()
+        // Parse speed (format: "2.5x") - handle NULL from LEFT JOIN
+        let average_speed = speed_opt
+            .as_ref()
+            .and_then(|s| s.trim_end_matches('x').parse::<f64>().ok())
             .unwrap_or(0.0);
 
         // Extract filename from path
@@ -116,7 +116,7 @@ pub async fn get_client_history(pool: &SqlitePool, client_id: &str) -> Result<Cl
 /// Get remote user progress for all active jobs
 pub async fn get_remote_progress(pool: &SqlitePool, exclude_client_id: Option<&str>) -> Result<RemoteProgressResponse> {
     // Query all in-progress jobs with their progress and client info
-    let jobs: Vec<(String, String, i64, i64, String, f64)> = sqlx::query_as(
+    let jobs: Vec<(String, String, Option<i64>, i64, Option<String>, Option<f64>)> = sqlx::query_as(
         r#"
         SELECT
             c.display_name,
@@ -141,16 +141,17 @@ pub async fn get_remote_progress(pool: &SqlitePool, exclude_client_id: Option<&s
 
     let active_jobs: Vec<RemoteJobProgress> = jobs
         .into_iter()
-        .map(|(client_name, path, frame, total_frames, speed_str, _fps)| {
+        .map(|(client_name, path, frame_opt, total_frames, speed_opt, _fps)| {
             let filename = path.split(['/', '\\']).last().unwrap_or(&path).to_string();
+            let frame = frame_opt.unwrap_or(0);
             let percentage = if total_frames > 0 {
                 (frame as f64 / total_frames as f64) * 100.0
             } else {
                 0.0
             };
-            let speed = speed_str
-                .trim_end_matches('x')
-                .parse::<f64>()
+            let speed = speed_opt
+                .as_ref()
+                .and_then(|s| s.trim_end_matches('x').parse::<f64>().ok())
                 .unwrap_or(0.0);
 
             RemoteJobProgress {
@@ -234,7 +235,7 @@ pub async fn get_leaderboard(
         }
         LeaderboardCategory::HighestSpeed => {
             // Average encoding speed per client
-            let results: Vec<(String, String)> = sqlx::query_as(
+            let results: Vec<(String, f64)> = sqlx::query_as(
                 r#"
                 SELECT c.display_name, AVG(
                     CAST(REPLACE(ep.speed, 'x', '') AS REAL)
@@ -256,13 +257,11 @@ pub async fn get_leaderboard(
             results
                 .into_iter()
                 .enumerate()
-                .filter_map(|(idx, (name, speed_str))| {
-                    speed_str.parse::<f64>().ok().map(|speed| LeaderboardEntry {
-                        rank: (idx + 1) as i64,
-                        client_name: name,
-                        value: speed,
-                        formatted_value: format!("{:.2}x", speed),
-                    })
+                .map(|(idx, (name, speed))| LeaderboardEntry {
+                    rank: (idx + 1) as i64,
+                    client_name: name,
+                    value: speed,
+                    formatted_value: format!("{:.2}x", speed),
                 })
                 .collect()
         }
