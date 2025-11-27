@@ -194,6 +194,7 @@ impl Encoder {
         // Build and execute FFmpeg command using the builder
         // Note: args already contain input (-i), progress, and output from template substitution
         let mut builder = self.ffmpeg.ffmpeg_command_builder();
+        builder = builder.overwrite(true);
 
         // Add all parsed args as raw arguments (includes input, progress, and output)
         builder = builder.raw_args(args);
@@ -210,7 +211,9 @@ impl Encoder {
 
         // Process progress updates with stateful accumulation
         let mut progress_state = ProgressState::default();
+        log::debug!("Starting progress monitoring loop");
         while let Some(line) = rx.recv().await {
+            log::trace!("Encoder received line: {}", line.trim());
             if let Some(progress) =
                 self.parse_progress_update(&line, &mut progress_state, total_frames)
             {
@@ -224,6 +227,7 @@ impl Encoder {
                 progress_callback(progress);
             }
         }
+        log::debug!("Progress monitoring loop ended");
 
         // Wait for encoding to complete
         handle
@@ -334,24 +338,39 @@ impl Encoder {
 
         // Parse key=value format
         if let Some((key, value)) = line.split_once('=') {
+            let value = value.trim();
             match key {
                 "frame" => {
-                    state.frame = value.parse().unwrap_or(0);
+                    // Frame value can be in two formats:
+                    // 1. Structured: "frame=12345" (just the number)
+                    // 2. Visual status line: "frame= 2957 fps=410 q=-0.0 size=..." (number + extra text)
+                    // Extract just the number part
+                    let frame_str = value.split_whitespace().next().unwrap_or("0");
+                    let parsed = frame_str.parse().unwrap_or(0);
+                    log::trace!("Parsed frame: {} (from '{}')", parsed, value);
+                    state.frame = parsed;
                 }
                 "fps" => {
-                    state.fps = value.parse().unwrap_or(0.0);
+                    let parsed = value.parse().unwrap_or(0.0);
+                    log::trace!("Parsed fps: {} (from '{}')", parsed, value);
+                    state.fps = parsed;
                 }
                 "bitrate" => {
                     // Handle format: "1234.5kbits/s"
                     let bitrate_str = value.replace("kbits/s", "").trim().to_string();
-                    state.bitrate = bitrate_str.parse().unwrap_or(0.0) * 1000.0; // Convert to bits/s
+                    let parsed = bitrate_str.parse().unwrap_or(0.0) * 1000.0;
+                    log::trace!("Parsed bitrate: {} (from '{}')", parsed, value);
+                    state.bitrate = parsed;
                 }
                 "speed" => {
                     // Handle format: "1.2x"
                     let speed_str = value.replace("x", "").trim().to_string();
-                    state.speed = speed_str.parse().unwrap_or(0.0);
+                    let parsed = speed_str.parse().unwrap_or(0.0);
+                    log::trace!("Parsed speed: {} (from '{}')", parsed, value);
+                    state.speed = parsed;
                 }
                 "progress" => {
+                    log::trace!("Progress marker: '{}', state.frame={}", value, state.frame);
                     // When we see "progress=continue" or "progress=end", emit current state
                     if (value == "continue" || value == "end") && state.frame > 0 {
                         let percentage = if total_frames > 0 {
@@ -359,6 +378,14 @@ impl Encoder {
                         } else {
                             0.0
                         };
+
+                        log::debug!(
+                            "Emitting progress: frame={}, fps={:.1}, speed={:.2}x, {:.1}%",
+                            state.frame,
+                            state.fps,
+                            state.speed,
+                            percentage
+                        );
 
                         return Some(EncodingProgress {
                             frame: state.frame,
