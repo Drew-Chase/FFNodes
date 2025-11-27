@@ -325,43 +325,105 @@ impl FFMpeg {
 
 		let sender_clone = sender.clone();
 		let stdout_reader = async move {
-			use tokio::io::AsyncBufReadExt;
+			use tokio::io::AsyncReadExt;
 			let mut reader = BufReader::new(stdout);
-			let mut buffer = String::new();
 
-			// Stream output line by line for real-time progress (FFmpeg encoding)
-			loop {
-				buffer.clear();
-				match reader.read_line(&mut buffer).await {
-					Ok(0) => break, // EOF
-					Ok(_) => {
-						if !buffer.is_empty() {
-							trace!("{} stdout: {}", if ffmpeg { "ffmpeg" } else { "ffprobe" }, buffer.trim());
-							let _ = sender_clone.send(buffer.clone()).await;
+			if ffmpeg {
+				// For FFmpeg: Stream output in chunks for real-time progress
+				let mut chunk = vec![0u8; 8192]; // 8KB chunks
+				let mut line_buffer = String::new();
+
+				loop {
+					match reader.read(&mut chunk).await {
+						Ok(0) => {
+							// EOF - send any remaining incomplete line
+							if !line_buffer.is_empty() {
+								trace!("ffmpeg stdout: {}", line_buffer.trim());
+								let _ = sender_clone.send(line_buffer.clone()).await;
+							}
+							break;
 						}
+						Ok(n) => {
+							// Convert chunk to string and append to line buffer
+							let data = String::from_utf8_lossy(&chunk[..n]);
+							line_buffer.push_str(&data);
+
+							// Process all complete lines in the buffer
+							while let Some(newline_pos) = line_buffer.find('\n') {
+								let line = line_buffer[..=newline_pos].to_string();
+								line_buffer.drain(..=newline_pos);
+
+								if !line.trim().is_empty() {
+									trace!("ffmpeg stdout: {}", line.trim());
+									let _ = sender_clone.send(line).await;
+								}
+							}
+						}
+						Err(_) => break,
 					}
-					Err(_) => break,
+				}
+			} else {
+				// For FFprobe: Read entire output at once
+				let mut buffer = Vec::new();
+
+				// Read entire output into buffer
+				if reader.read_to_end(&mut buffer).await.is_ok() && !buffer.is_empty() {
+					let output = String::from_utf8_lossy(&buffer);
+					trace!("ffprobe stdout: {}", output);
+					// Send the entire output as one message
+					let _ = sender_clone.send(output.to_string()).await;
 				}
 			}
 		};
 
 		let stderr_reader = async move {
-			use tokio::io::AsyncBufReadExt;
+			use tokio::io::AsyncReadExt;
 			let mut reader = BufReader::new(stderr);
-			let mut buffer = String::new();
 
-			// Stream output line by line for real-time progress (FFmpeg encoding)
-			loop {
-				buffer.clear();
-				match reader.read_line(&mut buffer).await {
-					Ok(0) => break, // EOF
-					Ok(_) => {
-						if !buffer.is_empty() {
-							trace!("{} stderr: {}", if ffmpeg { "ffmpeg" } else { "ffprobe" }, buffer.trim());
-							let _ = sender.send(buffer.clone()).await;
+			if ffmpeg {
+				// For FFmpeg: Stream output in chunks for real-time progress
+				let mut chunk = vec![0u8; 8192]; // 8KB chunks
+				let mut line_buffer = String::new();
+
+				loop {
+					match reader.read(&mut chunk).await {
+						Ok(0) => {
+							// EOF - send any remaining incomplete line
+							if !line_buffer.is_empty() {
+								trace!("ffmpeg stderr: {}", line_buffer.trim());
+								let _ = sender.send(line_buffer.clone()).await;
+							}
+							break;
 						}
+						Ok(n) => {
+							// Convert chunk to string and append to line buffer
+							let data = String::from_utf8_lossy(&chunk[..n]);
+							line_buffer.push_str(&data);
+
+							// Process all complete lines in the buffer
+							while let Some(newline_pos) = line_buffer.find('\n') {
+								let line = line_buffer[..=newline_pos].to_string();
+								line_buffer.drain(..=newline_pos);
+
+								if !line.trim().is_empty() {
+									trace!("ffmpeg stderr: {}", line.trim());
+									let _ = sender.send(line).await;
+								}
+							}
+						}
+						Err(_) => break,
 					}
-					Err(_) => break,
+				}
+			} else {
+				// For FFprobe: Read entire output at once
+				let mut buffer = Vec::new();
+
+				// Read entire output into buffer
+				if reader.read_to_end(&mut buffer).await.is_ok() && !buffer.is_empty() {
+					let output = String::from_utf8_lossy(&buffer);
+					trace!("ffprobe stderr: {}", output);
+					// Send the entire output as one message
+					let _ = sender.send(output.to_string()).await;
 				}
 			}
 		};
