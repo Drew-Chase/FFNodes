@@ -25,10 +25,7 @@ pub fn init() -> Result<PathBuf> {
 
     // Create formatting layer for console
     let console_layer = fmt::layer().with_target(true).with_line_number(true);
-
-    // Set up env filter (defaults to INFO, can be overridden with RUST_LOG env var)
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info,ffnodes_client=debug"));
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
 
     // Initialize subscriber with both console and file output
     tracing_subscriber::registry()
