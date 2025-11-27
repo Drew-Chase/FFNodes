@@ -41,11 +41,8 @@ pub async fn test_connection(input: ConfigInput) -> Result<ClientConfig, String>
         .await
         .map_err(|e| format!("Handshake failed: {}", e))?;
 
-    // Generate client ID
-    let client_id = uuid::Uuid::new_v4().to_string();
-
     let mut config = ClientConfig::new(input.server_url, input.server_guid, input.display_name);
-    config.client_id = Some(client_id);
+    config.client_id = Some(response.client_id);
     config.auth_token = Some(response.auth_token);
     // Note: ffmpeg_template is NOT saved to config - server sends it with each job
 

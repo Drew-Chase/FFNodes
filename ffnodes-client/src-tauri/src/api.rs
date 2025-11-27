@@ -14,6 +14,7 @@ pub struct HandshakeRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HandshakeResponse {
+    pub client_id: String,
     pub auth_token: String,
     pub ffmpeg_template: String,
 }

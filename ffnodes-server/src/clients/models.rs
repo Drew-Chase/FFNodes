@@ -41,6 +41,7 @@ impl Client {
 /// Authentication response
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AuthResponse {
+    pub client_id: String,
     pub auth_token: String,
     pub ffmpeg_template: String,
 }

@@ -42,6 +42,7 @@ pub async fn handshake(
         })?;
 
     let response = AuthResponse {
+        client_id: client.id.clone(),
         auth_token: token,
         ffmpeg_template: config.ffmpeg_template.clone(),
     };
