@@ -57,9 +57,10 @@ pub async fn request_job(
 
             let response = JobResponse {
                 input_path: job.media_file_path.clone(),
-                output_template: format!("{}.h264.mp4", job.media_file_path),
+                output_template: format!("{}.h264.{}", job.media_file_path, config.output_container),
                 total_frames,
                 ffmpeg_template: config.ffmpeg_template.clone(),
+                output_container: config.output_container.clone(),
                 job,
             };
 
@@ -109,6 +110,7 @@ pub async fn complete_job(
     job_id: web::Path<String>,
     completion: web::Json<JobCompletion>,
     job_queue: web::Data<Arc<JobQueue>>,
+    config: web::Data<Arc<Configuration>>,
 ) -> Result<HttpResponse, Error> {
     debug!("Completing job: {}", job_id);
 
@@ -123,7 +125,7 @@ pub async fn complete_job(
         Error::not_found("Job not found")
     })?;
 
-    let output_path = format!("{}.h264.mp4", job.media_file_path);
+    let output_path = format!("{}.h264.{}", job.media_file_path, config.output_container);
 
     job_queue
         .complete_job(

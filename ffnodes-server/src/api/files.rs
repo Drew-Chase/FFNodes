@@ -123,7 +123,7 @@ pub async fn upload_output(
         return Err(Error::bad_request("Job is not in progress"));
     }
 
-    let output_path_str = format!("{}.h264.mp4", job.media_file_path);
+    let output_path_str = format!("{}.h264.{}", job.media_file_path, config.output_container);
     let output_path = Path::new(&output_path_str);
 
     // Validate path security - ensure no path traversal
