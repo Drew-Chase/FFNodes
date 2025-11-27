@@ -133,8 +133,9 @@ pub async fn upload_output(
     let output_path = Path::new(&output_path_str);
 
     // Validate path security - ensure no path traversal
+    // Use non-existent version since the output file doesn't exist yet
     debug!("Validating path security...");
-    let validated_path = path_security::validate_path_security(output_path).map_err(|e| {
+    let validated_path = path_security::validate_path_security_non_existent(output_path).map_err(|e| {
         warn!("Path validation failed: {:#}", e);
         Error::forbidden("Invalid output path")
     })?;
@@ -146,13 +147,25 @@ pub async fn upload_output(
     if let Some(parent) = validated_path.parent() {
         debug!("Parent directory: {:?}", parent);
         debug!("Watch directories: {:?}", config.watch_directories);
-        path_security::validate_path_within_base(parent, &config.watch_directories).map_err(
+
+        // Use non-existent version in case parent directory doesn't exist yet
+        path_security::validate_path_within_base_non_existent(parent, &config.watch_directories).map_err(
             |e| {
                 warn!("Output directory validation failed: {:#}", e);
                 Error::forbidden("Output directory is not allowed")
             },
         )?;
         debug!("✓ Output directory validated");
+
+        // Create parent directory if it doesn't exist
+        if !parent.exists() {
+            debug!("Creating parent directory: {:?}", parent);
+            std::fs::create_dir_all(parent).map_err(|e| {
+                warn!("Failed to create parent directory: {:#}", e);
+                Error::internal_server_error("Failed to create output directory")
+            })?;
+            debug!("✓ Parent directory created");
+        }
     }
 
     // Process multipart stream
