@@ -277,7 +277,7 @@ impl JobManager {
         }
 
         // Process the job with error handling
-        let result: Result<(i64, i64)> = async {
+        let result: Result<(i64, i64, f64)> = async {
             // Download input file
             log::info!("---------- Download Phase ----------");
             log::debug!("Creating temp directory...");
@@ -388,7 +388,7 @@ impl JobManager {
             let app_handle = self.app_handle.clone();
             let client_clone = client.clone();
 
-            let (output_size, output_bitrate) = self
+            let (output_size, output_bitrate, average_speed) = self
                 .encoder
                 .encode_video(
                     &input_path,
@@ -418,9 +418,10 @@ impl JobManager {
 
             log::info!("✓ Encoding completed successfully for job {}", job_id);
             log::debug!(
-                "Output file size: {} bytes, bitrate: {} bps",
+                "Output file size: {} bytes, bitrate: {} bps, average speed: {:.2}x",
                 output_size,
-                output_bitrate
+                output_bitrate,
+                average_speed
             );
 
             // Upload output file
@@ -485,12 +486,12 @@ impl JobManager {
             }
 
             log::debug!("Returning success with metrics");
-            Ok((output_size, output_bitrate))
+            Ok((output_size, output_bitrate, average_speed))
         }
         .await;
 
         match result {
-            Ok((output_size, output_bitrate)) => {
+            Ok((output_size, output_bitrate, average_speed)) => {
                 log::info!("---------- Completion Phase ----------");
                 log::debug!("Job processing succeeded, marking as complete on server...");
 
@@ -498,6 +499,7 @@ impl JobManager {
                 let completion = JobCompletion {
                     output_size,
                     output_bitrate,
+                    average_speed,
                 };
                 log::debug!("Calling POST /api/jobs/{}/complete with metrics", job_id);
                 client.complete_job(&job_id, completion).await?;

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { motion } from 'framer-motion';
 import { BentoCard, BentoCardHeader, BentoCardContent } from '../layout/BentoGrid';
 import { useConfigStore } from '../../stores/useConfigStore';
@@ -51,10 +52,23 @@ export function HistoryBento() {
       }
     };
 
+    // Initial fetch
     fetchHistory();
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchHistory, 30000);
-    return () => clearInterval(interval);
+
+    // Listen for job completion and refresh immediately
+    const unlistenPromise = listen('job-completed', () => {
+      console.log('Job completed, refreshing history...');
+      fetchHistory();
+    });
+
+    // Fallback: Refresh every 60 seconds (in case events are missed)
+    const interval = setInterval(fetchHistory, 60000);
+
+    // Cleanup
+    return () => {
+      clearInterval(interval);
+      unlistenPromise.then(unlisten => unlisten());
+    };
   }, [config]);
 
   const formatBytes = (bytes: number) => {

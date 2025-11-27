@@ -176,6 +176,7 @@ impl JobQueue {
         output_path: String,
         output_size: i64,
         output_bitrate: i64,
+        average_speed: f64,
     ) -> Result<()> {
         let now = chrono::Utc::now().timestamp();
 
@@ -185,7 +186,7 @@ impl JobQueue {
         // Update encoding_jobs table
         let result = sqlx::query(
             r#"UPDATE encoding_jobs
-            SET status = ?, completed_at = ?, output_path = ?, output_size = ?, output_bitrate = ?
+            SET status = ?, completed_at = ?, output_path = ?, output_size = ?, output_bitrate = ?, average_speed = ?
             WHERE id = ?"#,
         )
         .bind(JobStatus::Completed.as_str())
@@ -193,6 +194,7 @@ impl JobQueue {
         .bind(&output_path)
         .bind(output_size)
         .bind(output_bitrate)
+        .bind(average_speed)
         .bind(job_id)
         .execute(&mut *tx)
         .await?;

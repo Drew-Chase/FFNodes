@@ -133,6 +133,7 @@ pub async fn complete_job(
             output_path,
             completion.output_size,
             completion.output_bitrate,
+            completion.average_speed,
         )
         .await
         .map_err(|e| {

@@ -52,6 +52,7 @@ pub struct EncodingJob {
     pub output_path: Option<String>,
     pub output_size: Option<i64>,
     pub output_bitrate: Option<i64>,
+    pub average_speed: Option<f64>,
     pub created_at: i64,
 }
 
@@ -71,6 +72,7 @@ impl EncodingJob {
             output_path: None,
             output_size: None,
             output_bitrate: None,
+            average_speed: None,
             created_at: now,
         }
     }
@@ -118,6 +120,7 @@ pub struct ProgressUpdate {
 pub struct JobCompletion {
     pub output_size: i64,
     pub output_bitrate: i64,
+    pub average_speed: f64,
 }
 
 /// Job failure payload

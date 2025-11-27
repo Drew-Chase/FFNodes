@@ -51,9 +51,11 @@ function calculateTransferETA(transferred?: number, total?: number, speed?: numb
 }
 
 function calculateEncodingETA(remainingFrames: number, fps: number, speed: number): string {
-  if (fps === 0 || speed === 0) return 'Calculating...';
+  if (fps === 0) return 'Calculating...';
 
-  const secondsRemaining = remainingFrames / (fps * speed);
+  // FFmpeg's fps value is the actual encoding speed (frames per second being processed)
+  // So we just divide remaining frames by fps to get seconds remaining
+  const secondsRemaining = remainingFrames / fps;
   const hours = Math.floor(secondsRemaining / 3600);
   const minutes = Math.floor((secondsRemaining % 3600) / 60);
   const seconds = Math.floor(secondsRemaining % 60);

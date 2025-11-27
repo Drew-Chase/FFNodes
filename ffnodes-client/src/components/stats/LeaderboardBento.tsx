@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { motion } from 'framer-motion';
 import { BentoCard, BentoCardHeader, BentoCardContent } from '../layout/BentoGrid';
 import { Button } from '../ui';
@@ -59,10 +60,23 @@ export function LeaderboardBento() {
       }
     };
 
+    // Initial fetch
     fetchLeaderboard();
-    // Refresh every 60 seconds
+
+    // Listen for job completion and refresh immediately
+    const unlistenPromise = listen('job-completed', () => {
+      console.log('Job completed, refreshing leaderboard...');
+      fetchLeaderboard();
+    });
+
+    // Fallback: Refresh every 60 seconds (in case events are missed)
     const interval = setInterval(fetchLeaderboard, 60000);
-    return () => clearInterval(interval);
+
+    // Cleanup
+    return () => {
+      clearInterval(interval);
+      unlistenPromise.then(unlisten => unlisten());
+    };
   }, [config, selectedCategory]);
 
   const currentCategory = categories.find((c) => c.id === selectedCategory);

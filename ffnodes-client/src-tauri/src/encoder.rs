@@ -145,7 +145,7 @@ impl Encoder {
         ffmpeg_template: &str,
         total_frames: Option<i64>,
         mut progress_callback: F,
-    ) -> Result<(i64, i64)>
+    ) -> Result<(i64, i64, f64)>
     where
         F: FnMut(EncodingProgress) + Send,
     {
@@ -215,6 +215,7 @@ impl Encoder {
 
         // Process progress updates with stateful accumulation
         let mut progress_state = ProgressState::default();
+        let mut speed_samples = Vec::new();
         log::debug!("Starting progress monitoring loop");
         while let Some(line) = rx.recv().await {
             log::trace!("Encoder received line: {}", line.trim());
@@ -228,6 +229,10 @@ impl Encoder {
                     progress.speed,
                     progress.percentage
                 );
+                // Track speed for average calculation
+                if progress.speed > 0.0 {
+                    speed_samples.push(progress.speed);
+                }
                 progress_callback(progress);
             }
         }
@@ -250,7 +255,15 @@ impl Encoder {
         let output_bitrate = ((output_size * 8) as f64 / duration) as i64;
         log::debug!("Output bitrate: {} bps", output_bitrate);
 
-        Ok((output_size, output_bitrate))
+        // Calculate average speed
+        let average_speed = if !speed_samples.is_empty() {
+            speed_samples.iter().sum::<f64>() / speed_samples.len() as f64
+        } else {
+            0.0
+        };
+        log::debug!("Average encoding speed: {:.2}x (from {} samples)", average_speed, speed_samples.len());
+
+        Ok((output_size, output_bitrate, average_speed))
     }
 
     /// Build FFmpeg arguments from template

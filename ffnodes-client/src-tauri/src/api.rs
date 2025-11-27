@@ -52,6 +52,7 @@ pub struct ProgressUpdate {
 pub struct JobCompletion {
     pub output_size: i64,
     pub output_bitrate: i64,
+    pub average_speed: f64,
 }
 
 #[derive(Debug, Clone, Serialize)]
