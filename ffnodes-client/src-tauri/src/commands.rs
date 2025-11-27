@@ -27,13 +27,14 @@ pub async fn save_config(config: ClientConfig) -> Result<(), String> {
 pub async fn test_connection(input: ConfigInput) -> Result<ClientConfig, String> {
     let client = ServerClient::new(input.server_url.clone());
 
+    // Create config first to generate machine_id
+    let mut config = ClientConfig::new(input.server_url, input.server_guid, input.display_name);
+
     let request = HandshakeRequest {
-        server_guid: input.server_guid.clone(),
-        display_name: input.display_name.clone(),
-        computer_name: hostname::get()
-            .ok()
-            .and_then(|h| h.into_string().ok())
-            .unwrap_or_else(|| "Unknown".to_string()),
+        server_guid: config.server_guid.clone(),
+        display_name: config.display_name.clone(),
+        computer_name: config.computer_name.clone(),
+        machine_id: config.machine_id.clone(),
     };
 
     let response = client
@@ -41,7 +42,6 @@ pub async fn test_connection(input: ConfigInput) -> Result<ClientConfig, String>
         .await
         .map_err(|e| format!("Handshake failed: {}", e))?;
 
-    let mut config = ClientConfig::new(input.server_url, input.server_guid, input.display_name);
     config.client_id = Some(response.client_id);
     config.auth_token = Some(response.auth_token);
     // Note: ffmpeg_template is NOT saved to config - server sends it with each job

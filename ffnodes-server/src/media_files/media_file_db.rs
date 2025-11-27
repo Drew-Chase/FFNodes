@@ -60,10 +60,27 @@ pub async fn initialize() -> Result<()> {
     id             TEXT    PRIMARY KEY NOT NULL,
     display_name   TEXT    NOT NULL,
     computer_name  TEXT    NOT NULL,
+    machine_id     TEXT             DEFAULT NULL,
     connected_at   INTEGER NOT NULL,
     last_heartbeat INTEGER NOT NULL,
     disconnected_at INTEGER         DEFAULT NULL
 )"#,
+    )
+    .await?;
+
+    // Migration: Add machine_id column if it doesn't exist (for existing databases)
+    let _ = pool
+        .execute("ALTER TABLE clients ADD COLUMN machine_id TEXT DEFAULT NULL")
+        .await;
+    // Ignore error if column already exists
+
+    // Create indexes for client lookups
+    pool.execute("CREATE INDEX IF NOT EXISTS idx_clients_computer_name ON clients(computer_name)")
+        .await?;
+
+    // Unique index on machine_id (when not NULL)
+    pool.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_machine_id ON clients(machine_id) WHERE machine_id IS NOT NULL"
     )
     .await?;
 

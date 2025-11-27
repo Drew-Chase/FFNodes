@@ -7,6 +7,7 @@ pub struct ClientRegistration {
     pub server_guid: String,
     pub display_name: String,
     pub computer_name: String,
+    pub machine_id: String,
 }
 
 /// Client information stored in database
@@ -15,18 +16,20 @@ pub struct Client {
     pub id: String,
     pub display_name: String,
     pub computer_name: String,
+    pub machine_id: Option<String>,
     pub connected_at: i64,
     pub last_heartbeat: i64,
     pub disconnected_at: Option<i64>,
 }
 
 impl Client {
-    pub fn new(id: String, display_name: String, computer_name: String) -> Self {
+    pub fn new(id: String, display_name: String, computer_name: String, machine_id: Option<String>) -> Self {
         let now = chrono::Utc::now().timestamp();
         Self {
             id,
             display_name,
             computer_name,
+            machine_id,
             connected_at: now,
             last_heartbeat: now,
             disconnected_at: None,

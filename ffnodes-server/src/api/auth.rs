@@ -25,6 +25,7 @@ pub async fn handshake(
         .register_client(
             registration.display_name.clone(),
             registration.computer_name.clone(),
+            Some(registration.machine_id.clone()),
         )
         .await
         .map_err(|e| {

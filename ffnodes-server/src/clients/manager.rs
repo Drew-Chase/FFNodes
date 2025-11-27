@@ -20,32 +20,145 @@ impl ClientManager {
         }
     }
 
-    /// Register a new client
+    /// Find existing client by machine_id or computer_name
+    /// Returns the existing client if found, None otherwise
+    async fn find_existing_client(
+        &self,
+        computer_name: &str,
+        machine_id: Option<&str>,
+    ) -> Result<Option<Client>> {
+        // Strategy 1: Try to find by machine_id first (most reliable)
+        if let Some(mid) = machine_id {
+            let client: Option<Client> = sqlx::query_as(
+                "SELECT * FROM clients WHERE machine_id = ? ORDER BY last_heartbeat DESC LIMIT 1"
+            )
+            .bind(mid)
+            .fetch_optional(&self.pool)
+            .await?;
+
+            if client.is_some() {
+                tracing::debug!("Found existing client by machine_id");
+                return Ok(client);
+            }
+        }
+
+        // Strategy 2: Fallback to computer_name for old clients without machine_id
+        let client: Option<Client> = sqlx::query_as(
+            "SELECT * FROM clients WHERE computer_name = ? ORDER BY last_heartbeat DESC LIMIT 1"
+        )
+        .bind(computer_name)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        if client.is_some() {
+            tracing::debug!("Found existing client by computer_name");
+        }
+
+        Ok(client)
+    }
+
+    /// Register a new client or reconnect existing one
+    /// Implements find-or-create pattern with hardware-based machine identification
     pub async fn register_client(
         &self,
         display_name: String,
         computer_name: String,
+        machine_id: Option<String>,
     ) -> Result<Client> {
-        let client = Client::new(Uuid::new_v4().to_string(), display_name, computer_name);
+        // Try to find existing client
+        let existing = self
+            .find_existing_client(&computer_name, machine_id.as_deref())
+            .await?;
 
-        sqlx::query(
-            r#"INSERT INTO clients
-            (id, display_name, computer_name, connected_at, last_heartbeat)
-            VALUES (?, ?, ?, ?, ?)"#,
-        )
-        .bind(&client.id)
-        .bind(&client.display_name)
-        .bind(&client.computer_name)
-        .bind(client.connected_at)
-        .bind(client.last_heartbeat)
-        .execute(&self.pool)
-        .await?;
+        if let Some(mut client) = existing {
+            // RECONNECTION PATH - Update existing client
+            let now = chrono::Utc::now().timestamp();
 
-        // Add to in-memory registry
-        let mut clients = self.clients.write().await;
-        clients.push(client.clone());
+            // Build UPDATE query for changed fields
+            let mut updates = vec!["last_heartbeat = ?", "disconnected_at = NULL"];
+            let display_name_changed = client.display_name != display_name;
+            let computer_name_changed = client.computer_name != computer_name;
+            let machine_id_added = client.machine_id.is_none() && machine_id.is_some();
 
-        Ok(client)
+            if display_name_changed {
+                updates.push("display_name = ?");
+            }
+            if computer_name_changed {
+                updates.push("computer_name = ?");
+            }
+            if machine_id_added {
+                updates.push("machine_id = ?");
+            }
+
+            let query = format!(
+                "UPDATE clients SET {} WHERE id = ?",
+                updates.join(", ")
+            );
+
+            // Build query with dynamic parameters
+            let mut q = sqlx::query(&query).bind(now);
+            if display_name_changed {
+                q = q.bind(&display_name);
+            }
+            if computer_name_changed {
+                q = q.bind(&computer_name);
+            }
+            if machine_id_added {
+                q = q.bind(&machine_id);
+            }
+            q = q.bind(&client.id);
+
+            q.execute(&self.pool).await?;
+
+            // Update struct for return
+            client.display_name = display_name;
+            client.computer_name = computer_name;
+            if machine_id_added {
+                client.machine_id = machine_id;
+            }
+            client.last_heartbeat = now;
+            client.disconnected_at = None;
+
+            // Update in-memory registry
+            let mut clients = self.clients.write().await;
+            if let Some(c) = clients.iter_mut().find(|c| c.id == client.id) {
+                *c = client.clone();
+            } else {
+                clients.push(client.clone());
+            }
+
+            tracing::info!("Client reconnected: {} ({})", client.display_name, client.id);
+            Ok(client)
+        } else {
+            // NEW CLIENT PATH - Create new record
+            let client = Client::new(
+                Uuid::new_v4().to_string(),
+                display_name,
+                computer_name,
+                machine_id,
+            );
+
+            sqlx::query(
+                r#"INSERT INTO clients
+                (id, display_name, computer_name, machine_id, connected_at, last_heartbeat)
+                VALUES (?, ?, ?, ?, ?, ?)"#,
+            )
+            .bind(&client.id)
+            .bind(&client.display_name)
+            .bind(&client.computer_name)
+            .bind(&client.machine_id)
+            .bind(client.connected_at)
+            .bind(client.last_heartbeat)
+            .execute(&self.pool)
+            .await?;
+
+            // Add to in-memory registry
+            let mut clients = self.clients.write().await;
+            clients.push(client.clone());
+
+            tracing::info!("New client registered: {} ({})", client.display_name, client.id);
+            Ok(client)
+        }
     }
 
     /// Update client heartbeat

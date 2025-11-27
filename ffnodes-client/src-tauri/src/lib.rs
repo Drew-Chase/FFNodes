@@ -5,6 +5,7 @@ mod encoder;
 mod gpu;
 mod job_manager;
 mod logger;
+mod machine_id;
 mod oauth;
 
 use commands::*;

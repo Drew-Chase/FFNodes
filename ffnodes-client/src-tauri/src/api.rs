@@ -10,6 +10,7 @@ pub struct HandshakeRequest {
     pub server_guid: String,
     pub display_name: String,
     pub computer_name: String,
+    pub machine_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
