@@ -53,7 +53,60 @@ impl JobQueue {
         Ok(job)
     }
 
-    /// Assign job to a client
+    /// Atomically get and assign next pending job to a client
+    /// This prevents TOCTOU race conditions by combining get + assign in a single atomic operation
+    pub async fn claim_next_job(&self, client_id: &str) -> Result<Option<EncodingJob>> {
+        let now = chrono::Utc::now().timestamp();
+
+        // Use a transaction to ensure atomicity
+        let mut tx = self.pool.begin().await?;
+
+        // Get the next pending job
+        let job: Option<EncodingJob> = sqlx::query_as(
+            r#"SELECT * FROM encoding_jobs
+            WHERE status = 'pending'
+            ORDER BY priority DESC, created_at ASC
+            LIMIT 1"#,
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        if let Some(job) = job {
+            // Immediately assign it in the same transaction
+            let result = sqlx::query(
+                r#"UPDATE encoding_jobs
+                SET status = ?, assigned_client = ?, assigned_at = ?
+                WHERE id = ? AND status = 'pending'"#,
+            )
+            .bind(JobStatus::Assigned.as_str())
+            .bind(client_id)
+            .bind(now)
+            .bind(&job.id)
+            .execute(&mut *tx)
+            .await?;
+
+            if result.rows_affected() == 0 {
+                // Job was claimed by another process between SELECT and UPDATE
+                tx.rollback().await?;
+                return Ok(None);
+            }
+
+            tx.commit().await?;
+
+            // Return the updated job
+            Ok(Some(EncodingJob {
+                status: JobStatus::Assigned.as_str().to_string(),
+                assigned_client: Some(client_id.to_string()),
+                assigned_at: Some(now),
+                ..job
+            }))
+        } else {
+            tx.rollback().await?;
+            Ok(None)
+        }
+    }
+
+    /// Assign job to a client (legacy method, prefer claim_next_job for atomic operations)
     pub async fn assign_job(&self, job_id: &str, client_id: &str) -> Result<()> {
         let now = chrono::Utc::now().timestamp();
 
@@ -115,7 +168,8 @@ impl JobQueue {
         Ok(())
     }
 
-    /// Complete a job
+    /// Complete a job with transaction isolation
+    /// Both encoding_jobs and media_files updates are atomic
     pub async fn complete_job(
         &self,
         job_id: &str,
@@ -125,19 +179,28 @@ impl JobQueue {
     ) -> Result<()> {
         let now = chrono::Utc::now().timestamp();
 
-        sqlx::query(
+        // Use a transaction to ensure both updates succeed or both fail
+        let mut tx = self.pool.begin().await?;
+
+        // Update encoding_jobs table
+        let result = sqlx::query(
             r#"UPDATE encoding_jobs
             SET status = ?, completed_at = ?, output_path = ?, output_size = ?, output_bitrate = ?
             WHERE id = ?"#,
         )
         .bind(JobStatus::Completed.as_str())
         .bind(now)
-        .bind(output_path)
+        .bind(&output_path)
         .bind(output_size)
         .bind(output_bitrate)
         .bind(job_id)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
+
+        if result.rows_affected() == 0 {
+            tx.rollback().await?;
+            return Err(anyhow!("Job not found"));
+        }
 
         // Update media_files table
         sqlx::query(
@@ -148,8 +211,11 @@ impl JobQueue {
         .bind(output_size)
         .bind(output_bitrate)
         .bind(job_id)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
+
+        // Commit both updates together
+        tx.commit().await?;
 
         Ok(())
     }
@@ -234,6 +300,25 @@ impl JobQueue {
         .await?;
 
         Ok(jobs)
+    }
+
+    /// Atomically requeue all stale jobs (assigned/in_progress but not updated within timeout)
+    /// Returns the number of jobs requeued
+    pub async fn requeue_stale_jobs(&self, timeout_seconds: i64) -> Result<u64> {
+        let cutoff = chrono::Utc::now().timestamp() - timeout_seconds;
+
+        // Atomically update all stale jobs in a single query
+        let result = sqlx::query(
+            r#"UPDATE encoding_jobs
+            SET status = 'pending', assigned_client = NULL, assigned_at = NULL, started_at = NULL, error_message = NULL
+            WHERE status IN ('assigned', 'in_progress')
+            AND assigned_at < ?"#,
+        )
+        .bind(cutoff)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(result.rows_affected())
     }
 
     /// Get stale jobs (assigned but not started within timeout)

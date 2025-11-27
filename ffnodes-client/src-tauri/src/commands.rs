@@ -75,7 +75,8 @@ pub async fn extract_frame(video_path: String) -> Result<String, String> {
 /// Get list of active jobs from server
 #[tauri::command]
 pub async fn get_active_jobs(config: ClientConfig) -> Result<Vec<crate::api::EncodingJob>, String> {
-    let client = ServerClient::new(config.server_url);
+    let auth_token = config.auth_token.ok_or("No auth token")?;
+    let client = ServerClient::with_auth(config.server_url, auth_token);
     client.get_active_jobs().await.map_err(|e| e.to_string())
 }
 

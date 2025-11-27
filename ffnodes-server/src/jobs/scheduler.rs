@@ -37,25 +37,15 @@ impl JobScheduler {
         })
     }
 
-    /// Check for stale jobs and requeue them
+    /// Check for stale jobs and requeue them atomically
     async fn check_stale_jobs(&self) -> Result<()> {
         debug!("Checking for stale jobs");
 
-        let stale_jobs = self.queue.get_stale_jobs(self.timeout_seconds).await?;
+        // Use atomic requeue operation to prevent race conditions
+        let requeued_count = self.queue.requeue_stale_jobs(self.timeout_seconds).await?;
 
-        if !stale_jobs.is_empty() {
-            info!("Found {} stale jobs, requeuing...", stale_jobs.len());
-
-            for job in stale_jobs {
-                info!("Requeuing stale job: {} (assigned to: {:?})",
-                    job.id, job.assigned_client);
-
-                if let Err(e) = self.queue.requeue_job(&job.id).await {
-                    warn!("Failed to requeue job {}: {:#}", job.id, e);
-                } else {
-                    debug!("Successfully requeued job: {}", job.id);
-                }
-            }
+        if requeued_count > 0 {
+            info!("Requeued {} stale jobs", requeued_count);
         }
 
         Ok(())

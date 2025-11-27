@@ -27,7 +27,7 @@ export function CurrentJob() {
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5 }}
     >
-      <Card variant="gradient" className="overflow-hidden">
+      <Card variant="glass" className="overflow-hidden">
         {/* File Name Header */}
         <div className="mb-6">
           <h2 className="text-xl font-bold mb-2">

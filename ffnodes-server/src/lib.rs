@@ -1,4 +1,4 @@
-use actix_web::{App, HttpResponse, HttpServer, middleware, web};
+use actix_web::{App, HttpResponse, HttpServer, web};
 use anyhow::Result;
 use serde_json::json;
 use std::env::set_current_dir;
@@ -15,6 +15,9 @@ mod http_error;
 mod jobs;
 mod media_files;
 mod templates;
+mod jwt;
+mod middleware;
+mod path_security;
 
 pub static DEBUG: bool = cfg!(debug_assertions);
 
@@ -38,7 +41,7 @@ pub async fn run() -> Result<()> {
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"))
     };
 
-    let file_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("debug"));
+    let file_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
 
     tracing_subscriber::registry()
         .with(
@@ -135,7 +138,7 @@ pub async fn run() -> Result<()> {
 
     let server = HttpServer::new(move || {
         App::new()
-            .wrap(middleware::Logger::default())
+            .wrap(actix_web::middleware::Logger::default())
             .app_data(config_data.clone())
             .app_data(job_queue_data.clone())
             .app_data(client_manager_data.clone())
@@ -153,47 +156,52 @@ pub async fn run() -> Result<()> {
             )
             .service(
                 web::scope("api")
-                    // Authentication
+                    // Authentication (no middleware required)
                     .route("/handshake", web::post().to(api::auth::handshake))
-                    // Job endpoints
-                    .route(
-                        "/jobs/request/{client_id}",
-                        web::post().to(api::jobs::request_job),
+                    // Protected endpoints (JWT required)
+                    .service(
+                        web::scope("")
+                            .wrap(actix_web::middleware::from_fn(middleware::jwt_auth::jwt_auth))
+                            // Job endpoints
+                            .route(
+                                "/jobs/request/{client_id}",
+                                web::post().to(api::jobs::request_job),
+                            )
+                            .route("/jobs/{job_id}/start", web::post().to(api::jobs::start_job))
+                            .route(
+                                "/jobs/{job_id}/progress",
+                                web::post().to(api::jobs::update_progress),
+                            )
+                            .route(
+                                "/jobs/{job_id}/complete",
+                                web::post().to(api::jobs::complete_job),
+                            )
+                            .route("/jobs/{job_id}/fail", web::post().to(api::jobs::fail_job))
+                            .route("/jobs/active", web::get().to(api::jobs::get_active_jobs))
+                            // File transfer
+                            .route(
+                                "/files/{job_id}/input",
+                                web::get().to(api::files::download_input),
+                            )
+                            .route(
+                                "/files/{job_id}/output",
+                                web::post().to(api::files::upload_output),
+                            )
+                            // Heartbeat
+                            .route(
+                                "/heartbeat/{client_id}",
+                                web::post().to(api::jobs::heartbeat),
+                            )
+                            // Monitoring
+                            .route("/status", web::get().to(api::monitoring::get_status))
+                            .route("/clients", web::get().to(api::monitoring::get_clients))
+                            .route(
+                                "/scan/progress",
+                                web::get().to(api::monitoring::scan_progress),
+                            )
+                            // WebSocket
+                            .route("/ws/progress", web::get().to(api::websocket::ws_progress))
                     )
-                    .route("/jobs/{job_id}/start", web::post().to(api::jobs::start_job))
-                    .route(
-                        "/jobs/{job_id}/progress",
-                        web::post().to(api::jobs::update_progress),
-                    )
-                    .route(
-                        "/jobs/{job_id}/complete",
-                        web::post().to(api::jobs::complete_job),
-                    )
-                    .route("/jobs/{job_id}/fail", web::post().to(api::jobs::fail_job))
-                    .route("/jobs/active", web::get().to(api::jobs::get_active_jobs))
-                    // File transfer
-                    .route(
-                        "/files/{job_id}/input",
-                        web::get().to(api::files::download_input),
-                    )
-                    .route(
-                        "/files/{job_id}/output",
-                        web::post().to(api::files::upload_output),
-                    )
-                    // Heartbeat
-                    .route(
-                        "/heartbeat/{client_id}",
-                        web::post().to(api::jobs::heartbeat),
-                    )
-                    // Monitoring
-                    .route("/status", web::get().to(api::monitoring::get_status))
-                    .route("/clients", web::get().to(api::monitoring::get_clients))
-                    .route(
-                        "/scan/progress",
-                        web::get().to(api::monitoring::scan_progress),
-                    )
-                    // WebSocket
-                    .route("/ws/progress", web::get().to(api::websocket::ws_progress)),
             )
     })
     .workers(4)

@@ -1,5 +1,7 @@
+use crate::configuration::Configuration;
 use crate::http_error::Error;
 use crate::jobs::JobQueue;
+use crate::path_security;
 use actix_multipart::Multipart;
 use actix_web::{web, HttpResponse};
 use futures_util::StreamExt;
@@ -16,6 +18,7 @@ use tokio::io::AsyncReadExt;
 pub async fn download_input(
     job_id: web::Path<String>,
     job_queue: web::Data<Arc<JobQueue>>,
+    config: web::Data<Arc<Configuration>>,
 ) -> Result<HttpResponse, Error> {
     debug!("Download request for job: {}", job_id);
 
@@ -37,19 +40,29 @@ pub async fn download_input(
 
     let input_path = Path::new(&job.media_file_path);
 
+    // Validate path security - ensure no path traversal
+    let validated_path = path_security::validate_path_within_base(
+        input_path,
+        &config.watch_directories,
+    )
+    .map_err(|e| {
+        warn!("Path validation failed: {:#}", e);
+        Error::forbidden("Access to this path is not allowed")
+    })?;
+
     // Check if file exists
-    if !input_path.exists() {
+    if !validated_path.exists() {
         return Err(Error::not_found("Input file not found"));
     }
 
     // Get file metadata
-    let metadata = tokio::fs::metadata(&input_path).await.map_err(|e| {
+    let metadata = tokio::fs::metadata(&validated_path).await.map_err(|e| {
         warn!("Error reading file metadata: {:#}", e);
         Error::internal_server_error("Error reading file metadata")
     })?;
 
     // Read file
-    let mut file = TokioFile::open(&input_path).await.map_err(|e| {
+    let mut file = TokioFile::open(&validated_path).await.map_err(|e| {
         warn!("Error opening file: {:#}", e);
         Error::internal_server_error("Error opening file")
     })?;
@@ -61,7 +74,7 @@ pub async fn download_input(
     })?;
 
     // Get filename for Content-Disposition
-    let filename = input_path
+    let filename = validated_path
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("video.mp4");
@@ -81,6 +94,7 @@ pub async fn upload_output(
     job_id: web::Path<String>,
     mut payload: Multipart,
     job_queue: web::Data<Arc<JobQueue>>,
+    config: web::Data<Arc<Configuration>>,
 ) -> Result<HttpResponse, Error> {
     debug!("Upload request for job: {}", job_id);
 
@@ -100,7 +114,24 @@ pub async fn upload_output(
         return Err(Error::bad_request("Job is not in progress"));
     }
 
-    let output_path = format!("{}.h264.mp4", job.media_file_path);
+    let output_path_str = format!("{}.h264.mp4", job.media_file_path);
+    let output_path = Path::new(&output_path_str);
+
+    // Validate path security - ensure no path traversal
+    let validated_path = path_security::validate_path_security(output_path).map_err(|e| {
+        warn!("Path validation failed: {:#}", e);
+        Error::forbidden("Invalid output path")
+    })?;
+
+    // Ensure output directory is within watch directories
+    if let Some(parent) = validated_path.parent() {
+        path_security::validate_path_within_base(parent, &config.watch_directories).map_err(
+            |e| {
+                warn!("Output directory validation failed: {:#}", e);
+                Error::forbidden("Output directory is not allowed")
+            },
+        )?;
+    }
 
     // Process multipart stream
     let mut file_data: Option<Vec<u8>> = None;
@@ -127,7 +158,7 @@ pub async fn upload_output(
     let file_data = file_data.ok_or_else(|| Error::bad_request("No file provided"))?;
 
     // Write file
-    let mut file = File::create(&output_path).map_err(|e| {
+    let mut file = File::create(&validated_path).map_err(|e| {
         warn!("Error creating output file: {:#}", e);
         Error::internal_server_error("Error creating output file")
     })?;
@@ -140,12 +171,12 @@ pub async fn upload_output(
     debug!(
         "Successfully uploaded {} bytes to {}",
         file_data.len(),
-        output_path
+        validated_path.display()
     );
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "message": "File uploaded successfully",
         "size": file_data.len(),
-        "path": output_path
+        "path": validated_path.display().to_string()
     })))
 }

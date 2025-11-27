@@ -126,7 +126,7 @@ impl Scanner {
                     });
 
                     trace!("Probing video file: {:?}", file);
-                    let result = match MediaFile::from_path_with_config(&file, &config, false).await {
+                    let result = match MediaFile::from_path_with_config(&file, &config).await {
                         Ok(media_file) => {
                             // Insert immediately after probing
                             match media_file.insert_direct(&pool).await {

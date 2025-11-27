@@ -9,7 +9,7 @@ import {EncodingJob, useJobStore} from "../stores/useJobStore";
 import {VideoBackground} from "../components/VideoBackground";
 import {CurrentJob} from "../components/CurrentJob";
 import {VideoList} from "../components/VideoList";
-import {Button} from "../components/ui";
+import {Button, Card} from "../components/ui";
 import {BentoGrid, BentoCard, BentoCardHeader, BentoCardContent} from "../components/layout/BentoGrid";
 import {Logger} from "../utils/logger";
 
@@ -21,6 +21,7 @@ export function Dashboard()
     const [isLoading, setIsLoading] = useState(true);
     const [gpuInfo, setGpuInfo] = useState<any>(null);
     const [isPaused, setIsPaused] = useState(false);
+    const [isProcessingStarted, setIsProcessingStarted] = useState(false);
 
     // Create logger for Dashboard
     const logger = new Logger("Dashboard");
@@ -38,8 +39,8 @@ export function Dashboard()
                 const savedConfig: ClientConfig = await invoke("load_config");
                 if (!savedConfig)
                 {
-                    logger.warn("No configuration found, redirecting to setup");
-                    navigate("/setup");
+                    logger.warn("No configuration found, redirecting to login");
+                    navigate("/login");
                     return;
                 }
                 logger.info("✓ Configuration loaded", {
@@ -66,29 +67,37 @@ export function Dashboard()
                 const state: any = await invoke("get_job_manager_state");
                 logger.info("Job manager state:", state);
 
-                if (!state.is_processing)
+                if (!state.is_processing && savedConfig.auto_start_processing !== false)
                 {
-                    // Start job processing only if not already running
-                    logger.info("Starting job processing...");
+                    // Start job processing only if not already running and auto-start enabled
+                    logger.info("Config allows auto-start, starting job processing...");
                     await invoke("start_job_processing", {config: savedConfig, gpu});
                     setProcessing(true);
-                    logger.info("✓ Job processing started successfully");
+                    setIsProcessingStarted(true);
+                    logger.info("✓ Job processing started automatically");
 
                     addToast({
                         title: "Success",
-                        description: "Connected to server! Job processing started.",
+                        description: "Connected to server! Job processing started automatically.",
                         color: "success"
                     });
-                } else
+                } else if (state.is_processing)
                 {
                     // Already running, just update state
                     logger.info("Job processing already active, skipping start");
                     setProcessing(true);
+                    setIsProcessingStarted(true);
                     addToast({
                         title: "Info",
                         description: "Job processing already active.",
                         color: "primary"
                     });
+                } else
+                {
+                    // Auto-start disabled
+                    logger.info("Auto-start disabled in config, staying paused");
+                    setProcessing(false);
+                    setIsProcessingStarted(false);
                 }
 
                 logger.info("========== Dashboard Initialization Complete ==========");
@@ -125,10 +134,13 @@ export function Dashboard()
             listen("job-started", (event: any) =>
             {
                 logger.info("📥 Received job-started event", event.payload);
-                setCurrentJob(event.payload);
+                setCurrentJob(event.payload.job);
+                if (event.payload.total_frames) {
+                    updateProgress({ totalFrames: event.payload.total_frames });
+                }
                 addToast({
                     title: "Info",
-                    description: `Started encoding: ${event.payload.file_name}`,
+                    description: `Started encoding: ${event.payload.job.media_file_path}`,
                     color: "primary"
                 });
             })
@@ -290,6 +302,55 @@ export function Dashboard()
                     </BentoCard>
                 </motion.header>
 
+                {/* Paused State Banner */}
+                {!isProcessingStarted && !isLoading && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="mb-6"
+                    >
+                        <Card variant="solid" className="p-6 border-2 border-warning/50">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-lg font-bold text-warning flex items-center gap-2">
+                                        <iconify-icon icon="mdi:pause-circle" class="text-2xl"/>
+                                        Processing Paused
+                                    </h3>
+                                    <p className="text-sm text-default-500 mt-1">
+                                        Click "Start Processing" to begin encoding jobs from the server
+                                    </p>
+                                </div>
+                                <Button
+                                    variant="primary"
+                                    size="lg"
+                                    onPress={async () => {
+                                        try {
+                                            await invoke("start_job_processing", {config, gpu: gpuInfo});
+                                            setProcessing(true);
+                                            setIsProcessingStarted(true);
+                                            addToast({
+                                                title: "Success",
+                                                description: "Job processing started!",
+                                                color: "success"
+                                            });
+                                        } catch (error) {
+                                            addToast({
+                                                title: "Error",
+                                                description: String(error),
+                                                color: "danger"
+                                            });
+                                        }
+                                    }}
+                                >
+                                    <iconify-icon icon="mdi:play" class="text-xl mr-2"/>
+                                    Start Processing
+                                </Button>
+                            </div>
+                        </Card>
+                    </motion.div>
+                )}
+
                 {/* Bento Grid Layout */}
                 <BentoGrid columns={6} gap="md">
                     {/* Current Job - Large card spanning 4 columns and 2 rows */}
@@ -374,10 +435,10 @@ export function Dashboard()
                         elevation={2}
                         background="solid"
                         hover
-                        onClick={() => navigate("/setup")}
+                        onClick={() => navigate("/settings")}
                     >
                         <BentoCardHeader
-                            title="Quick Setup"
+                            title="Quick Settings"
                             icon={<iconify-icon icon="mdi:settings-outline" class="text-2xl"/>}
                         />
                         <BentoCardContent>

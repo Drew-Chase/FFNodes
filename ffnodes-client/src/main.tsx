@@ -6,7 +6,6 @@ import {HeroUIProvider} from "@heroui/react";
 import {ToastProvider} from "@heroui/toast";
 
 import "./css/index.css";
-import {Setup} from "./pages/Setup.tsx";
 import {Dashboard} from "./pages/Dashboard.tsx";
 import {Settings} from "./pages/Settings.tsx";
 import {Login} from "./pages/Login.tsx";
@@ -37,7 +36,6 @@ function App() {
                     <Routes>
                         <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />} />
                         <Route path="/login" element={<ProtectedRoute requireAuth={false}><Login /></ProtectedRoute>} />
-                        <Route path="/setup" element={<ProtectedRoute><Setup /></ProtectedRoute>} />
                         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                     </Routes>

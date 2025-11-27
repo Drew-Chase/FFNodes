@@ -18,7 +18,7 @@ pub async fn initialize() -> Result<()> {
     size                 INTEGER          DEFAULT NULL,
     scanned_bit_rate     INTEGER NOT NULL,
     bit_rate             INTEGER          DEFAULT NULL,
-    duration             INTEGER NOT NULL,
+    duration             REAL    NOT NULL,
     width                INTEGER NOT NULL,
     height               INTEGER NOT NULL,
     frames               INTEGER NOT NULL,

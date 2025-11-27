@@ -10,6 +10,7 @@ pub struct ClientConfig {
     pub computer_name: String,
     pub client_id: Option<String>,
     pub auth_token: Option<String>,
+    pub auto_start_processing: Option<bool>,
 }
 
 impl ClientConfig {
@@ -26,6 +27,7 @@ impl ClientConfig {
             computer_name,
             client_id: None,
             auth_token: None,
+            auto_start_processing: Some(false),
         }
     }
 
@@ -45,7 +47,13 @@ impl ClientConfig {
         }
 
         let content = fs::read_to_string(path)?;
-        let config: ClientConfig = serde_json::from_str(&content)?;
+        let mut config: ClientConfig = serde_json::from_str(&content)?;
+
+        // Provide default for auto_start_processing if not present
+        if config.auto_start_processing.is_none() {
+            config.auto_start_processing = Some(false);
+        }
+
         Ok(Some(config))
     }
 

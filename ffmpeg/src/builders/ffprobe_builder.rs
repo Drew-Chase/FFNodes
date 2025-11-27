@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use encoding_rs::UTF_16LE;
+use log::error;
 
 /// FFprobe command builder with fluent API
 ///
@@ -217,6 +218,7 @@ impl FFprobeCommand {
         let (tx, mut rx) = tokio::sync::mpsc::channel(100);
 
         let args: Vec<&str> = self.args.iter().map(|s| s.as_str()).collect();
+        log::debug!("Executing ffprobe with args: {:?}", args);
         self.ffmpeg
             .exec_ffprobe(&args, working_dir, tx)
             .await
@@ -227,36 +229,44 @@ impl FFprobeCommand {
         while let Some(chunk) = rx.recv().await {
             raw_bytes.extend_from_slice(chunk.as_bytes());
         }
+        log::trace!("Received {} bytes of output", raw_bytes.len());
 
         // Detect and handle encoding
         let output = if raw_bytes.len() >= 2 && raw_bytes[0] == 0xFF && raw_bytes[1] == 0xFE {
             // UTF-16 LE with BOM
             let (decoded, _encoding, had_errors) = UTF_16LE.decode(&raw_bytes[2..]); // Skip BOM
             if had_errors {
-                eprintln!("Warning: UTF-16 LE decoding had errors");
+                error!("Warning: UTF-16 LE decoding had errors");
             }
+            log::trace!("Decoded UTF-16 LE with BOM text");
             decoded.into_owned()
         } else if raw_bytes.len() >= 2 && raw_bytes[0] == 0xFE && raw_bytes[1] == 0xFF {
             // UTF-16 BE with BOM
             let (decoded, _encoding, had_errors) = encoding_rs::UTF_16BE.decode(&raw_bytes[2..]);
             if had_errors {
-                eprintln!("Warning: UTF-16 BE decoding had errors");
+                error!("Warning: UTF-16 BE decoding had errors");
             }
+            log::trace!("Decoded UTF-16 BE with BOM text");
             decoded.into_owned()
         } else if raw_bytes.len() >= 4 && raw_bytes[0] == b'{' && raw_bytes[1] == 0 && raw_bytes[2] == b' ' && raw_bytes[3] == 0 {
             // UTF-16 LE without BOM (detected by pattern: '{' 0x00 ' ' 0x00 for "{ ")
             let (decoded, _encoding, had_errors) = UTF_16LE.decode(&raw_bytes);
             if had_errors {
-                eprintln!("Warning: UTF-16 LE (no BOM) decoding had errors");
+                error!("Warning: UTF-16 LE (no BOM) decoding had errors");
             }
+            log::trace!("Decoded UTF-16 LE without BOM text");
             decoded.into_owned()
         } else {
             // Try UTF-8
             match String::from_utf8(raw_bytes.clone()) {
-                Ok(s) => s,
+                Ok(s) => {
+                    log::trace!("Decoded UTF-8 text");
+                    s
+                }
                 Err(_) => {
                     // UTF-8 failed, try UTF-16 LE as last resort
                     let (decoded, _encoding, _) = UTF_16LE.decode(&raw_bytes);
+                    log::trace!("UTF-8 failed, decoded as UTF-16 LE text");
                     decoded.into_owned()
                 }
             }

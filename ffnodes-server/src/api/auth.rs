@@ -1,6 +1,7 @@
 use crate::clients::{AuthResponse, ClientManager, ClientRegistration};
 use crate::configuration::Configuration;
 use crate::http_error::Error;
+use crate::jwt;
 use actix_web::{web, HttpResponse};
 use log::{debug, warn};
 use std::sync::Arc;
@@ -33,8 +34,15 @@ pub async fn handshake(
 
     debug!("Client registered: {} ({})", client.display_name, client.id);
 
+    // Generate JWT token (expires in 90 days)
+    let token = jwt::generate_token(client.id.clone(), &config.jwt_secret, 90)
+        .map_err(|e| {
+            warn!("Failed to generate JWT token: {:#}", e);
+            Error::internal_server_error("Failed to generate authentication token")
+        })?;
+
     let response = AuthResponse {
-        auth_token: client.id,
+        auth_token: token,
         ffmpeg_template: config.ffmpeg_template.clone(),
     };
 

@@ -1,4 +1,4 @@
-use crate::api::{JobCompletion, ProgressUpdate, ServerClient};
+use crate::api::{EncodingJob, JobCompletion, ProgressUpdate, ServerClient};
 use crate::config::ClientConfig;
 use crate::encoder::{Encoder, EncodingProgress};
 use crate::gpu::GpuInfo;
@@ -12,6 +12,12 @@ pub struct JobManagerState {
     pub is_processing: bool,
     pub is_paused: bool,
     pub current_job_id: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+struct JobStartedPayload {
+    job: EncodingJob,
+    total_frames: Option<i64>,
 }
 
 pub struct JobManager {
@@ -173,15 +179,17 @@ impl JobManager {
             gpu_info.encoder_h265
         );
 
-        // Create API client
-        log::debug!("Creating API client...");
-        let client = ServerClient::new(config.server_url.clone());
-
-        // Request a job
-        let client_id = config
+        // Create API client with auth token
+        log::debug!("Creating authenticated API client...");
+        let auth_token = config
             .auth_token
             .as_ref()
-            .ok_or_else(|| anyhow!("No auth token"))?;
+            .ok_or_else(|| anyhow!("No auth token"))?
+            .clone();
+        let client = ServerClient::with_auth(config.server_url.clone(), auth_token.clone());
+
+        // Request a job
+        let client_id = &auth_token;
 
         log::info!("Requesting job from server with auth token: {}", client_id);
         log::debug!(
@@ -227,7 +235,11 @@ impl JobManager {
 
         // Emit job started event
         log::debug!("Emitting 'job-started' event to frontend...");
-        match self.app_handle.emit("job-started", &job) {
+        let payload = JobStartedPayload {
+            job: job.clone(),
+            total_frames: job_resp.total_frames,
+        };
+        match self.app_handle.emit("job-started", &payload) {
             Ok(_) => log::debug!("✓ 'job-started' event emitted successfully"),
             Err(e) => log::warn!("Failed to emit 'job-started' event: {}", e),
         }

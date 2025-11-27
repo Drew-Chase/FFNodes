@@ -162,6 +162,10 @@ impl Error {
     pub fn internal_server_error(message: impl Into<String>) -> Self {
         Error::Internal(anyhow!(message.into()))
     }
+
+    pub fn forbidden(message: impl Into<String>) -> Self {
+        Error::Anyhow(anyhow!(message.into()))
+    }
 }
 
 /// Helper to parse the backtrace into structured JSON data

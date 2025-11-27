@@ -129,7 +129,7 @@ impl FileWatcher {
         }
 
         // Probe the file
-        let media_file = MediaFile::from_path_with_config(path, &self.config, false).await?;
+        let media_file = MediaFile::from_path_with_config(path, &self.config).await?;
 
         // Insert into database
         media_file.insert_direct(&self.pool).await?;

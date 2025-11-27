@@ -13,6 +13,7 @@ pub struct Configuration {
     pub ffmpeg: FFMpeg,
     pub watch_directories: Vec<PathBuf>,
     pub server_guid: String,
+    pub jwt_secret: String,
     pub ffmpeg_template: String,
     pub client_timeout_seconds: u64,
     pub notify_batch_interval_seconds: u64,
@@ -26,6 +27,7 @@ impl Default for Configuration {
             ffmpeg: FFMpeg::default(),
             watch_directories: vec![],
             server_guid: Uuid::new_v4().to_string(),
+            jwt_secret: Uuid::new_v4().to_string(),
             ffmpeg_template: "-i {INPUT} -c:v h264{HWACCEL_CODE} -c:a aac {OUTPUT}".to_string(),
             client_timeout_seconds: 300,
             notify_batch_interval_seconds: 30,
@@ -42,7 +44,15 @@ impl Configuration {
             return Ok(default_config);
         }
         let config_file = tokio::fs::File::open(CONFIG_FILE_NAME).await?;
-        Ok(serde_json::from_reader(config_file.into_std().await)?)
+        let mut config: Configuration = serde_json::from_reader(config_file.into_std().await)?;
+
+        // Ensure jwt_secret exists (for backwards compatibility)
+        if config.jwt_secret.is_empty() {
+            config.jwt_secret = Uuid::new_v4().to_string();
+            config.save().await?;
+        }
+
+        Ok(config)
     }
     pub async fn save(&self) -> Result<()> {
         let config_file = tokio::fs::File::create(CONFIG_FILE_NAME).await?;

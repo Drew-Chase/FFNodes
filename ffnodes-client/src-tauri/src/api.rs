@@ -53,6 +53,7 @@ pub struct JobCompletion {
 pub struct ServerClient {
     client: Client,
     base_url: String,
+    auth_token: Option<String>,
 }
 
 impl ServerClient {
@@ -60,6 +61,23 @@ impl ServerClient {
         Self {
             client: Client::new(),
             base_url,
+            auth_token: None,
+        }
+    }
+
+    pub fn with_auth(base_url: String, auth_token: String) -> Self {
+        Self {
+            client: Client::new(),
+            base_url,
+            auth_token: Some(auth_token),
+        }
+    }
+
+    fn add_auth_header(&self, builder: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+        if let Some(token) = &self.auth_token {
+            builder.header("Authorization", format!("Bearer {}", token))
+        } else {
+            builder
         }
     }
 
@@ -79,7 +97,7 @@ impl ServerClient {
 
     pub async fn request_job(&self, client_id: &str) -> Result<Option<JobResponse>> {
         let url = format!("{}/api/jobs/request/{}", self.base_url, client_id);
-        let response = self.client.post(&url).send().await?;
+        let response = self.add_auth_header(self.client.post(&url)).send().await?;
 
         if response.status() == 204 {
             // No content - no jobs available
@@ -92,16 +110,17 @@ impl ServerClient {
 
     pub async fn start_job(&self, job_id: &str) -> Result<()> {
         let url = format!("{}/api/jobs/{}/start", self.base_url, job_id);
-        self.client.post(&url).send().await?.error_for_status()?;
+        self.add_auth_header(self.client.post(&url)).send().await?.error_for_status()?;
         Ok(())
     }
 
     pub async fn update_progress(&self, job_id: &str, progress: ProgressUpdate) -> Result<()> {
         let url = format!("{}/api/jobs/{}/progress", self.base_url, job_id);
-        self.client
-            .post(&url)
-            .json(&progress)
-            .send()
+        self.add_auth_header(
+            self.client
+                .post(&url)
+                .json(&progress)
+        ).send()
             .await?
             .error_for_status()?;
         Ok(())
@@ -109,10 +128,11 @@ impl ServerClient {
 
     pub async fn complete_job(&self, job_id: &str, completion: JobCompletion) -> Result<()> {
         let url = format!("{}/api/jobs/{}/complete", self.base_url, job_id);
-        self.client
-            .post(&url)
-            .json(&completion)
-            .send()
+        self.add_auth_header(
+            self.client
+                .post(&url)
+                .json(&completion)
+        ).send()
             .await?
             .error_for_status()?;
         Ok(())
@@ -121,10 +141,11 @@ impl ServerClient {
     pub async fn fail_job(&self, job_id: &str, error: String) -> Result<()> {
         let url = format!("{}/api/jobs/{}/fail", self.base_url, job_id);
         let body = serde_json::json!({ "error": error });
-        self.client
-            .post(&url)
-            .json(&body)
-            .send()
+        self.add_auth_header(
+            self.client
+                .post(&url)
+                .json(&body)
+        ).send()
             .await?
             .error_for_status()?;
         Ok(())
@@ -133,13 +154,13 @@ impl ServerClient {
     #[allow(dead_code)]
     pub async fn heartbeat(&self, client_id: &str) -> Result<()> {
         let url = format!("{}/api/heartbeat/{}", self.base_url, client_id);
-        self.client.post(&url).send().await?.error_for_status()?;
+        self.add_auth_header(self.client.post(&url)).send().await?.error_for_status()?;
         Ok(())
     }
 
     pub async fn download_input_file(&self, job_id: &str, output_path: &Path) -> Result<()> {
         let url = format!("{}/api/files/{}/input", self.base_url, job_id);
-        let response = self.client.get(&url).send().await?.error_for_status()?;
+        let response = self.add_auth_header(self.client.get(&url)).send().await?.error_for_status()?;
 
         let bytes = response.bytes().await?;
         tokio::fs::write(output_path, bytes).await?;
@@ -168,10 +189,11 @@ impl ServerClient {
 
         let form = multipart::Form::new().part("file", file_part);
 
-        self.client
-            .post(&url)
-            .multipart(form)
-            .send()
+        self.add_auth_header(
+            self.client
+                .post(&url)
+                .multipart(form)
+        ).send()
             .await?
             .error_for_status()?;
 
@@ -180,7 +202,7 @@ impl ServerClient {
 
     pub async fn get_active_jobs(&self) -> Result<Vec<EncodingJob>> {
         let url = format!("{}/api/jobs/active", self.base_url);
-        let response = self.client.get(&url).send().await?.error_for_status()?;
+        let response = self.add_auth_header(self.client.get(&url)).send().await?.error_for_status()?;
         let jobs: Vec<EncodingJob> = response.json().await?;
         Ok(jobs)
     }

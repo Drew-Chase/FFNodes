@@ -50,20 +50,16 @@ impl MediaFile {
     pub async fn new(file_path: impl AsRef<Path>) -> Result<Self> {
         info!("Loading media file {:?}", file_path.as_ref());
         let config = Configuration::load().await?;
-        Self::from_path_with_config(file_path, &config, false).await
+        Self::from_path_with_config(file_path, &config).await
     }
 
     pub async fn from_path_with_config(
         file_path: impl AsRef<Path>,
         config: &Configuration,
-        slow_calc_frames: bool,
     ) -> Result<Self> {
         info!("Probing media file {:?}", file_path.as_ref());
 
         // Try fast probe first, then retry with slow frame counting if needed
-        let mut current_slow_calc = slow_calc_frames;
-
-        loop {
             let builder = config
                 .ffmpeg
                 .ffprobe_command_builder()
@@ -101,15 +97,8 @@ impl MediaFile {
             let frames = match frames_result {
                 Some(frames) => frames,
                 None => {
-                    // If we haven't tried slow counting yet, retry with it
-                    if !current_slow_calc {
-                        debug!("Frame count not available, retrying with count_frames enabled");
-                        current_slow_calc = true;
-                        continue;
-                    } else {
                         // Even with slow counting, couldn't get frame count
                         return Err(anyhow!("Failed to determine frame count"));
-                    }
                 }
             };
 
@@ -144,7 +133,7 @@ impl MediaFile {
 
             debug!("Parsed ffprobe output successfully");
 
-            return Ok(Self {
+            Ok(Self {
                 path: file_path.as_ref().to_path_buf(),
                 scanned_size: format
                     .size
@@ -162,8 +151,7 @@ impl MediaFile {
                 encoding_complexity,
                 retry_count: 0,
                 processed: false,
-            });
-        }
+            })
     }
 
     /// Extract frame count from probe output, trying multiple sources
@@ -210,23 +198,28 @@ impl MediaFile {
             )?
             .output("-")?
             .build()?;
-        let (sender, mut receiver) = tokio::sync::mpsc::channel::<String>(5);
-        cmd.execute(None, Some(sender)).await?;
-        loop {
-            if let Some(output) = receiver.recv().await
-                && output.contains("frame=")
-                && let Some(section) = output.split("frame=").last()
-                && let Some(frame_count) = section.split_whitespace().nth(0)
-            {
-                return Ok(Some(frame_count.trim().parse::<u64>()?));
-            }
+        let (sender, mut receiver) = tokio::sync::mpsc::channel::<String>(100);
 
-            // Channel closed, no more output
-            if receiver.is_closed() {
-                break;
+        // Execute in background while we drain the receiver
+        let execute_task = tokio::spawn(async move {
+            cmd.execute(None, Some(sender)).await
+        });
+
+        // Drain receiver concurrently with execution
+        let mut frame_count = None;
+        while let Some(output) = receiver.recv().await {
+            if output.contains("frame=")
+                && let Some(section) = output.split("frame=").last()
+                && let Some(count_str) = section.split_whitespace().next()
+                && let Ok(count) = count_str.trim().parse::<u64>()
+            {
+                frame_count = Some(count);
             }
         }
 
-        Ok(None)
+        // Wait for execution to complete
+        execute_task.await??;
+
+        Ok(frame_count)
     }
 }

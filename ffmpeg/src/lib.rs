@@ -4,9 +4,10 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use log::trace;
 use tokio::join;
 use tokio::process::Command;
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::BufReader;
 use crate::builders::{FFmpegBuilder, FFprobeBuilder};
 
 const FFBINARIES_API: &str = "https://ffbinaries.com/api/v1/version/latest";
@@ -322,33 +323,37 @@ impl FFMpeg {
 		let stdout = child.stdout.take().ok_or_else(|| anyhow::anyhow!("Failed to capture stdout"))?;
 		let stderr = child.stderr.take().ok_or_else(|| anyhow::anyhow!("Failed to capture stderr"))?;
 
-		// Read output in background
 		let sender_clone = sender.clone();
-		let stdout_task = tokio::spawn(async move {
-			let reader = BufReader::new(stdout);
-			let mut lines = reader.lines();
-			while let Ok(Some(line)) = lines.next_line().await {
-				if sender_clone.send(line + "\n").await.is_err() {
-					break;
-				}
+		let stdout_reader = async move {
+			use tokio::io::AsyncReadExt;
+			let mut reader = BufReader::new(stdout);
+			let mut buffer = Vec::new();
+
+			// Read entire output into buffer
+			if reader.read_to_end(&mut buffer).await.is_ok() && !buffer.is_empty() {
+				let output = String::from_utf8_lossy(&buffer);
+				trace!("{} stdout: {}", if ffmpeg { "ffmpeg" } else { "ffprobe" }, output);
+				// Send the entire output as one message
+				let _ = sender_clone.send(output.to_string()).await;
 			}
-		});
+		};
 
-		let stderr_task = tokio::spawn(async move {
-			let reader = BufReader::new(stderr);
-			let mut lines = reader.lines();
-			while let Ok(Some(line)) = lines.next_line().await {
-				if sender.send(line + "\n").await.is_err() {
-					break;
-				}
+		let stderr_reader = async move {
+			use tokio::io::AsyncReadExt;
+			let mut reader = BufReader::new(stderr);
+			let mut buffer = Vec::new();
+
+			// Read entire output into buffer
+			if reader.read_to_end(&mut buffer).await.is_ok() && !buffer.is_empty() {
+				let output = String::from_utf8_lossy(&buffer);
+				trace!("{} stderr: {}", if ffmpeg { "ffmpeg" } else { "ffprobe" }, output);
+				// Send the entire output as one message
+				let _ = sender.send(output.to_string()).await;
 			}
-		});
+		};
 
-		// CRITICAL FIX: Wait for process and check exit status
-		let status = child.wait().await?;
-
-		// Wait for output tasks to finish
-		let _ = tokio::join!(stdout_task, stderr_task);
+		let (status, _, _) = join!(child.wait(), stdout_reader, stderr_reader);
+		let status = status?;
 
 		// CRITICAL FIX: Check exit status
 		if !status.success() {
