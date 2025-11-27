@@ -18,6 +18,7 @@ mod templates;
 mod jwt;
 mod middleware;
 mod path_security;
+mod stats;
 
 pub static DEBUG: bool = cfg!(debug_assertions);
 
@@ -130,6 +131,7 @@ pub async fn run() -> Result<()> {
     let config_data = web::Data::new(Arc::clone(&configuration));
     let job_queue_data = web::Data::new(Arc::clone(&job_queue));
     let client_manager_data = web::Data::new(Arc::clone(&client_manager));
+    let pool_data = web::Data::new(pool.clone());
 
     let server = HttpServer::new(move || {
         App::new()
@@ -137,6 +139,7 @@ pub async fn run() -> Result<()> {
             .app_data(config_data.clone())
             .app_data(job_queue_data.clone())
             .app_data(client_manager_data.clone())
+            .app_data(pool_data.clone())
             .app_data(
                 web::JsonConfig::default()
                     .limit(4096)
@@ -193,6 +196,19 @@ pub async fn run() -> Result<()> {
                             .route(
                                 "/scan/progress",
                                 web::get().to(api::monitoring::scan_progress),
+                            )
+                            // Statistics
+                            .route(
+                                "/stats/client/{client_id}/history",
+                                web::get().to(api::stats::get_client_history),
+                            )
+                            .route(
+                                "/stats/remote-progress",
+                                web::get().to(api::stats::get_remote_progress),
+                            )
+                            .route(
+                                "/stats/leaderboard",
+                                web::get().to(api::stats::get_leaderboard),
                             )
                             // WebSocket
                             .route("/ws/progress", web::get().to(api::websocket::ws_progress))

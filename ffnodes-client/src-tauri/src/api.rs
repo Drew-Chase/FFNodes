@@ -247,4 +247,87 @@ impl ServerClient {
         let jobs: Vec<EncodingJob> = response.json().await?;
         Ok(jobs)
     }
+
+    // Statistics endpoints
+    pub async fn get_client_history(&self, client_id: &str) -> Result<ClientHistoryResponse> {
+        let url = format!("{}/api/stats/client/{}/history", self.base_url, client_id);
+        let response = self.add_auth_header(self.client.get(&url)).send().await?.error_for_status()?;
+        let history: ClientHistoryResponse = response.json().await?;
+        Ok(history)
+    }
+
+    pub async fn get_remote_progress(&self, exclude_client_id: Option<&str>) -> Result<RemoteProgressResponse> {
+        let mut url = format!("{}/api/stats/remote-progress", self.base_url);
+        if let Some(client_id) = exclude_client_id {
+            url = format!("{}?exclude_self={}", url, client_id);
+        }
+        let response = self.add_auth_header(self.client.get(&url)).send().await?.error_for_status()?;
+        let progress: RemoteProgressResponse = response.json().await?;
+        Ok(progress)
+    }
+
+    pub async fn get_leaderboard(&self, category: &str) -> Result<LeaderboardResponse> {
+        let url = format!("{}/api/stats/leaderboard?category={}", self.base_url, category);
+        let response = self.add_auth_header(self.client.get(&url)).send().await?.error_for_status()?;
+        let leaderboard: LeaderboardResponse = response.json().await?;
+        Ok(leaderboard)
+    }
 }
+
+// Statistics response types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JobHistoryEntry {
+    pub filename: String,
+    pub average_speed: f64,
+    pub duration_seconds: i64,
+    pub size_before: i64,
+    pub size_after: i64,
+    pub size_saved: i64,
+    pub size_reduction_percent: f64,
+    pub completed_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OverallStats {
+    pub average_speed: f64,
+    pub average_duration_seconds: f64,
+    pub average_size_reduction_percent: f64,
+    pub total_jobs: i64,
+    pub total_size_saved: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientHistoryResponse {
+    pub jobs: Vec<JobHistoryEntry>,
+    pub overall: OverallStats,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RemoteJobProgress {
+    pub client_name: String,
+    pub filename: String,
+    pub percentage: f64,
+    pub speed: f64,
+    pub frame: i64,
+    pub total_frames: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RemoteProgressResponse {
+    pub active_jobs: Vec<RemoteJobProgress>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LeaderboardEntry {
+    pub rank: i64,
+    pub client_name: String,
+    pub value: f64,
+    pub formatted_value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LeaderboardResponse {
+    pub category: String,
+    pub entries: Vec<LeaderboardEntry>,
+}
+

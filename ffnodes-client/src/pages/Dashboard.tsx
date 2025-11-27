@@ -12,6 +12,9 @@ import {VideoList} from "../components/VideoList";
 import {Button, Card} from "../components/ui";
 import {BentoGrid, BentoCard, BentoCardHeader, BentoCardContent} from "../components/layout/BentoGrid";
 import {Logger} from "../utils/logger";
+import {HistoryBento} from "../components/stats/HistoryBento";
+import {RemoteUsersBento} from "../components/stats/RemoteUsersBento";
+import {LeaderboardBento} from "../components/stats/LeaderboardBento";
 
 export function Dashboard()
 {
@@ -374,6 +377,15 @@ export function Dashboard()
                     >
                         <VideoList/>
                     </BentoCard>
+
+                    {/* History Bento Box */}
+                    <HistoryBento />
+
+                    {/* Remote Users Bento Box */}
+                    <RemoteUsersBento />
+
+                    {/* Leaderboard Bento Box */}
+                    <LeaderboardBento />
 
                     {/* Connection Status Card */}
                     <BentoCard

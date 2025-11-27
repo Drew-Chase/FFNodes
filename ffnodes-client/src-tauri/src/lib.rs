@@ -155,7 +155,10 @@ pub fn run() {
             get_job_manager_state,
             log_frontend,
             start_oauth_flow,
-            refresh_oauth_token
+            refresh_oauth_token,
+            get_client_history,
+            get_remote_progress,
+            get_leaderboard
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

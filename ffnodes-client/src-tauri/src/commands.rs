@@ -146,3 +146,29 @@ pub async fn get_job_manager_state(
 pub fn log_frontend(level: String, message: String, source: Option<String>) {
     crate::logger::log_frontend(level, message, source);
 }
+
+/// Get client history statistics
+#[tauri::command]
+pub async fn get_client_history(config: ClientConfig) -> Result<crate::api::ClientHistoryResponse, String> {
+    let auth_token = config.auth_token.ok_or("No auth token")?;
+    let client_id = config.client_id.ok_or("No client ID")?;
+    let client = ServerClient::with_auth(config.server_url, auth_token);
+    client.get_client_history(&client_id).await.map_err(|e| e.to_string())
+}
+
+/// Get remote user progress
+#[tauri::command]
+pub async fn get_remote_progress(config: ClientConfig) -> Result<crate::api::RemoteProgressResponse, String> {
+    let auth_token = config.auth_token.ok_or("No auth token")?;
+    let client_id = config.client_id.clone();
+    let client = ServerClient::with_auth(config.server_url, auth_token);
+    client.get_remote_progress(client_id.as_deref()).await.map_err(|e| e.to_string())
+}
+
+/// Get leaderboard data
+#[tauri::command]
+pub async fn get_leaderboard(config: ClientConfig, category: String) -> Result<crate::api::LeaderboardResponse, String> {
+    let auth_token = config.auth_token.ok_or("No auth token")?;
+    let client = ServerClient::with_auth(config.server_url, auth_token);
+    client.get_leaderboard(&category).await.map_err(|e| e.to_string())
+}
