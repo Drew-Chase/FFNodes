@@ -12,15 +12,13 @@ use job_manager::JobManager;
 use oauth::*;
 use std::sync::Arc;
 use tauri::Manager;
+use tauri_plugin_window_state::{AppHandleExt, StateFlags, WindowExt};
 use tokio::sync::Mutex;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Create logs directory if it doesn't exist
-    if let Err(e) = std::fs::create_dir_all("logs") {
-        tracing::warn!("Failed to create logs directory: {}", e);
-    }
     tauri::Builder::default()
+        .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_fs::init())
@@ -41,7 +39,8 @@ pub fn run() {
             tracing::info!("Creating JobManager...");
             let job_manager = tauri::async_runtime::block_on(async {
                 JobManager::new(app.handle().clone()).await
-            }).expect("Failed to create JobManager");
+            })
+            .expect("Failed to create JobManager");
             app.manage(Arc::new(Mutex::new(job_manager)));
             tracing::info!("JobManager created successfully");
 
@@ -76,6 +75,13 @@ pub fn run() {
                         });
                     }
                     "quit" => {
+                        if let Some(window) = app.get_webview_window("main")
+                            && let Ok(visible) = window.is_visible()
+                            && visible
+                            && let Err(e) = app.save_window_state(StateFlags::all())
+                        {
+                            tracing::error!("Failed to save window state: {}", e);
+                        }
                         app.exit(0);
                     }
                     _ => {}
@@ -115,9 +121,17 @@ pub fn run() {
 
             // Handle window close event - minimize to tray instead
             if let Some(window) = app.get_webview_window("main") {
+                if let Err(e) = window.restore_state(StateFlags::all()) {
+                    tracing::error!("Failed to window restore state: {}", e);
+                }
                 let window_clone = window.clone();
                 window.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        let handle = window_clone.app_handle();
+                        if let Err(e) = handle.save_window_state(StateFlags::all()) {
+                            tracing::error!("Failed to save window state: {}", e);
+                        }
+
                         // Prevent window from closing, hide it instead
                         api.prevent_close();
                         let _ = window_clone.hide();
