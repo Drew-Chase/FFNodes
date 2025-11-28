@@ -161,24 +161,24 @@ impl MediaFile {
             .ok_or_else(|| anyhow!("No video stream found"))?;
 
         // Try nb_frames field
-        if let Some(nb_frames_s) = stream.nb_frames.as_ref()
-            && let Ok(nb_frames) = nb_frames_s.parse::<u64>()
-        {
-            return Ok(Some(nb_frames));
+        if let Some(nb_frames_s) = stream.nb_frames.as_ref() {
+            if let Ok(nb_frames) = nb_frames_s.parse::<u64>() {
+                return Ok(Some(nb_frames));
+            }
         }
 
         // Try NUMBER_OF_FRAMES tag
-        if let Some(nb_frames_s) = stream.tags.get("NUMBER_OF_FRAMES")
-            && let Ok(nb_frames) = nb_frames_s.parse::<u64>()
-        {
-            return Ok(Some(nb_frames));
+        if let Some(nb_frames_s) = stream.tags.get("NUMBER_OF_FRAMES") {
+            if let Ok(nb_frames) = nb_frames_s.parse::<u64>() {
+                return Ok(Some(nb_frames));
+            }
         }
 
         // Try NUMBER_OF_FRAMES-eng tag
-        if let Some(nb_frames_s) = stream.tags.get("NUMBER_OF_FRAMES-eng")
-            && let Ok(nb_frames) = nb_frames_s.parse::<u64>()
-        {
-            return Ok(Some(nb_frames));
+        if let Some(nb_frames_s) = stream.tags.get("NUMBER_OF_FRAMES-eng") {
+            if let Ok(nb_frames) = nb_frames_s.parse::<u64>() {
+                return Ok(Some(nb_frames));
+            }
         }
 
         // If unable to get the frame count from the probe output, use ffmpeg to try to get the frame count.
@@ -208,12 +208,14 @@ impl MediaFile {
         // Drain receiver concurrently with execution
         let mut frame_count = None;
         while let Some(output) = receiver.recv().await {
-            if output.contains("frame=")
-                && let Some(section) = output.split("frame=").last()
-                && let Some(count_str) = section.split_whitespace().next()
-                && let Ok(count) = count_str.trim().parse::<u64>()
-            {
-                frame_count = Some(count);
+            if output.contains("frame=") {
+                if let Some(section) = output.split("frame=").last() {
+                    if let Some(count_str) = section.split_whitespace().next() {
+                        if let Ok(count) = count_str.trim().parse::<u64>() {
+                            frame_count = Some(count);
+                        }
+                    }
+                }
             }
         }
 

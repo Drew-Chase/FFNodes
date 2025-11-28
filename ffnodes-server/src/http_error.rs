@@ -208,10 +208,11 @@ fn parse_backtrace(backtrace_str: &str) -> Vec<serde_json::Value> {
 
 /// Extract file path and line number from string
 fn extract_line_number(location: &str) -> (String, i32) {
-    if let Some((path, line_number_str)) = location.rsplit_once(':')
-        && let Ok(line_number) = line_number_str.parse::<i32>() {
+    if let Some((path, line_number_str)) = location.rsplit_once(':') {
+        if let Ok(line_number) = line_number_str.parse::<i32>() {
             return (path.to_string(), line_number);
         }
+    }
     (location.to_string(), -1)
 }
 
