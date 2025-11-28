@@ -78,8 +78,8 @@ fn main() {
         }
         println!("Updated {}", tauri_config);
 
-        Command::new("cargo").arg("update").output().expect("failed to execute process");
-        
+        Command::new("cargo").arg("check").output().expect("failed to execute process");
+
         // Create tag
         let mut files = Vec::with_capacity(cargo_tomls.len() + package_json.len() + 1);
         files.push(tauri_config);
