@@ -1,0 +1,7 @@
+[package]
+name = "publish_docker"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = {version = "1.48.0", features = ["rt-multi-thread", "rt", "io-util", "process", "macros"]}

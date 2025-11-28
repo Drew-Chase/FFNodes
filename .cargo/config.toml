@@ -1,0 +1,3 @@
+[alias]
+update-version = "run --bin update_version --release -q --"
+publish-docker = "run --bin publish_docker --release -q"
