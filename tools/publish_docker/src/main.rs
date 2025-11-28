@@ -9,6 +9,7 @@ async fn main() {
         .arg("--privileged --user 0")
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
+        .current_dir("./")
         .spawn()
         .expect("failed to launch gh process");
 
