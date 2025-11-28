@@ -34,7 +34,7 @@ fn main() {
             }
         };
         package["version"] = toml::Value::String(new_version.to_string());
-        let new_content = toml.to_string();
+        let new_content = toml::to_string_pretty(&toml).expect("Error serializing TOML");
         if let Err(e) = fs::write(cargo, new_content) {
             eprintln!("Error writing to {}: {}", cargo, e);
             std::process::exit(1);
