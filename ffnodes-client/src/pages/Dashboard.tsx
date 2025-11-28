@@ -460,7 +460,6 @@ export function Dashboard()
                         colSpan={3}
                         elevation={2}
                         background="gradient"
-                        hover
                     >
                         <BentoCardHeader
                             title="Connection Status"
@@ -486,7 +485,6 @@ export function Dashboard()
                         colSpan={3}
                         elevation={2}
                         background="gradient"
-                        hover
                     >
                         <BentoCardHeader
                             title="GPU Information"
