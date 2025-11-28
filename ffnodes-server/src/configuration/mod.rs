@@ -24,7 +24,7 @@ pub struct Configuration {
 impl Default for Configuration {
     fn default() -> Self {
         Self {
-            port: 8080,
+            port: 7456,
             ffmpeg: FFMpeg::default(),
             watch_directories: vec![],
             server_guid: Uuid::new_v4().to_string(),
