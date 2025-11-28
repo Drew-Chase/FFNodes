@@ -80,9 +80,13 @@ fn main() {
         println!("Updated {}", tauri_config);
 
         // Create tag
-        let output = Command::new("git").arg("tag").arg(format!("v{}", new_version)).output().expect("failed to execute process");
-        println!("[FFNodes Update Version] {:?}", from_utf8(output.stdout.as_slice()).unwrap());
-        let output = Command::new("git").arg("push").arg("--tags").output().expect("failed to execute process");
-        println!("[FFNodes Update Version] {:?}", from_utf8(output.stdout.as_slice()).unwrap());
+        let mut files = [tauri_config];
+        files.copy_from_slice(cargo_tomls.as_slice());
+        files.copy_from_slice(package_json.as_slice());
+        Command::new("git").arg("add").args(files).output().expect("failed to execute process");
+        Command::new("git").arg("commit").arg("-m").arg(format!("Updated version to v{}", new_version)).output().expect("failed to execute process");
+        Command::new("git").arg("push").output().expect("failed to execute process");
+        Command::new("git").arg("tag").arg(format!("v{}", new_version)).output().expect("failed to execute process");
+        Command::new("git").arg("push").arg("--tags").output().expect("failed to execute process");
     }
 }
