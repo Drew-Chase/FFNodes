@@ -21,8 +21,10 @@ COPY Cargo.toml Cargo.lock ./
 COPY ffmpeg/Cargo.toml ./ffmpeg/
 COPY ffnodes-server/Cargo.toml ./ffnodes-server/
 
-# Remove client from workspace members to avoid building it
+# Remove client and tools from workspace members to avoid building it
 RUN sed -i '/"ffnodes-client\/src-tauri"/d' Cargo.toml
+RUN sed -i '/"tools\/update_version"/d' Cargo.toml
+RUN sed -i '/"tools\/publish_docker"/d' Cargo.toml
 
 # Copy ONLY server and library source (NOT client)
 COPY ffmpeg/ ./ffmpeg/
