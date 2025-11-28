@@ -21,7 +21,12 @@ RUN case "$TARGETARCH" in \
         rustup target add x86_64-unknown-linux-gnu \
         ;; \
     "arm64") \
-        apt-get update && apt-get install -y gcc-aarch64-linux-gnu && \
+        dpkg --add-architecture arm64 && \
+        apt-get update && \
+        apt-get install -y \
+            gcc-aarch64-linux-gnu \
+            libssl-dev:arm64 \
+            pkg-config:arm64 && \
         rustup target add aarch64-unknown-linux-gnu && \
         rm -rf /var/lib/apt/lists/* \
         ;; \
@@ -54,6 +59,8 @@ RUN case "$TARGETARCH" in \
         cargo build --release --target x86_64-unknown-linux-gnu --bin ffnodes_server || true \
         ;; \
     "arm64") \
+        PKG_CONFIG_ALLOW_CROSS=1 \
+        PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig \
         CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
         cargo build --release --target aarch64-unknown-linux-gnu --bin ffnodes_server || true \
         ;; \
@@ -73,6 +80,8 @@ RUN case "$TARGETARCH" in \
         cp target/x86_64-unknown-linux-gnu/release/ffnodes_server /build/ffnodes_server \
         ;; \
     "arm64") \
+        PKG_CONFIG_ALLOW_CROSS=1 \
+        PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig \
         CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
         cargo build --release --target aarch64-unknown-linux-gnu --bin ffnodes_server && \
         cp target/aarch64-unknown-linux-gnu/release/ffnodes_server /build/ffnodes_server \
