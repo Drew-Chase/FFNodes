@@ -1,6 +1,6 @@
 [package]
 name = "ffnodes_client"
-version = "0.1.13-beta"
+version = "0.1.14-beta"
 description = ""
 authors = ["Drew Chase"]
 edition = "2024"
