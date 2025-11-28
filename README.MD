@@ -168,6 +168,105 @@ The client is a GUI application that can be used to manage encoding jobs. You ca
 5. Using Homebrew: `brew install drew-chase/tap/ffnodes-client` (macos only)
 6. Using winget: `winget install FFNodes.FFNodesClient` (windows only)
 
+## Docker Deployment (Server Only)
+
+The ffnodes-server can be deployed as a Docker container for easy deployment and management. **Note**: Only the server is containerized. The client is a desktop application that connects to the server.
+
+### Quick Start
+
+```bash
+# Pull latest image
+docker pull ghcr.io/drew-chase/ffnodes/ffnodes-server:latest
+
+# Run with default configuration
+docker run -d \
+  --name ffnodes-server \
+  -p 8080:8080 \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/logs:/app/logs \
+  ghcr.io/drew-chase/ffnodes/ffnodes-server:latest
+```
+
+### Using Docker Compose
+
+Create `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+
+services:
+  ffnodes-server:
+    image: ghcr.io/drew-chase/ffnodes/ffnodes-server:latest
+    container_name: ffnodes-server
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - /path/to/videos:/videos:ro  # Mount video directories read-only
+    environment:
+      - RUST_LOG=info
+      - FFNODES_PORT=8080
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+```
+
+Run:
+```bash
+docker-compose up -d
+```
+
+### Docker Configuration
+
+The container expects configuration at `/app/data/config.json`. On first run, a default configuration will be generated.
+
+**Extract the server GUID**:
+```bash
+docker logs ffnodes-server | grep "Server GUID"
+```
+
+**Mount existing config**:
+```bash
+docker run -d \
+  -p 8080:8080 \
+  -v $(pwd)/config.json:/app/data/config.json \
+  -v $(pwd)/data:/app/data \
+  ghcr.io/drew-chase/ffnodes/ffnodes-server:latest
+```
+
+### Persistent Data
+
+The container uses the following volumes for persistent data:
+- `/app/data` - Configuration and SQLite database (app.db)
+- `/app/logs` - Application logs
+- Video directories - Mount source directories as read-only with `:ro` flag
+
+### Multi-Architecture Support
+
+The Docker image supports multiple architectures:
+- `linux/amd64` - Intel/AMD x86_64
+- `linux/arm64` - ARM 64-bit (Raspberry Pi 4, Apple Silicon, AWS Graviton)
+
+Docker automatically pulls the correct architecture for your platform.
+
+### Building Locally
+
+```bash
+# Clone repository
+git clone https://github.com/Drew-Chase/FFNodes.git
+cd FFNodes
+
+# Build for current architecture
+docker build -t ffnodes-server .
+
+# Build for specific platform
+docker buildx build --platform linux/arm64 -t ffnodes-server:arm64 .
+```
+
 ## Configuration
 
 The server uses a `config.json` file for configuration. On first launch, it will generate a default configuration with a new server GUID.
