@@ -39,14 +39,14 @@ ENV SQLX_OFFLINE=true
 COPY Cargo.toml Cargo.lock ./
 COPY ffmpeg/Cargo.toml ./ffmpeg/
 COPY ffnodes-server/Cargo.toml ./ffnodes-server/
-COPY ffnodes-client/src-tauri/Cargo.toml ./ffnodes-client/src-tauri/
+
+# Remove client from workspace members to avoid building it
+RUN sed -i '/"ffnodes-client\/src-tauri"/d' Cargo.toml
 
 # Create dummy source files to build dependencies (cache optimization)
 RUN mkdir -p ffmpeg/src && echo "fn main() {}" > ffmpeg/src/lib.rs && \
     mkdir -p ffnodes-server/src && echo "fn main() {}" > ffnodes-server/src/main.rs && \
-    echo "fn main() {}" > ffnodes-server/src/lib.rs && \
-    mkdir -p ffnodes-client/src-tauri/src && echo "fn main() {}" > ffnodes-client/src-tauri/src/lib.rs && \
-    echo "fn main() {}" > ffnodes-client/src-tauri/src/main.rs
+    echo "fn main() {}" > ffnodes-server/src/lib.rs
 
 # Build dependencies only (this layer will be cached)
 RUN case "$TARGETARCH" in \
@@ -60,7 +60,7 @@ RUN case "$TARGETARCH" in \
     esac
 
 # Remove dummy files
-RUN rm -rf ffmpeg/src ffnodes-server/src ffnodes-client/src-tauri/src
+RUN rm -rf ffmpeg/src ffnodes-server/src
 
 # Copy ONLY server and library source (NOT client)
 COPY ffmpeg/ ./ffmpeg/
