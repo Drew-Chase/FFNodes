@@ -1,7 +1,6 @@
 use regex::Regex;
 use std::fs;
 use std::process::Command;
-use std::str::from_utf8;
 
 fn main() {
     let new_version = std::env::args().nth(1).unwrap_or_else(|| {
@@ -80,13 +79,15 @@ fn main() {
         println!("Updated {}", tauri_config);
 
         // Create tag
-        let mut files = [tauri_config];
-        files.copy_from_slice(cargo_tomls.as_slice());
-        files.copy_from_slice(package_json.as_slice());
+        let mut files = Vec::with_capacity(cargo_tomls.len() + package_json.len() + 1);
+        files.push(tauri_config);
+        files.extend(cargo_tomls);
+        files.extend(package_json);
         Command::new("git").arg("add").args(files).output().expect("failed to execute process");
         Command::new("git").arg("commit").arg("-m").arg(format!("Updated version to v{}", new_version)).output().expect("failed to execute process");
         Command::new("git").arg("push").output().expect("failed to execute process");
         Command::new("git").arg("tag").arg(format!("v{}", new_version)).output().expect("failed to execute process");
         Command::new("git").arg("push").arg("--tags").output().expect("failed to execute process");
+        println!("Pushed to git!")
     }
 }
