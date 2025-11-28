@@ -75,17 +75,36 @@ pub async fn update_progress(
     job_id: web::Path<String>,
     progress: web::Json<ProgressUpdate>,
     job_queue: web::Data<Arc<JobQueue>>,
+    ws_registry: web::Data<crate::api::websocket::WsRegistry>,
 ) -> Result<HttpResponse, Error> {
     debug!("Progress update for job: {}", job_id);
 
-    // Update progress
+    let progress_data = progress.into_inner();
+
+    // Update progress in database
     job_queue
-        .update_progress(&job_id, progress.into_inner())
+        .update_progress(&job_id, progress_data.clone())
         .await
         .map_err(|e| {
             warn!("Error updating progress: {:#}", e);
             Error::internal_server_error("Error updating progress")
         })?;
+
+    // Get job details for broadcasting
+    if let Ok(Some(job)) = job_queue.get_job(&job_id).await {
+        if let Some(assigned_client) = job.assigned_client {
+            // Broadcast progress event to all connected clients
+            let event = crate::api::websocket::WsEvent::Progress {
+                job_id: job_id.to_string(),
+                client_id: assigned_client,
+                frame: progress_data.frame,
+                fps: progress_data.fps,
+                speed: progress_data.speed.clone(),
+            };
+
+            crate::api::websocket::broadcast_event(&ws_registry, event).await;
+        }
+    }
 
     Ok(HttpResponse::Ok().finish())
 }

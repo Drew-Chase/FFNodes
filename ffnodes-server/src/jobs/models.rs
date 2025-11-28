@@ -107,7 +107,7 @@ pub struct JobResponse {
 }
 
 /// Progress update from client
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProgressUpdate {
     pub frame: i64,
     pub fps: f64,

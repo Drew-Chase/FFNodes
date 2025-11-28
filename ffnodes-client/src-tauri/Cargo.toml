@@ -30,6 +30,7 @@ ffmpeg = {path="../../ffmpeg"}
 reqwest = { version = "0.12", features = ["json", "multipart", "stream"] }
 tokio = { version = "1", features = ["full"] }
 tokio-util = { version = "0.7", features = ["io"] }
+tokio-tungstenite = "0.24"
 async-stream = "0.3"
 futures-util = "0.3"
 sysinfo = "0.30"

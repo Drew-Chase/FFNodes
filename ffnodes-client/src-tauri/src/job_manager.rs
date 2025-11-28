@@ -1,4 +1,4 @@
-use crate::api::{EncodingJob, JobCompletion, ProgressUpdate, ServerClient, TransferProgress};
+use crate::api::{EncodingJob, JobCompletion, ProgressUpdate, ServerClient, TransferProgress, WsEvent};
 use crate::config::ClientConfig;
 use crate::encoder::{Encoder, EncodingProgress};
 use crate::gpu::GpuInfo;
@@ -6,6 +6,7 @@ use anyhow::{Result, anyhow};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::Mutex;
+use tokio::task::JoinHandle;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct JobManagerState {
@@ -41,6 +42,7 @@ pub struct JobManager {
     state: Arc<Mutex<JobManagerState>>,
     app_handle: AppHandle,
     encoder: Arc<Encoder>,
+    ws_task: Arc<Mutex<Option<JoinHandle<()>>>>,
 }
 
 impl JobManager {
@@ -57,6 +59,7 @@ impl JobManager {
             })),
             app_handle,
             encoder: Arc::new(encoder),
+            ws_task: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -85,6 +88,86 @@ impl JobManager {
 
         log::info!("Starting job manager");
 
+        // Connect to WebSocket for real-time progress updates
+        let config_lock = self.config.lock().await;
+        if let Some(config) = config_lock.as_ref() {
+            if let Some(client_id) = &config.client_id {
+                if let Some(auth_token) = &config.auth_token {
+                    let client = ServerClient::with_auth(config.server_url.clone(), auth_token.clone());
+
+                    match client.connect_websocket(client_id).await {
+                        Ok(mut ws_rx) => {
+                            log::info!("✓ WebSocket connected successfully");
+
+                            // Spawn task to listen for WebSocket events
+                            let app_handle = self.app_handle.clone();
+                            let ws_handle = tokio::spawn(async move {
+                                log::info!("WebSocket listener task started");
+                                while let Some(event) = ws_rx.recv().await {
+                                    log::debug!("Received WebSocket event: {:?}", event);
+
+                                    // Forward event to frontend based on type
+                                    match &event {
+                                        WsEvent::Progress { job_id, client_id: remote_client_id, frame, fps, speed } => {
+                                            let progress = serde_json::json!({
+                                                "job_id": job_id,
+                                                "client_id": remote_client_id,
+                                                "frame": frame,
+                                                "fps": fps,
+                                                "speed": speed
+                                            });
+                                            let _ = app_handle.emit("remote-progress", &progress);
+                                        }
+                                        WsEvent::JobCompleted { job_id, client_id: remote_client_id } => {
+                                            let payload = serde_json::json!({
+                                                "job_id": job_id,
+                                                "client_id": remote_client_id
+                                            });
+                                            let _ = app_handle.emit("remote-job-completed", &payload);
+                                        }
+                                        WsEvent::JobFailed { job_id, client_id: remote_client_id, error } => {
+                                            let payload = serde_json::json!({
+                                                "job_id": job_id,
+                                                "client_id": remote_client_id,
+                                                "error": error
+                                            });
+                                            let _ = app_handle.emit("remote-job-failed", &payload);
+                                        }
+                                        WsEvent::ClientConnected { client_id: remote_client_id, display_name } => {
+                                            let payload = serde_json::json!({
+                                                "client_id": remote_client_id,
+                                                "display_name": display_name
+                                            });
+                                            let _ = app_handle.emit("remote-client-connected", &payload);
+                                        }
+                                        WsEvent::ClientDisconnected { client_id: remote_client_id } => {
+                                            let payload = serde_json::json!({
+                                                "client_id": remote_client_id
+                                            });
+                                            let _ = app_handle.emit("remote-client-disconnected", &payload);
+                                        }
+                                        _ => {
+                                            // Ignore other events or log them
+                                            log::debug!("Ignoring WebSocket event: {:?}", event);
+                                        }
+                                    }
+                                }
+                                log::info!("WebSocket listener task ended");
+                            });
+
+                            // Store the task handle
+                            let mut ws_task = self.ws_task.lock().await;
+                            *ws_task = Some(ws_handle);
+                        }
+                        Err(e) => {
+                            log::warn!("Failed to connect to WebSocket: {} - continuing without real-time updates", e);
+                        }
+                    }
+                }
+            }
+        }
+        drop(config_lock);
+
         // Start the processing loop in a background task
         let manager = Arc::new(self.clone_internals());
         tokio::spawn(async move {
@@ -96,6 +179,15 @@ impl JobManager {
 
     pub async fn stop(&self) -> Result<()> {
         log::info!("Stopping job manager");
+
+        // Stop WebSocket listener
+        let mut ws_task = self.ws_task.lock().await;
+        if let Some(handle) = ws_task.take() {
+            log::info!("Aborting WebSocket listener task");
+            handle.abort();
+            log::info!("✓ WebSocket listener stopped");
+        }
+        drop(ws_task);
 
         // Get current job ID and client info before clearing state
         let (job_id, auth_token, server_url) = {
@@ -188,6 +280,7 @@ impl JobManager {
             state: Arc::clone(&self.state),
             app_handle: self.app_handle.clone(),
             encoder: Arc::clone(&self.encoder),
+            ws_task: Arc::clone(&self.ws_task),
         }
     }
 

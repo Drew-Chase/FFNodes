@@ -4,8 +4,10 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-use futures_util::StreamExt;
+use futures_util::{StreamExt, SinkExt};
 use tokio_util::io::ReaderStream;
+use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio::sync::mpsc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HandshakeRequest {
@@ -61,6 +63,40 @@ pub struct TransferProgress {
     pub total_bytes: u64,
     pub percentage: f64,
     pub bytes_per_second: f64,
+}
+
+/// WebSocket event types matching server WsEvent enum
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum WsEvent {
+    JobAssigned {
+        job_id: String,
+        client_id: String,
+        media_file: String,
+    },
+    Progress {
+        job_id: String,
+        client_id: String,
+        frame: i64,
+        fps: f64,
+        speed: String,
+    },
+    JobCompleted {
+        job_id: String,
+        client_id: String,
+    },
+    JobFailed {
+        job_id: String,
+        client_id: String,
+        error: String,
+    },
+    ClientConnected {
+        client_id: String,
+        display_name: String,
+    },
+    ClientDisconnected {
+        client_id: String,
+    },
 }
 
 #[derive(Clone)]
@@ -497,6 +533,73 @@ impl ServerClient {
         let response = self.add_auth_header(self.client.get(&url)).send().await?.error_for_status()?;
         let leaderboard: LeaderboardResponse = response.json().await?;
         Ok(leaderboard)
+    }
+
+    /// Connect to WebSocket for real-time progress updates
+    /// Returns a receiver channel for incoming WebSocket events
+    pub async fn connect_websocket(&self, client_id: &str) -> Result<mpsc::UnboundedReceiver<WsEvent>> {
+        // Convert http/https URL to ws/wss
+        let ws_url = self.base_url
+            .replace("http://", "ws://")
+            .replace("https://", "wss://");
+        let ws_url = format!("{}/api/ws/progress?client_id={}", ws_url, client_id);
+
+        log::info!("Connecting to WebSocket: {}", ws_url);
+
+        // Connect to WebSocket
+        let (ws_stream, _) = connect_async(&ws_url).await
+            .map_err(|e| anyhow::anyhow!("Failed to connect to WebSocket: {}", e))?;
+
+        log::info!("✓ WebSocket connected");
+
+        let (mut write, mut read) = ws_stream.split();
+
+        // Create channel for sending events to the application
+        let (tx, rx) = mpsc::unbounded_channel();
+
+        // Spawn task to handle incoming WebSocket messages
+        tokio::spawn(async move {
+            while let Some(msg) = read.next().await {
+                match msg {
+                    Ok(Message::Text(text)) => {
+                        // Parse JSON message into WsEvent
+                        match serde_json::from_str::<WsEvent>(&text) {
+                            Ok(event) => {
+                                log::debug!("Received WebSocket event: {:?}", event);
+                                if tx.send(event).is_err() {
+                                    log::warn!("Failed to send WebSocket event - receiver dropped");
+                                    break;
+                                }
+                            }
+                            Err(e) => {
+                                log::warn!("Failed to parse WebSocket message: {} - {}", e, text);
+                            }
+                        }
+                    }
+                    Ok(Message::Ping(data)) => {
+                        log::trace!("Received WebSocket ping, sending pong");
+                        if let Err(e) = write.send(Message::Pong(data)).await {
+                            log::error!("Failed to send WebSocket pong: {}", e);
+                            break;
+                        }
+                    }
+                    Ok(Message::Close(reason)) => {
+                        log::info!("WebSocket closed: {:?}", reason);
+                        break;
+                    }
+                    Ok(_) => {
+                        // Ignore other message types (binary, pong, etc.)
+                    }
+                    Err(e) => {
+                        log::error!("WebSocket error: {}", e);
+                        break;
+                    }
+                }
+            }
+            log::info!("WebSocket connection closed");
+        });
+
+        Ok(rx)
     }
 }
 

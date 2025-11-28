@@ -127,11 +127,15 @@ pub async fn run() -> Result<()> {
         }
     });
 
+    // Create WebSocket registry
+    let ws_registry = api::websocket::create_ws_registry();
+
     // Clone for HttpServer closure
     let config_data = web::Data::new(Arc::clone(&configuration));
     let job_queue_data = web::Data::new(Arc::clone(&job_queue));
     let client_manager_data = web::Data::new(Arc::clone(&client_manager));
     let pool_data = web::Data::new(pool.clone());
+    let ws_registry_data = web::Data::new(ws_registry.clone());
 
     let server = HttpServer::new(move || {
         App::new()
@@ -140,6 +144,7 @@ pub async fn run() -> Result<()> {
             .app_data(job_queue_data.clone())
             .app_data(client_manager_data.clone())
             .app_data(pool_data.clone())
+            .app_data(ws_registry_data.clone())
             .app_data(
                 web::JsonConfig::default()
                     .limit(4096)
