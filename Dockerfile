@@ -3,7 +3,7 @@
 # =============================================================================
 # Builder Stage - Compile Rust binary (ffnodes-server ONLY)
 # =============================================================================
-FROM --platform=$BUILDPLATFORM rust:1.83-bookworm AS builder
+FROM --platform=$BUILDPLATFORM rust:1.91-bookworm AS builder
 
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM

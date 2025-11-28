@@ -40,15 +40,16 @@ impl Scanner {
             debug!("Scanning directory {:?}", dir);
             for entry in WalkDir::new(dir) {
                 let entry = entry?;
-                if let Some(extension) = entry.path().extension() {
-                    if VIDEO_EXTENSIONS.contains(&extension.to_string_lossy().to_string().as_str()) {
-                        // Check if file needs probing using smart re-probing logic
-                        match MediaFile::does_path_need_probing(entry.path(), &pool).await {
-                            Ok(needs_probing) => {
-                                if needs_probing {
-                                    debug!("File needs probing: {:?}", entry.path());
-                                    files.push(entry.into_path());
-                                } else {
+                if let Some(extension) = entry.path().extension()
+                    && VIDEO_EXTENSIONS.contains(&extension.to_string_lossy().to_string().as_str())
+                {
+                    // Check if file needs probing using smart re-probing logic
+                    match MediaFile::does_path_need_probing(entry.path(), &pool).await {
+                        Ok(needs_probing) => {
+                            if needs_probing {
+                                debug!("File needs probing: {:?}", entry.path());
+                                files.push(entry.into_path());
+                            } else {
                                 trace!("File already up-to-date: {:?}", entry.path());
                             }
                         }
@@ -58,7 +59,6 @@ impl Scanner {
                             files.push(entry.into_path());
                         }
                     }
-                }
                 }
             }
         }
