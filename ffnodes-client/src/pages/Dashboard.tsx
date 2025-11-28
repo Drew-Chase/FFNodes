@@ -66,38 +66,34 @@ export function Dashboard()
                 logger.info(`✓ Loaded ${jobs?.length || 0} active jobs`);
                 setJobQueue(jobs || []);
 
-                // Always start job processing (paused by default)
+                // Check job manager state (don't auto-start)
                 logger.info("Checking job manager state...");
                 const state: any = await invoke("get_job_manager_state");
                 logger.info("Job manager state:", state);
 
-                if (!state.is_processing)
+                if (state.is_processing)
                 {
-                    // Start job processing if not already running
-                    logger.info("Starting job processing (paused)...");
-                    await invoke("start_job_processing", {config: savedConfig, gpu});
-
-                    // Immediately pause it so user has to manually resume
-                    await invoke("pause_job_processing");
-                    setProcessing(true);
-                    setIsPaused(true);
-                    logger.info("✓ Job processing started in paused state");
-
-                    addToast({
-                        title: "Connected",
-                        description: "Connected to server. Click Resume to start processing jobs.",
-                        color: "primary"
-                    });
-                } else
-                {
-                    // Already running, check if it's paused
-                    logger.info("Job processing already active");
+                    // Already running from a previous session
+                    logger.info("Job processing already active from previous session");
                     setProcessing(true);
                     setIsPaused(state.is_paused);
 
                     addToast({
-                        title: "Info",
-                        description: "Job processing already active.",
+                        title: "Reconnected",
+                        description: state.is_paused ? "Job processing paused. Click Resume to continue." : "Job processing active.",
+                        color: "primary"
+                    });
+                }
+                else
+                {
+                    // Not running - user must manually start
+                    logger.info("Job processing not active. User must click Resume to start.");
+                    setProcessing(false);
+                    setIsPaused(true);
+
+                    addToast({
+                        title: "Connected",
+                        description: "Connected to server. Click Resume to start processing jobs.",
                         color: "primary"
                     });
                 }
@@ -304,19 +300,39 @@ export function Dashboard()
         {
             if (isPaused)
             {
-                await invoke("resume_job_processing");
-                setIsPaused(false);
-                addToast({
-                    title: "Success",
-                    description: "Job processing resumed",
-                    color: "success"
-                });
+                // Check if processing is actually running
+                const state: any = await invoke("get_job_manager_state");
+
+                if (!state.is_processing)
+                {
+                    // Start processing for the first time
+                    logger.info("Starting job processing for the first time...");
+                    await invoke("start_job_processing", {config, gpu: gpuInfo});
+                    setProcessing(true);
+                    setIsPaused(false);
+                    addToast({
+                        title: "Started",
+                        description: "Job processing started",
+                        color: "success"
+                    });
+                }
+                else
+                {
+                    // Resume existing processing
+                    await invoke("resume_job_processing");
+                    setIsPaused(false);
+                    addToast({
+                        title: "Resumed",
+                        description: "Job processing resumed",
+                        color: "success"
+                    });
+                }
             } else
             {
                 await invoke("pause_job_processing");
                 setIsPaused(true);
                 addToast({
-                    title: "Info",
+                    title: "Paused",
                     description: "Job processing paused",
                     color: "primary"
                 });

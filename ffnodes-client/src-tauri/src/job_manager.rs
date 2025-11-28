@@ -43,6 +43,7 @@ pub struct JobManager {
     app_handle: AppHandle,
     encoder: Arc<Encoder>,
     ws_task: Arc<Mutex<Option<JoinHandle<()>>>>,
+    processing_task: Arc<Mutex<Option<JoinHandle<()>>>>,
 }
 
 impl JobManager {
@@ -60,6 +61,7 @@ impl JobManager {
             app_handle,
             encoder: Arc::new(encoder),
             ws_task: Arc::new(Mutex::new(None)),
+            processing_task: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -170,9 +172,15 @@ impl JobManager {
 
         // Start the processing loop in a background task
         let manager = Arc::new(self.clone_internals());
-        tokio::spawn(async move {
+        let processing_handle = tokio::spawn(async move {
             manager.processing_loop().await;
         });
+
+        // Store the task handle so it can be aborted
+        {
+            let mut task = self.processing_task.lock().await;
+            *task = Some(processing_handle);
+        }
 
         Ok(())
     }
@@ -188,6 +196,15 @@ impl JobManager {
             log::info!("✓ WebSocket listener stopped");
         }
         drop(ws_task);
+
+        // Stop processing task (this will kill the entire processing loop including any active FFmpeg)
+        let mut processing_task = self.processing_task.lock().await;
+        if let Some(handle) = processing_task.take() {
+            log::info!("Aborting processing task (this will kill FFmpeg if running)");
+            handle.abort();
+            log::info!("✓ Processing task aborted");
+        }
+        drop(processing_task);
 
         // Get current job ID and client info before clearing state
         let (job_id, auth_token, server_url) = {
@@ -281,6 +298,7 @@ impl JobManager {
             app_handle: self.app_handle.clone(),
             encoder: Arc::clone(&self.encoder),
             ws_task: Arc::clone(&self.ws_task),
+            processing_task: Arc::clone(&self.processing_task),
         }
     }
 
@@ -545,14 +563,21 @@ impl JobManager {
             let app_handle = self.app_handle.clone();
             let client_clone = client.clone();
 
-            let (output_size, output_bitrate, average_speed) = self
-                .encoder
-                .encode_video(
-                    &input_path,
-                    &output_path,
-                    &gpu_info,
-                    ffmpeg_template,
-                    job_resp.total_frames,
+            // Spawn encoding task so we can abort it if needed
+            let encoder_clone = self.encoder.clone();
+            let input_path_clone = input_path.clone();
+            let output_path_clone = output_path.clone();
+            let gpu_info_clone = gpu_info.clone();
+            let ffmpeg_template_clone = ffmpeg_template.clone();
+            let total_frames = job_resp.total_frames;
+
+            let encoding_handle = tokio::spawn(async move {
+                encoder_clone.encode_video(
+                    &input_path_clone,
+                    &output_path_clone,
+                    &gpu_info_clone,
+                    &ffmpeg_template_clone,
+                    total_frames,
                     move |progress: EncodingProgress| {
                         // Emit progress event
                         let _ = app_handle.emit("encoding-progress", &progress);
@@ -571,7 +596,13 @@ impl JobManager {
                         });
                     },
                 )
-                .await?;
+                .await
+            });
+
+            // Wait for encoding to complete
+            let (output_size, output_bitrate, average_speed) = encoding_handle
+                .await
+                .map_err(|e| anyhow!("Encoding task failed: {}", e))??;
 
             log::info!("✓ Encoding completed successfully for job {}", job_id);
             log::debug!(
