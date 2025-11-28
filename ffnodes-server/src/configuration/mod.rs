@@ -1,5 +1,6 @@
 use std::path::PathBuf;
-use anyhow::Result;
+use actix_multipart::form::json;
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use ffmpeg::FFMpeg;
 use uuid::Uuid;
@@ -18,7 +19,6 @@ pub struct Configuration {
     pub output_container: String,
     pub client_timeout_seconds: u64,
     pub notify_batch_interval_seconds: u64,
-    pub max_concurrent_jobs_per_client: u32,
 }
 
 impl Default for Configuration {
@@ -29,11 +29,10 @@ impl Default for Configuration {
             watch_directories: vec![],
             server_guid: Uuid::new_v4().to_string(),
             jwt_secret: Uuid::new_v4().to_string(),
-            ffmpeg_template: "-i {INPUT} -c:v h264{HWACCEL_CODE} -c:a aac {OUTPUT}".to_string(),
+            ffmpeg_template: r#"-i {INPUT} -map 0 -c:v h264{HWACCEL_CODE} -b:v 5M -maxrate 8M -bufsize 8M -profile:v high -vf "scale='min(1920,iw)':-2" -c:a aac -b:a 320k {OUTPUT}"#.to_string(),
             output_container: "mp4".to_string(),
             client_timeout_seconds: 300,
             notify_batch_interval_seconds: 30,
-            max_concurrent_jobs_per_client: 4,
         }
     }
 }
@@ -43,6 +42,7 @@ impl Configuration {
         if !tokio::fs::try_exists(CONFIG_FILE_NAME).await? {
             let mut default_config = Self::default();
             default_config.reset().await?;
+            default_config.parse_env()?;
             return Ok(default_config);
         }
         let config_file = tokio::fs::File::open(CONFIG_FILE_NAME).await?;
@@ -65,12 +65,41 @@ impl Configuration {
             .into_iter()
             .filter_map(|p| p.canonicalize().ok())
             .collect();
+        config.parse_env()?;
 
         Ok(config)
     }
     pub async fn save(&self) -> Result<()> {
         let config_file = tokio::fs::File::create(CONFIG_FILE_NAME).await?;
         serde_json::to_writer_pretty(config_file.into_std().await, self)?;
+        Ok(())
+    }
+
+    fn parse_env(&mut self) -> Result<()> {
+        if let Ok(s_port) = std::env::var("FFNODE_PORT") {
+            self.port = s_port.parse().map_err(|_| anyhow!("FFNODE_PORT must be a valid integer"))?;
+        }
+        if let Ok(container) = std::env::var("FFNODE_OUTPUT_CONTAINER") {
+            self.output_container = container;
+        }
+
+        if let Ok(directories) = std::env::var("FFNODE_WATCH_DIRECTORIES") {
+            self.watch_directories = serde_json::from_str(directories.as_str())?;
+        }
+
+        if let Ok(ffmpeg_template) = std::env::var("FFNODE_FFMPEG_TEMPLATE") {
+            self.ffmpeg_template = ffmpeg_template;
+        }
+        if let Ok(guid) = std::env::var("FFNODE_SERVER_GUID") {
+            self.server_guid = guid;
+        }
+        if let Ok(client_timeout_seconds) = std::env::var("FFNODE_CLIENT_TIMEOUT_SECONDS") {
+            self.client_timeout_seconds = client_timeout_seconds.parse().map_err(|_| anyhow!("FFNODE_CLIENT_TIMEOUT_SECONDS must be a valid integer"))?;
+        }
+        if let Ok(notify_batch_interval_seconds) = std::env::var("FFNODE_NOTIFY_BATCH_INTERVAL_SECONDS") {
+            self.notify_batch_interval_seconds = notify_batch_interval_seconds.parse().map_err(|_| anyhow!("FFNODE_NOTIFY_BATCH_INTERVAL_SECONDS must be a valid integer"))?;
+        }
+
         Ok(())
     }
 
