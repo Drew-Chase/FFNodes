@@ -39,25 +39,28 @@ ENV SQLX_OFFLINE=true
 COPY Cargo.toml Cargo.lock ./
 COPY ffmpeg/Cargo.toml ./ffmpeg/
 COPY ffnodes-server/Cargo.toml ./ffnodes-server/
+COPY ffnodes-client/src-tauri/Cargo.toml ./ffnodes-client/src-tauri/
 
 # Create dummy source files to build dependencies (cache optimization)
 RUN mkdir -p ffmpeg/src && echo "fn main() {}" > ffmpeg/src/lib.rs && \
     mkdir -p ffnodes-server/src && echo "fn main() {}" > ffnodes-server/src/main.rs && \
-    echo "fn main() {}" > ffnodes-server/src/lib.rs
+    echo "fn main() {}" > ffnodes-server/src/lib.rs && \
+    mkdir -p ffnodes-client/src-tauri/src && echo "fn main() {}" > ffnodes-client/src-tauri/src/lib.rs && \
+    echo "fn main() {}" > ffnodes-client/src-tauri/src/main.rs
 
 # Build dependencies only (this layer will be cached)
 RUN case "$TARGETARCH" in \
     "amd64") \
-        cargo build --release --target x86_64-unknown-linux-gnu --bin ffnodes-server || true \
+        cargo build --release --target x86_64-unknown-linux-gnu --bin ffnodes_server || true \
         ;; \
     "arm64") \
         CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
-        cargo build --release --target aarch64-unknown-linux-gnu --bin ffnodes-server || true \
+        cargo build --release --target aarch64-unknown-linux-gnu --bin ffnodes_server || true \
         ;; \
     esac
 
 # Remove dummy files
-RUN rm -rf ffmpeg/src ffnodes-server/src
+RUN rm -rf ffmpeg/src ffnodes-server/src ffnodes-client/src-tauri/src
 
 # Copy ONLY server and library source (NOT client)
 COPY ffmpeg/ ./ffmpeg/
@@ -66,18 +69,18 @@ COPY ffnodes-server/ ./ffnodes-server/
 # Build the actual server binary
 RUN case "$TARGETARCH" in \
     "amd64") \
-        cargo build --release --target x86_64-unknown-linux-gnu --bin ffnodes-server && \
-        cp target/x86_64-unknown-linux-gnu/release/ffnodes-server /build/ffnodes-server \
+        cargo build --release --target x86_64-unknown-linux-gnu --bin ffnodes_server && \
+        cp target/x86_64-unknown-linux-gnu/release/ffnodes_server /build/ffnodes_server \
         ;; \
     "arm64") \
         CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
-        cargo build --release --target aarch64-unknown-linux-gnu --bin ffnodes-server && \
-        cp target/aarch64-unknown-linux-gnu/release/ffnodes-server /build/ffnodes-server \
+        cargo build --release --target aarch64-unknown-linux-gnu --bin ffnodes_server && \
+        cp target/aarch64-unknown-linux-gnu/release/ffnodes_server /build/ffnodes_server \
         ;; \
     esac
 
 # Strip binary to reduce size
-RUN strip /build/ffnodes-server
+RUN strip /build/ffnodes_server
 
 # =============================================================================
 # Runtime Stage - Minimal image with FFmpeg and server binary ONLY
@@ -100,9 +103,9 @@ RUN useradd --create-home --shell /bin/bash ffnodes && \
     chown -R ffnodes:ffnodes /app
 
 # Copy ONLY the server binary from builder (no client, no library)
-COPY --from=builder /build/ffnodes-server /app/ffnodes-server
-RUN chmod +x /app/ffnodes-server && \
-    chown ffnodes:ffnodes /app/ffnodes-server
+COPY --from=builder /build/ffnodes_server /app/ffnodes_server
+RUN chmod +x /app/ffnodes_server && \
+    chown ffnodes:ffnodes /app/ffnodes_server
 
 # Switch to non-root user
 USER ffnodes
@@ -123,4 +126,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD ["wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/status"]
 
 # Entry point - run server only
-ENTRYPOINT ["/app/ffnodes-server"]
+ENTRYPOINT ["/app/ffnodes_server"]
