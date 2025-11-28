@@ -3,6 +3,8 @@ use tokio::io::{BufReader, AsyncBufReadExt};
 
 #[tokio::main]
 async fn main() {
+    // Runs this command:
+    // gh act --container-options "--privileged --user 0"
     let mut child = Command::new("gh")
         .arg("act")
         .arg("--container-options")
