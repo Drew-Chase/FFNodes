@@ -89,7 +89,7 @@ impl FFMpeg {
 	}
 
 	pub async fn find_ffmpeg() -> Result<Option<PathBuf>> {
-		let output = {
+		let mut cmd = {
 			#[cfg(target_os = "windows")]
 			{
 				Command::new("where")
@@ -98,10 +98,16 @@ impl FFMpeg {
 			{
 				Command::new("which")
 			}
+		};
+		cmd.arg("ffmpeg");
+
+		// On Windows, prevent creating a new console window
+		#[cfg(target_os = "windows")]
+		{
+			cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
 		}
-			.arg("ffmpeg")
-			.output()
-			.await?;
+
+		let output = cmd.output().await?;
 
 		let output = String::from_utf8(output.stdout)?;
 		let output = output.trim();
@@ -111,7 +117,7 @@ impl FFMpeg {
 		}
 	}
 	pub async fn find_ffprobe() -> Result<Option<PathBuf>> {
-		let output = {
+		let mut cmd = {
 			#[cfg(target_os = "windows")]
 			{
 				Command::new("where")
@@ -120,10 +126,16 @@ impl FFMpeg {
 			{
 				Command::new("which")
 			}
+		};
+		cmd.arg("ffprobe");
+
+		// On Windows, prevent creating a new console window
+		#[cfg(target_os = "windows")]
+		{
+			cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
 		}
-			.arg("ffprobe")
-			.output()
-			.await?;
+
+		let output = cmd.output().await?;
 
 		let output: String = String::from_utf8(output.stdout)?;
 		let output = output.trim();
@@ -326,12 +338,19 @@ impl FFMpeg {
 
 		log::debug!("Executing: {:?} with args: {:?} in {:?}", binary_path, args, working_dir);
 
-		let mut child = Command::new(binary_path)
-			.args(args)
+		let mut cmd = Command::new(binary_path);
+		cmd.args(args)
 			.current_dir(&working_dir)
 			.stdout(std::process::Stdio::piped())
-			.stderr(std::process::Stdio::piped())
-			.spawn()?;
+			.stderr(std::process::Stdio::piped());
+
+		// On Windows, prevent creating a new console window
+		#[cfg(target_os = "windows")]
+		{
+			cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+		}
+
+		let mut child = cmd.spawn()?;
 
 		// Store the process ID if requested
 		if let Some(pid_storage) = pid_storage {
