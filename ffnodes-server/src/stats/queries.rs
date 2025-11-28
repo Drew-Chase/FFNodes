@@ -5,7 +5,7 @@ use sqlx::SqlitePool;
 /// Get client history with completed jobs
 pub async fn get_client_history(pool: &SqlitePool, client_id: &str) -> Result<ClientHistoryResponse> {
     // Query all completed jobs for this client with necessary data
-    let jobs: Vec<(String, i64, Option<i64>, i64, i64, i64, Option<String>, Option<f64>)> = sqlx::query_as(
+    let jobs: Vec<(String, i64, Option<i64>, i64, i64, Option<f64>)> = sqlx::query_as(
         r#"
         SELECT
             ej.media_file_path,
@@ -13,12 +13,9 @@ pub async fn get_client_history(pool: &SqlitePool, client_id: &str) -> Result<Cl
             ej.output_size,
             ej.started_at,
             ej.completed_at,
-            mf.frames,
-            ep.speed,
-            ep.fps
+            ej.average_speed
         FROM encoding_jobs ej
         JOIN media_files mf ON ej.media_file_path = mf.path
-        LEFT JOIN encoding_progress ep ON ej.id = ep.job_id
         WHERE ej.assigned_client = ?
         AND ej.status = 'completed'
         AND ej.output_size IS NOT NULL
@@ -37,7 +34,7 @@ pub async fn get_client_history(pool: &SqlitePool, client_id: &str) -> Result<Cl
     let mut total_size_after = 0i64;
     let mut speed_count = 0;
 
-    for (path, scanned_size, output_size, started_at, completed_at, _frames, speed_opt, _fps) in jobs {
+    for (path, scanned_size, output_size, started_at, completed_at, speed_opt) in jobs {
         let duration = completed_at - started_at;
         let size_after = output_size.unwrap_or(scanned_size);
         let size_saved = scanned_size - size_after;
@@ -47,11 +44,8 @@ pub async fn get_client_history(pool: &SqlitePool, client_id: &str) -> Result<Cl
             0.0
         };
 
-        // Parse speed (format: "2.5x") - handle NULL from LEFT JOIN
-        let average_speed = speed_opt
-            .as_ref()
-            .and_then(|s| s.trim_end_matches('x').parse::<f64>().ok())
-            .unwrap_or(0.0);
+        // Use average_speed directly from encoding_jobs table
+        let average_speed = speed_opt.unwrap_or(0.0);
 
         // Extract filename from path
         let filename = path.split(['/', '\\']).last().unwrap_or(&path).to_string();
@@ -237,14 +231,11 @@ pub async fn get_leaderboard(
             // Average encoding speed per client
             let results: Vec<(String, f64)> = sqlx::query_as(
                 r#"
-                SELECT c.display_name, AVG(
-                    CAST(REPLACE(ep.speed, 'x', '') AS REAL)
-                ) as avg_speed
+                SELECT c.display_name, AVG(ej.average_speed) as avg_speed
                 FROM encoding_jobs ej
                 JOIN clients c ON ej.assigned_client = c.id
-                LEFT JOIN encoding_progress ep ON ej.id = ep.job_id
                 WHERE ej.status = 'completed'
-                AND ep.speed IS NOT NULL
+                AND ej.average_speed IS NOT NULL
                 GROUP BY ej.assigned_client, c.display_name
                 HAVING COUNT(*) >= 3
                 ORDER BY avg_speed DESC

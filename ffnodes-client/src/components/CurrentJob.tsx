@@ -50,7 +50,7 @@ function calculateTransferETA(transferred?: number, total?: number, speed?: numb
   return `${secs}s`;
 }
 
-function calculateEncodingETA(remainingFrames: number, fps: number, speed: number): string {
+function calculateEncodingETA(remainingFrames: number, fps: number): string {
   if (fps === 0) return 'Calculating...';
 
   // FFmpeg's fps value is the actual encoding speed (frames per second being processed)
@@ -225,7 +225,7 @@ export function CurrentJob() {
           <div className="mt-6 text-center">
             <span className="text-sm text-default-500">Estimated Time Remaining: </span>
             <span className="text-secondary font-bold">
-              {calculateEncodingETA(totalFrames - frame, fps, speed)}
+              {calculateEncodingETA(totalFrames - frame, fps)}
             </span>
           </div>
         )}
