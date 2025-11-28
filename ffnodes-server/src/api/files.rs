@@ -3,9 +3,10 @@ use crate::http_error::Error;
 use crate::jobs::JobQueue;
 use crate::path_security;
 use actix_multipart::Multipart;
-use actix_web::{web, HttpResponse};
+use actix_web::{get, post, web, HttpResponse};
 use futures_util::StreamExt;
 use log::{debug, warn};
+use serde_json::json;
 use std::fs::File;
 use std::io::Write as _;
 use std::path::Path;
@@ -15,6 +16,7 @@ use tokio::io::AsyncReadExt;
 
 /// Download input file for a job
 /// GET /api/files/{job_id}/input
+#[get("/{job_id}/input")]
 pub async fn download_input(
     job_id: web::Path<String>,
     job_queue: web::Data<Arc<JobQueue>>,
@@ -99,6 +101,7 @@ pub async fn download_input(
 
 /// Upload output file for a job
 /// POST /api/files/{job_id}/output
+#[post("/{job_id}/output")]
 pub async fn upload_output(
     job_id: web::Path<String>,
     mut payload: Multipart,
@@ -226,4 +229,17 @@ pub async fn upload_output(
         "path": validated_path.display().to_string(),
         "original_deleted": original_path != validated_path && !original_path.exists()
     })))
+}
+
+pub fn configure(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/files")
+            .service(download_input)
+            .service(upload_output)
+            .default_service(web::to(|| async {
+                HttpResponse::NotFound().json(json!({
+                    "error": "API endpoint not found".to_string(),
+                }))
+            })),
+    );
 }

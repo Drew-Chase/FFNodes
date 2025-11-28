@@ -160,65 +160,27 @@ pub async fn run() -> Result<()> {
             .service(
                 web::scope("api")
                     // Authentication (no middleware required)
-                    .route("/handshake", web::post().to(api::auth::handshake))
+                    .configure(api::auth::configure)
                     // Protected endpoints (JWT required)
                     .service(
                         web::scope("")
                             .wrap(actix_web::middleware::from_fn(middleware::jwt_auth::jwt_auth))
-                            // Job endpoints
-                            .route(
-                                "/jobs/request/{client_id}",
-                                web::post().to(api::jobs::request_job),
-                            )
-                            .route("/jobs/{job_id}/start", web::post().to(api::jobs::start_job))
-                            .route(
-                                "/jobs/{job_id}/progress",
-                                web::post().to(api::jobs::update_progress),
-                            )
-                            .route(
-                                "/jobs/{job_id}/complete",
-                                web::post().to(api::jobs::complete_job),
-                            )
-                            .route("/jobs/{job_id}/fail", web::post().to(api::jobs::fail_job))
-                            .route("/jobs/{job_id}/cancel", web::post().to(api::jobs::cancel_job))
-                            .route("/jobs/active", web::get().to(api::jobs::get_active_jobs))
-                            // File transfer
-                            .route(
-                                "/files/{job_id}/input",
-                                web::get().to(api::files::download_input),
-                            )
-                            .route(
-                                "/files/{job_id}/output",
-                                web::post().to(api::files::upload_output),
-                            )
-                            // Heartbeat
-                            .route(
-                                "/heartbeat/{client_id}",
-                                web::post().to(api::jobs::heartbeat),
-                            )
-                            // Monitoring
-                            .route("/status", web::get().to(api::monitoring::get_status))
-                            .route("/clients", web::get().to(api::monitoring::get_clients))
-                            .route(
-                                "/scan/progress",
-                                web::get().to(api::monitoring::scan_progress),
-                            )
-                            // Statistics
-                            .route(
-                                "/stats/client/{client_id}/history",
-                                web::get().to(api::stats::get_client_history),
-                            )
-                            .route(
-                                "/stats/remote-progress",
-                                web::get().to(api::stats::get_remote_progress),
-                            )
-                            .route(
-                                "/stats/leaderboard",
-                                web::get().to(api::stats::get_leaderboard),
-                            )
-                            // WebSocket
-                            .route("/ws/progress", web::get().to(api::websocket::ws_progress))
+                            .configure(api::jobs::configure)
+                            .configure(api::files::configure)
+                            .configure(api::monitoring::configure)
+                            .configure(api::stats::configure)
+                            .configure(api::websocket::configure)
+                            .default_service(web::to(|| async {
+                                HttpResponse::NotFound().json(json!({
+                                    "error": "API endpoint not found".to_string(),
+                                }))
+                            }))
                     )
+                    .default_service(web::to(|| async {
+                        HttpResponse::NotFound().json(json!({
+                            "error": "API endpoint not found".to_string(),
+                        }))
+                    }))
             )
     })
     .workers(4)

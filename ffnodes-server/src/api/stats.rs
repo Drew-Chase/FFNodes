@@ -1,10 +1,12 @@
 use crate::http_error::Error as HttpError;
 use crate::stats::{models::LeaderboardCategory, queries};
-use actix_web::{web, HttpResponse};
+use actix_web::{get, web, HttpResponse};
+use serde_json::json;
 use sqlx::SqlitePool;
 
 /// Get client history statistics
 /// GET /api/stats/client/{client_id}/history
+#[get("/client/{client_id}/history")]
 pub async fn get_client_history(
     client_id: web::Path<String>,
     pool: web::Data<SqlitePool>,
@@ -15,6 +17,7 @@ pub async fn get_client_history(
 
 /// Get remote users' progress
 /// GET /api/stats/remote-progress?exclude_self={client_id}
+#[get("/remote-progress")]
 pub async fn get_remote_progress(
     pool: web::Data<SqlitePool>,
     query: web::Query<std::collections::HashMap<String, String>>,
@@ -26,6 +29,7 @@ pub async fn get_remote_progress(
 
 /// Get leaderboard data
 /// GET /api/stats/leaderboard?category={most_jobs|most_saved|highest_speed}
+#[get("/leaderboard")]
 pub async fn get_leaderboard(
     pool: web::Data<SqlitePool>,
     query: web::Query<std::collections::HashMap<String, String>>,
@@ -40,4 +44,18 @@ pub async fn get_leaderboard(
 
     let leaderboard = queries::get_leaderboard(&pool, category).await?;
     Ok(HttpResponse::Ok().json(leaderboard))
+}
+
+pub fn configure(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/stats")
+            .service(get_client_history)
+            .service(get_remote_progress)
+            .service(get_leaderboard)
+            .default_service(web::to(|| async {
+                HttpResponse::NotFound().json(json!({
+                    "error": "API endpoint not found".to_string(),
+                }))
+            })),
+    );
 }

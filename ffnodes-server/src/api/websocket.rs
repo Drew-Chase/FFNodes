@@ -1,10 +1,11 @@
 use crate::clients::ClientManager;
 use crate::jobs::JobQueue;
-use actix_web::{web, HttpRequest, HttpResponse};
+use actix_web::{get, web, HttpRequest, HttpResponse};
 use actix_ws::Message as WsMessage;
 use futures::StreamExt;
 use log::debug;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use std::collections::HashMap;
@@ -58,6 +59,7 @@ pub enum WsEvent {
 }
 
 /// WebSocket endpoint for progress updates
+#[get("/progress")]
 pub async fn ws_progress(
     req: HttpRequest,
     stream: web::Payload,
@@ -175,4 +177,16 @@ pub async fn broadcast_event(registry: &WsRegistry, event: WsEvent) {
     if !dead_senders.is_empty() {
         debug!("Detected {} dead WebSocket connections", dead_senders.len());
     }
+}
+
+pub fn configure(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/ws")
+            .service(ws_progress)
+            .default_service(web::to(|| async {
+                HttpResponse::NotFound().json(json!({
+                    "error": "API endpoint not found".to_string(),
+                }))
+            })),
+    );
 }

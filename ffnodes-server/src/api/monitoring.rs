@@ -2,11 +2,12 @@ use crate::clients::ClientManager;
 use crate::http_error::Error;
 use crate::jobs::JobQueue;
 use crate::media_files::progress;
-use actix_web::{web, HttpResponse, HttpRequest};
+use actix_web::{get, web, HttpResponse, HttpRequest};
 use tracing::{debug, warn, error};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
+use serde_json::json;
 
 /// System status response
 #[derive(Debug, Serialize, Deserialize)]
@@ -18,6 +19,7 @@ pub struct SystemStatus {
 }
 
 /// Get overall system status
+#[get("/status")]
 pub async fn get_status(
     job_queue: web::Data<Arc<JobQueue>>,
     client_manager: web::Data<Arc<ClientManager>>,
@@ -50,6 +52,7 @@ pub async fn get_status(
 }
 
 /// Get all connected clients with their statuses
+#[get("/clients")]
 pub async fn get_clients(
     client_manager: web::Data<Arc<ClientManager>>,
 ) -> Result<HttpResponse, Error> {
@@ -67,6 +70,7 @@ pub async fn get_clients(
 }
 
 /// Server-Sent Events endpoint for scan progress
+#[get("/scan/progress")]
 pub async fn scan_progress(_req: HttpRequest) -> Result<HttpResponse, Error> {
     debug!("New SSE client connected for scan progress");
 
@@ -132,4 +136,18 @@ pub async fn scan_progress(_req: HttpRequest) -> Result<HttpResponse, Error> {
         .insert_header(("Cache-Control", "no-cache"))
         .insert_header(("X-Accel-Buffering", "no"))
         .streaming(Box::pin(stream)))
+}
+
+pub fn configure(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/monitoring")
+            .service(get_status)
+            .service(get_clients)
+            .service(scan_progress)
+            .default_service(web::to(|| async {
+                HttpResponse::NotFound().json(json!({
+                    "error": "API endpoint not found".to_string(),
+                }))
+            })),
+    );
 }

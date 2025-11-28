@@ -2,11 +2,13 @@ use crate::clients::ClientManager;
 use crate::configuration::Configuration;
 use crate::http_error::Error;
 use crate::jobs::{JobCompletion, JobFailure, JobQueue, JobResponse, ProgressUpdate};
-use actix_web::{web, HttpResponse};
+use actix_web::{get, post, web, HttpResponse};
 use log::{debug, warn};
+use serde_json::json;
 use std::sync::Arc;
 
 /// Request next job
+#[post("/request/{client_id}")]
 pub async fn request_job(
     client_id: web::Path<String>,
     job_queue: web::Data<Arc<JobQueue>>,
@@ -71,6 +73,7 @@ pub async fn request_job(
 }
 
 /// Update job progress
+#[post("/{job_id}/progress")]
 pub async fn update_progress(
     job_id: web::Path<String>,
     progress: web::Json<ProgressUpdate>,
@@ -110,6 +113,7 @@ pub async fn update_progress(
 }
 
 /// Mark job as in progress
+#[post("/{job_id}/start")]
 pub async fn start_job(
     job_id: web::Path<String>,
     job_queue: web::Data<Arc<JobQueue>>,
@@ -125,6 +129,7 @@ pub async fn start_job(
 }
 
 /// Complete job
+#[post("/{job_id}/complete")]
 pub async fn complete_job(
     job_id: web::Path<String>,
     completion: web::Json<JobCompletion>,
@@ -164,6 +169,7 @@ pub async fn complete_job(
 }
 
 /// Fail job
+#[post("/{job_id}/fail")]
 pub async fn fail_job(
     job_id: web::Path<String>,
     failure: web::Json<JobFailure>,
@@ -183,6 +189,7 @@ pub async fn fail_job(
 }
 
 /// Cancel job and requeue it
+#[post("/{job_id}/cancel")]
 pub async fn cancel_job(
     job_id: web::Path<String>,
     job_queue: web::Data<Arc<JobQueue>>,
@@ -201,6 +208,7 @@ pub async fn cancel_job(
 }
 
 /// Heartbeat endpoint
+#[post("/heartbeat/{client_id}")]
 pub async fn heartbeat(
     client_id: web::Path<String>,
     client_manager: web::Data<Arc<ClientManager>>,
@@ -219,6 +227,7 @@ pub async fn heartbeat(
 }
 
 /// Get active jobs
+#[get("/active")]
 pub async fn get_active_jobs(
     job_queue: web::Data<Arc<JobQueue>>,
 ) -> Result<HttpResponse, Error> {
@@ -230,4 +239,23 @@ pub async fn get_active_jobs(
     })?;
 
     Ok(HttpResponse::Ok().json(jobs))
+}
+
+pub fn configure(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/jobs")
+            .service(request_job)
+            .service(start_job)
+            .service(update_progress)
+            .service(complete_job)
+            .service(fail_job)
+            .service(cancel_job)
+            .service(heartbeat)
+            .service(get_active_jobs)
+            .default_service(web::to(|| async {
+                HttpResponse::NotFound().json(json!({
+                    "error": "API endpoint not found".to_string(),
+                }))
+            })),
+    );
 }

@@ -2,11 +2,13 @@ use crate::clients::{AuthResponse, ClientManager, ClientRegistration};
 use crate::configuration::Configuration;
 use crate::http_error::Error;
 use crate::jwt;
-use actix_web::{web, HttpResponse};
+use actix_web::{post, web, HttpResponse};
 use log::{debug, warn};
+use serde_json::json;
 use std::sync::Arc;
 
 /// Handshake endpoint - validates server GUID and registers client
+#[post("/handshake")]
 pub async fn handshake(
     registration: web::Json<ClientRegistration>,
     config: web::Data<Arc<Configuration>>,
@@ -49,4 +51,16 @@ pub async fn handshake(
     };
 
     Ok(HttpResponse::Ok().json(response))
+}
+
+pub fn configure(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/auth")
+            .service(handshake)
+            .default_service(web::to(|| async {
+                HttpResponse::NotFound().json(json!({
+                    "error": "API endpoint not found".to_string(),
+                }))
+            })),
+    );
 }
