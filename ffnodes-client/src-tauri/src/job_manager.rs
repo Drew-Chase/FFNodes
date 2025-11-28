@@ -197,10 +197,14 @@ impl JobManager {
         }
         drop(ws_task);
 
-        // Stop processing task (this will kill the entire processing loop including any active FFmpeg)
+        // Kill any running FFmpeg process first
+        log::info!("Attempting to kill any running FFmpeg process");
+        self.encoder.abort_encoding().await;
+
+        // Stop processing task (this will kill the entire processing loop)
         let mut processing_task = self.processing_task.lock().await;
         if let Some(handle) = processing_task.take() {
-            log::info!("Aborting processing task (this will kill FFmpeg if running)");
+            log::info!("Aborting processing task");
             handle.abort();
             log::info!("✓ Processing task aborted");
         }

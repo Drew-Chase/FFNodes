@@ -4,10 +4,12 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 use log::trace;
 use tokio::join;
 use tokio::process::Command;
 use tokio::io::BufReader;
+use tokio::sync::Mutex;
 use crate::builders::{FFmpegBuilder, FFprobeBuilder};
 
 const FFBINARIES_API: &str = "https://ffbinaries.com/api/v1/version/latest";
@@ -284,7 +286,17 @@ impl FFMpeg {
 		working_dir: impl Into<PathBuf>,
 		sender: tokio::sync::mpsc::Sender<String>,
 	) -> Result<()> {
-		self.exec(true, args, working_dir, sender).await
+		self.exec(true, args, working_dir, sender, None).await
+	}
+
+	pub async fn exec_ffmpeg_with_pid(
+		&self,
+		args: &[&str],
+		working_dir: impl Into<PathBuf>,
+		sender: tokio::sync::mpsc::Sender<String>,
+		pid_storage: Arc<Mutex<Option<u32>>>,
+	) -> Result<()> {
+		self.exec(true, args, working_dir, sender, Some(pid_storage)).await
 	}
 
 	pub async fn exec_ffprobe(
@@ -293,7 +305,7 @@ impl FFMpeg {
 		working_dir: impl Into<PathBuf>,
 		sender: tokio::sync::mpsc::Sender<String>,
 	) -> Result<()> {
-		self.exec(false, args, working_dir, sender).await
+		self.exec(false, args, working_dir, sender, None).await
 	}
 
 	pub async fn exec(
@@ -302,6 +314,7 @@ impl FFMpeg {
 		args: &[&str],
 		working_dir: impl Into<PathBuf>,
 		sender: tokio::sync::mpsc::Sender<String>,
+		pid_storage: Option<Arc<Mutex<Option<u32>>>>,
 	) -> Result<()> {
 		let binary_path = if ffmpeg {
 			&self.ffmpeg_path
@@ -319,6 +332,15 @@ impl FFMpeg {
 			.stdout(std::process::Stdio::piped())
 			.stderr(std::process::Stdio::piped())
 			.spawn()?;
+
+		// Store the process ID if requested
+		if let Some(pid_storage) = pid_storage {
+			if let Some(pid) = child.id() {
+				let mut lock = pid_storage.lock().await;
+				*lock = Some(pid);
+				log::debug!("Stored FFmpeg process ID: {}", pid);
+			}
+		}
 
 		let stdout = child.stdout.take().ok_or_else(|| anyhow::anyhow!("Failed to capture stdout"))?;
 		let stderr = child.stderr.take().ok_or_else(|| anyhow::anyhow!("Failed to capture stderr"))?;

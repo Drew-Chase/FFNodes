@@ -3,6 +3,8 @@ use anyhow::{Result, anyhow};
 use base64::{Engine as _, engine::general_purpose};
 use ffmpeg::FFMpeg;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use tokio::fs;
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -25,6 +27,7 @@ struct ProgressState {
 pub struct Encoder {
     ffmpeg: FFMpeg,
     temp_dir: PathBuf,
+    current_ffmpeg_pid: Arc<Mutex<Option<u32>>>,
 }
 
 impl Encoder {
@@ -38,7 +41,33 @@ impl Encoder {
 
         log::info!("FFmpeg binary located at: {:?}", ffmpeg);
 
-        Ok(Self { ffmpeg, temp_dir })
+        Ok(Self {
+            ffmpeg,
+            temp_dir,
+            current_ffmpeg_pid: Arc::new(Mutex::new(None)),
+        })
+    }
+
+    /// Abort any currently running FFmpeg process
+    pub async fn abort_encoding(&self) {
+        let mut pid_lock = self.current_ffmpeg_pid.lock().await;
+        if let Some(pid) = *pid_lock {
+            log::info!("Killing FFmpeg process with PID: {}", pid);
+            #[cfg(target_os = "windows")]
+            {
+                let _ = std::process::Command::new("taskkill")
+                    .args(&["/F", "/PID", &pid.to_string()])
+                    .output();
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                unsafe {
+                    libc::kill(pid as i32, libc::SIGKILL);
+                }
+            }
+            *pid_lock = None;
+            log::info!("✓ FFmpeg process killed");
+        }
     }
 
     /// Extract a random frame from the video for background
@@ -210,8 +239,9 @@ impl Encoder {
         log::info!("Starting FFmpeg encoding process");
         log::debug!("FFmpeg command: {}", cmd);
 
-        // Execute in background and process progress
-        let handle = tokio::spawn(async move { cmd.execute(None, Some(tx)).await });
+        // Execute in background and process progress with PID storage
+        let pid_storage = self.current_ffmpeg_pid.clone();
+        let handle = tokio::spawn(async move { cmd.execute_with_pid(None, Some(tx), pid_storage).await });
 
         // Process progress updates with stateful accumulation
         let mut progress_state = ProgressState::default();

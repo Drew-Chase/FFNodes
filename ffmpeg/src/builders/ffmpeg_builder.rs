@@ -4,6 +4,7 @@ use crate::FFMpeg;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 /// FFmpeg command builder with fluent API
 ///
@@ -853,6 +854,47 @@ impl FFmpegCommand {
         // Execute and wait for completion
         let result = self.ffmpeg
             .exec_ffmpeg(&args, working_dir, actual_sender)
+            .await
+            .map_err(|e| BuilderError::ExecutionError(e.to_string()));
+
+        // Wait for drain task if we spawned one
+        if let Some(handle) = drain_handle {
+            let _ = handle.await;
+        }
+
+        result
+    }
+
+    /// Execute the command with process ID storage for cancellation
+    pub async fn execute_with_pid(
+        &self,
+        working_dir: Option<PathBuf>,
+        sender: Option<tokio::sync::mpsc::Sender<String>>,
+        pid_storage: Arc<Mutex<Option<u32>>>,
+    ) -> Result<()> {
+        let working_dir = working_dir.unwrap_or_else(|| PathBuf::from("."));
+
+        // CRITICAL FIX: Only create channel if no sender provided
+        let has_custom_sender = sender.is_some();
+        let (tx, mut rx) = tokio::sync::mpsc::channel(100);
+        let actual_sender = sender.unwrap_or(tx);
+
+        let args: Vec<&str> = self.args.iter().map(|s| s.as_str()).collect();
+
+        // If no custom sender, spawn task to drain the channel to prevent blocking
+        let drain_handle = if !has_custom_sender {
+            Some(tokio::spawn(async move {
+                while rx.recv().await.is_some() {
+                    // Discard output if no custom receiver
+                }
+            }))
+        } else {
+            None
+        };
+
+        // Execute with PID storage and wait for completion
+        let result = self.ffmpeg
+            .exec_ffmpeg_with_pid(&args, working_dir, actual_sender, pid_storage)
             .await
             .map_err(|e| BuilderError::ExecutionError(e.to_string()));
 
