@@ -15,6 +15,7 @@ import {Logger} from "../utils/logger";
 import {HistoryBento} from "../components/stats/HistoryBento";
 import {RemoteUsersBento} from "../components/stats/RemoteUsersBento";
 import {LeaderboardBento} from "../components/stats/LeaderboardBento";
+import {SettingsModal} from "../components/SettingsModal";
 
 export function Dashboard()
 {
@@ -25,6 +26,7 @@ export function Dashboard()
     const [gpuInfo, setGpuInfo] = useState<any>(null);
     const [isPaused, setIsPaused] = useState(false);
     const [isProcessingStarted, setIsProcessingStarted] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
     // Create logger for Dashboard
     const logger = new Logger("Dashboard");
@@ -120,11 +122,9 @@ export function Dashboard()
 
         loadInitialData();
 
-        // Cleanup: Stop job processing on unmount
-        return () =>
-        {
-            invoke("stop_job_processing").catch(console.error);
-        };
+        // Note: Removed cleanup effect that stopped job processing on unmount
+        // Processing now continues even when navigating within the app
+        // This allows settings modal to open without stopping encoding
     }, [navigate, setConfig, setJobQueue, setProcessing]);
 
     // Set up event listeners for job updates
@@ -382,7 +382,7 @@ export function Dashboard()
                                 </Button>
                                 <Button
                                     color="secondary"
-                                    onPress={() => navigate("/settings")}
+                                    onPress={() => setIsSettingsOpen(true)}
                                     className="rounded-md-lg shadow-md-2"
                                 >
                                     <iconify-icon icon="mdi:cog" class="text-lg mr-1"/>
@@ -535,7 +535,7 @@ export function Dashboard()
                         elevation={2}
                         background="solid"
                         hover
-                        onClick={() => navigate("/settings")}
+                        onClick={() => setIsSettingsOpen(true)}
                     >
                         <BentoCardHeader
                             title="Quick Settings"
@@ -593,6 +593,12 @@ export function Dashboard()
                     </BentoCard>
                 </BentoGrid>
             </div>
+
+            {/* Settings Modal */}
+            <SettingsModal
+                isOpen={isSettingsOpen}
+                onClose={() => setIsSettingsOpen(false)}
+            />
         </>
     );
 }
