@@ -165,6 +165,24 @@ impl ServerClient {
         Ok(())
     }
 
+    pub async fn cancel_job(&self, job_id: &str) -> Result<()> {
+        let url = format!("{}/api/jobs/{}/cancel", self.base_url, job_id);
+        self.add_auth_header(self.client.post(&url))
+            .send()
+            .await?
+            .error_for_status()?;
+        Ok(())
+    }
+
+    pub async fn disconnect(&self, client_id: &str) -> Result<()> {
+        let url = format!("{}/api/clients/{}/disconnect", self.base_url, client_id);
+        self.add_auth_header(self.client.post(&url))
+            .send()
+            .await?
+            .error_for_status()?;
+        Ok(())
+    }
+
     #[allow(dead_code)]
     pub async fn heartbeat(&self, client_id: &str) -> Result<()> {
         let url = format!("{}/api/heartbeat/{}", self.base_url, client_id);

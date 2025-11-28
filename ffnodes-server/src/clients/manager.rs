@@ -189,7 +189,6 @@ impl ClientManager {
     }
 
     /// Disconnect a client
-    #[allow(dead_code)]
     pub async fn disconnect_client(&self, client_id: &str) -> Result<()> {
         let now = chrono::Utc::now().timestamp();
 
@@ -206,6 +205,41 @@ impl ClientManager {
         // Remove from in-memory registry
         let mut clients = self.clients.write().await;
         clients.retain(|c| c.id != client_id);
+
+        tracing::info!("Client disconnected: {}", client_id);
+
+        Ok(())
+    }
+
+    /// Disconnect a client and requeue their jobs
+    pub async fn disconnect_and_requeue_jobs(
+        &self,
+        client_id: &str,
+        job_queue: &crate::jobs::JobQueue,
+    ) -> Result<()> {
+        tracing::info!("Disconnecting client {} and requeuing jobs", client_id);
+
+        // Get all jobs assigned to this client
+        let jobs = job_queue.get_client_jobs(client_id).await?;
+        let job_count = jobs.len();
+
+        // Requeue each job
+        for job in jobs {
+            if let Err(e) = job_queue.requeue_job(&job.id).await {
+                tracing::error!("Failed to requeue job {}: {}", job.id, e);
+            } else {
+                tracing::info!("Requeued job {} from client {}", job.id, client_id);
+            }
+        }
+
+        // Disconnect the client
+        self.disconnect_client(client_id).await?;
+
+        tracing::info!(
+            "Client {} disconnected, {} jobs requeued",
+            client_id,
+            job_count
+        );
 
         Ok(())
     }

@@ -95,12 +95,76 @@ impl JobManager {
     }
 
     pub async fn stop(&self) -> Result<()> {
+        log::info!("Stopping job manager");
+
+        // Get current job ID and client info before clearing state
+        let (job_id, auth_token, server_url) = {
+            let state = self.state.lock().await;
+            let job_id = state.current_job_id.clone();
+
+            // Get config for cancel request
+            let config_lock = self.config.lock().await;
+            let auth_token = config_lock.as_ref()
+                .and_then(|c| c.auth_token.clone());
+            let server_url = config_lock.as_ref()
+                .map(|c| c.server_url.clone());
+
+            (job_id, auth_token, server_url)
+        };
+
+        // If there's a current job, cancel it and clean up files
+        if let Some(job_id) = job_id {
+            log::info!("Cancelling current job {} and cleaning up files", job_id);
+
+            // Cleanup temp files
+            self.cleanup_job_files(&job_id).await;
+
+            // Notify server to cancel the job
+            if let (Some(auth_token), Some(server_url)) = (auth_token, server_url) {
+                let client = ServerClient::with_auth(server_url, auth_token);
+                match client.cancel_job(&job_id).await {
+                    Ok(_) => log::info!("✓ Job {} cancelled on server", job_id),
+                    Err(e) => log::warn!("Failed to cancel job {} on server: {}", job_id, e),
+                }
+            }
+        }
+
+        // Update state
         let mut state = self.state.lock().await;
         state.is_processing = false;
         state.is_paused = false;
         state.current_job_id = None;
-        log::info!("Stopping job manager");
+
         Ok(())
+    }
+
+    async fn cleanup_job_files(&self, job_id: &str) {
+        log::debug!("Cleaning up temporary files for job {}", job_id);
+
+        let temp_dir = std::env::temp_dir().join("ffnodes-client");
+
+        // Delete input file
+        let input_path = temp_dir.join(format!("input_{}", job_id));
+        if input_path.exists() {
+            match tokio::fs::remove_file(&input_path).await {
+                Ok(_) => log::info!("✓ Deleted input file: {:?}", input_path),
+                Err(e) => log::warn!("Failed to delete input file: {}", e),
+            }
+        }
+
+        // Delete output files (glob pattern for any extension)
+        // Try common output extensions
+        for ext in &["mp4", "mkv", "webm", "avi", "mov"] {
+            let output_path = temp_dir.join(format!("output_{}.{}", job_id, ext));
+            if output_path.exists() {
+                match tokio::fs::remove_file(&output_path).await {
+                    Ok(_) => log::info!("✓ Deleted output file: {:?}", output_path),
+                    Err(e) => log::warn!("Failed to delete output file: {}", e),
+                }
+            }
+        }
+
+        log::debug!("Cleanup complete for job {}", job_id);
     }
 
     pub async fn pause(&self) -> Result<()> {
@@ -527,6 +591,10 @@ impl JobManager {
             Err(e) => {
                 log::error!("---------- Error Handling Phase ----------");
                 log::error!("✗✗✗ Job {} failed: {:#} ✗✗✗", job_id, e);
+
+                // Clean up temp files
+                log::debug!("Cleaning up temporary files after job failure...");
+                self.cleanup_job_files(&job_id).await;
 
                 // Fail the job on server
                 let error_message = format!("{:#}", e);

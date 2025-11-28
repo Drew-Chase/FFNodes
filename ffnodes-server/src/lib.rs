@@ -175,6 +175,7 @@ pub async fn run() -> Result<()> {
                                 web::post().to(api::jobs::complete_job),
                             )
                             .route("/jobs/{job_id}/fail", web::post().to(api::jobs::fail_job))
+                            .route("/jobs/{job_id}/cancel", web::post().to(api::jobs::cancel_job))
                             .route("/jobs/active", web::get().to(api::jobs::get_active_jobs))
                             // File transfer
                             .route(

@@ -163,6 +163,24 @@ pub async fn fail_job(
     Ok(HttpResponse::Ok().finish())
 }
 
+/// Cancel job and requeue it
+pub async fn cancel_job(
+    job_id: web::Path<String>,
+    job_queue: web::Data<Arc<JobQueue>>,
+) -> Result<HttpResponse, Error> {
+    debug!("Cancelling job: {}", job_id);
+
+    job_queue
+        .requeue_job(&job_id)
+        .await
+        .map_err(|e| {
+            warn!("Error requeuing job: {:#}", e);
+            Error::internal_server_error("Error requeuing job")
+        })?;
+
+    Ok(HttpResponse::Ok().finish())
+}
+
 /// Heartbeat endpoint
 pub async fn heartbeat(
     client_id: web::Path<String>,
