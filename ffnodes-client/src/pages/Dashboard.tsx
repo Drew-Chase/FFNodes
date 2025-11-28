@@ -9,7 +9,7 @@ import {EncodingJob, useJobStore} from "../stores/useJobStore";
 import {VideoBackground} from "../components/VideoBackground";
 import {CurrentJob} from "../components/CurrentJob";
 import {VideoList} from "../components/VideoList";
-import {Button, Card} from "../components/ui";
+import {Button} from "../components/ui";
 import {BentoGrid, BentoCard, BentoCardHeader, BentoCardContent} from "../components/layout/BentoGrid";
 import {Logger} from "../utils/logger";
 import {HistoryBento} from "../components/stats/HistoryBento";
@@ -24,8 +24,7 @@ export function Dashboard()
     const {setJobQueue, setCurrentJob, updateProgress, setProcessing} = useJobStore();
     const [isLoading, setIsLoading] = useState(true);
     const [gpuInfo, setGpuInfo] = useState<any>(null);
-    const [isPaused, setIsPaused] = useState(false);
-    const [isProcessingStarted, setIsProcessingStarted] = useState(false);
+    const [isPaused, setIsPaused] = useState(true); // Start paused by default
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
     // Create logger for Dashboard
@@ -67,42 +66,40 @@ export function Dashboard()
                 logger.info(`✓ Loaded ${jobs?.length || 0} active jobs`);
                 setJobQueue(jobs || []);
 
-                // Check if job processing is already running
+                // Always start job processing (paused by default)
                 logger.info("Checking job manager state...");
                 const state: any = await invoke("get_job_manager_state");
                 logger.info("Job manager state:", state);
 
-                if (!state.is_processing && savedConfig.auto_start_processing !== false)
+                if (!state.is_processing)
                 {
-                    // Start job processing only if not already running and auto-start enabled
-                    logger.info("Config allows auto-start, starting job processing...");
+                    // Start job processing if not already running
+                    logger.info("Starting job processing (paused)...");
                     await invoke("start_job_processing", {config: savedConfig, gpu});
+
+                    // Immediately pause it so user has to manually resume
+                    await invoke("pause_job_processing");
                     setProcessing(true);
-                    setIsProcessingStarted(true);
-                    logger.info("✓ Job processing started automatically");
+                    setIsPaused(true);
+                    logger.info("✓ Job processing started in paused state");
 
                     addToast({
-                        title: "Success",
-                        description: "Connected to server! Job processing started automatically.",
-                        color: "success"
+                        title: "Connected",
+                        description: "Connected to server. Click Resume to start processing jobs.",
+                        color: "primary"
                     });
-                } else if (state.is_processing)
+                } else
                 {
-                    // Already running, just update state
-                    logger.info("Job processing already active, skipping start");
+                    // Already running, check if it's paused
+                    logger.info("Job processing already active");
                     setProcessing(true);
-                    setIsProcessingStarted(true);
+                    setIsPaused(state.is_paused);
+
                     addToast({
                         title: "Info",
                         description: "Job processing already active.",
                         color: "primary"
                     });
-                } else
-                {
-                    // Auto-start disabled
-                    logger.info("Auto-start disabled in config, staying paused");
-                    setProcessing(false);
-                    setIsProcessingStarted(false);
                 }
 
                 logger.info("========== Dashboard Initialization Complete ==========");
@@ -334,6 +331,30 @@ export function Dashboard()
         }
     };
 
+    // Handle cancel current job
+    const handleCancel = async () =>
+    {
+        try
+        {
+            logger.info("Cancelling current job...");
+            await invoke("stop_job_processing");
+            setCurrentJob(null);
+            updateProgress(null);
+            addToast({
+                title: "Job Cancelled",
+                description: "Current job has been cancelled and will be reassigned",
+                color: "warning"
+            });
+        } catch (error)
+        {
+            addToast({
+                title: "Error",
+                description: `Failed to cancel: ${error}`,
+                color: "danger"
+            });
+        }
+    };
+
     if (isLoading)
     {
         return (
@@ -381,6 +402,14 @@ export function Dashboard()
                                     {isPaused ? "Resume" : "Pause"}
                                 </Button>
                                 <Button
+                                    color="danger"
+                                    onPress={handleCancel}
+                                    className="rounded-md-lg shadow-md-2"
+                                >
+                                    <iconify-icon icon="mdi:stop" class="text-lg mr-1"/>
+                                    Cancel Job
+                                </Button>
+                                <Button
                                     color="secondary"
                                     onPress={() => setIsSettingsOpen(true)}
                                     className="rounded-md-lg shadow-md-2"
@@ -392,55 +421,6 @@ export function Dashboard()
                         </div>
                     </BentoCard>
                 </motion.header>
-
-                {/* Paused State Banner */}
-                {!isProcessingStarted && !isLoading && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="mb-6"
-                    >
-                        <Card variant="solid" className="p-6 border-2 border-warning/50">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h3 className="text-lg font-bold text-warning flex items-center gap-2">
-                                        <iconify-icon icon="mdi:pause-circle" class="text-2xl"/>
-                                        Processing Paused
-                                    </h3>
-                                    <p className="text-sm text-default-500 mt-1">
-                                        Click "Start Processing" to begin encoding jobs from the server
-                                    </p>
-                                </div>
-                                <Button
-                                    variant="primary"
-                                    size="lg"
-                                    onPress={async () => {
-                                        try {
-                                            await invoke("start_job_processing", {config, gpu: gpuInfo});
-                                            setProcessing(true);
-                                            setIsProcessingStarted(true);
-                                            addToast({
-                                                title: "Success",
-                                                description: "Job processing started!",
-                                                color: "success"
-                                            });
-                                        } catch (error) {
-                                            addToast({
-                                                title: "Error",
-                                                description: String(error),
-                                                color: "danger"
-                                            });
-                                        }
-                                    }}
-                                >
-                                    <iconify-icon icon="mdi:play" class="text-xl mr-2"/>
-                                    Start Processing
-                                </Button>
-                            </div>
-                        </Card>
-                    </motion.div>
-                )}
 
                 {/* Bento Grid Layout */}
                 <BentoGrid columns={6} gap="md">
