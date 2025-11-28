@@ -356,9 +356,15 @@ export function Dashboard()
             await invoke("stop_job_processing");
             setCurrentJob(null);
             updateProgress(null);
+
+            // Also pause job processing
+            await invoke("pause_job_processing");
+            setIsPaused(true);
+            setProcessing(false);
+
             addToast({
                 title: "Job Cancelled",
-                description: "Current job has been cancelled and will be reassigned",
+                description: "Current job has been cancelled and job processing paused",
                 color: "warning"
             });
         } catch (error)
