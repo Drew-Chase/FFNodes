@@ -1,0 +1,90 @@
+name: Publish ffnodes-server Docker Image
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'      # Trigger on semantic version tags like v1.0.0, v2.1.3
+      - 'v*.*.*-*'    # Also support pre-release tags like v1.0.0-beta.1
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/ffnodes-server
+
+jobs:
+  build-and-push-server:
+    name: Build and Push Server Image
+    runs-on: ubuntu-latest
+
+    # Required permissions for GHCR
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Extract version from git tag
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # Tag format: 1.0.0 (without 'v' prefix)
+            type=semver,pattern={{version}}
+            # Tag format: 1.0 (minor version)
+            type=semver,pattern={{major}}.{{minor}}
+            # Tag format: 1 (major version only)
+            type=semver,pattern={{major}}
+            # Always tag latest for non-pre-release versions
+            type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.title=FFNodes Server
+            org.opencontainers.image.description=Distributed video encoding server (server component only)
+          flavor: |
+            latest=auto
+
+      # Set up QEMU for ARM64 emulation
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+
+      # Set up Docker Buildx for multi-platform builds
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Login to GitHub Container Registry
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Build and push ffnodes-server image only
+      - name: Build and push ffnodes-server image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # Build arguments
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
+
+      # Output image details
+      - name: Image details
+        run: |
+          echo "Published ffnodes-server image (server component only)"
+          echo "Tags: ${{ steps.meta.outputs.tags }}"
+          echo "Registry: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          echo ""
+          echo "Pull command:"
+          echo "  docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
