@@ -1,0 +1,60 @@
+# Build artifacts
+target/
+debug/
+**/*.rs.bk
+*.pdb
+
+# Development
+.idea/
+.vscode/
+.claude/
+.git/
+.gitignore
+.github/
+
+# Client application (NOT needed for server image)
+ffnodes-client/node_modules/
+ffnodes-client/dist/
+ffnodes-client/build/
+ffnodes-client/src/
+ffnodes-client/public/
+ffnodes-client/index.html
+ffnodes-client/package.json
+ffnodes-client/pnpm-lock.yaml
+ffnodes-client/tsconfig.json
+ffnodes-client/vite.config.ts
+ffnodes-client/tailwind.config.ts
+ffnodes-client/postcss.config.js
+ffnodes-client/components.json
+
+# Keep only the client's Cargo.toml for workspace structure
+# (but exclude it from build via Dockerfile COPY commands)
+
+# Runtime data
+logs/
+*.log
+*.db
+*.db-shm
+*.db-wal
+config.json
+
+# Documentation
+*.md
+CLAUDE.MD
+todo.md
+
+# Test files
+videos/
+ffmpeg/tests/
+
+# Environment
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+*.swp
+*~
