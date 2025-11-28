@@ -1,5 +1,7 @@
 use regex::Regex;
 use std::fs;
+use std::process::Command;
+use std::str::from_utf8;
 
 fn main() {
     let new_version = std::env::args().nth(1).unwrap_or_else(|| {
@@ -8,11 +10,7 @@ fn main() {
     });
     println!("[FFNodes Update Version] New version: {}", new_version);
 
-    let cargo_tomls = [
-        "./ffnodes-client/src-tauri/Cargo.toml",
-        "./ffmpeg/Cargo.toml",
-        "./ffnodes-server/Cargo.toml",
-    ];
+    let cargo_tomls = ["./ffnodes-client/src-tauri/Cargo.toml", "./ffmpeg/Cargo.toml", "./ffnodes-server/Cargo.toml"];
     let package_json = ["./ffnodes-client/package.json"];
     let tauri_config = "ffnodes-client/src-tauri/tauri.conf.json";
 
@@ -80,5 +78,11 @@ fn main() {
             std::process::exit(1);
         }
         println!("Updated {}", tauri_config);
+
+        // Create tag
+        let output = Command::new("git").arg("tag").arg(format!("v{}", new_version)).output().expect("failed to execute process");
+        println!("[FFNodes Update Version] {:?}", from_utf8(output.stdout.as_slice()).unwrap());
+        let output = Command::new("git").arg("push").arg("--tags").output().expect("failed to execute process");
+        println!("[FFNodes Update Version] {:?}", from_utf8(output.stdout.as_slice()).unwrap());
     }
 }
