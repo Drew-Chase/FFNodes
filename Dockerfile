@@ -74,26 +74,17 @@ VOLUME ["/app/data", "/app/logs"]
 EXPOSE 7456
 
 # Environment variables for runtime configuration
-
-
 ENV RUST_LOG=info
-ENV FFNODES_PORT=8080
-
-# Health check endpoint
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD ["wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/status"]
-
-#ENV RUST_LOG=info
-#ENV FFNODE_PORT=7456
-#ENV FFNODE_OUTPUT_CONTAINER=mp4
-#ENV FFNODE_WATCH_DIRECTORIES="[]"
-#ENV FFNODE_FFMPEG_TEMPLATE="-i {INPUT} -map 0 -c:v h264{HWACCEL_CODE} -b:v 5M -maxrate 8M -bufsize 8M -profile:v high -vf \"scale='min(1920,iw)':-2\" -c:a aac -b:a 320k {OUTPUT}"
-#ENV FFNODE_CLIENT_TIMEOUT_SECONDS=300
-#ENV FFNODE_NOTIFY_BATCH_INTERVAL_SECONDS=30
+ENV FFNODE_PORT=7456
+ENV FFNODE_OUTPUT_CONTAINER=mp4
+ENV FFNODE_WATCH_DIRECTORIES="[]"
+ENV FFNODE_FFMPEG_TEMPLATE="-i {INPUT} -map 0 -c:v h264{HWACCEL_CODE} -b:v 5M -maxrate 8M -bufsize 8M -profile:v high -vf \"scale='min(1920,iw)':-2\" -c:a aac -b:a 320k {OUTPUT}"
+ENV FFNODE_CLIENT_TIMEOUT_SECONDS=300
+ENV FFNODE_NOTIFY_BATCH_INTERVAL_SECONDS=30
 #
 ## Health check endpoint
-#HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-#    CMD ["wget", "--quiet", "--tries=1", "--spider", "http://localhost:${FFNODE_PORT}/api/status"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD ["wget", "--quiet", "--tries=1", "--spider", "http://localhost:${FFNODE_PORT}/api/status"]
 
 # Entry point - run server only
 ENTRYPOINT ["/app/ffnodes_server"]
