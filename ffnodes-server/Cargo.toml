@@ -30,13 +30,11 @@ actix-multipart = "0.6"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0" }
 tokio = { version = "1", features = ["sync", "time", "fs", "macros", "rt-multi-thread", "io-util", "signal", "process"] }
-env_logger = "0.11.6"
 log = "0.4.22"
 walkdir = "2.5.0"
-pretty_env_logger = "0.5.0"
 anyhow = "1.0.100"
 thiserror = { version = "2.0.17" }
-clap = { version = "4.5.52", features = ["derive", "unicode", "string", "usage", "error-context", "wrap_help", "suggestions", "help", "color"] }
+#clap = { version = "4.5.52", features = ["derive", "unicode", "string", "usage", "error-context", "wrap_help", "suggestions", "help", "color"] }
 sqlx = { version = "0.8.6", features = ["sqlite", "macros", "derive", "time", "chrono", "runtime-tokio"] }
 serde_hash = { version = "0.1.3" }
 ffmpeg = { path = "../ffmpeg" }
@@ -45,7 +43,6 @@ futures-util = { version = "0.3" }
 notify = { version = "6.1" }
 uuid = { version = "1.11", features = ["v4", "serde"] }
 actix-ws = { version = "0.3" }
-actix = { version = "0.13" }
 chrono = { version = "0.4" }
 indicatif = { version = "0.17" }
 tracing = { version = "0.1" }
