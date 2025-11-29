@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "ffnodes_client",
+  "productName": "ffnodes",
   "version": "0.1.19",
   "identifier": "gh.drew-chase.ffnodes",
   "build": {
