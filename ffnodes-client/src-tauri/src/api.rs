@@ -132,7 +132,7 @@ impl ServerClient {
     }
 
     pub async fn handshake(&self, request: HandshakeRequest) -> Result<HandshakeResponse> {
-        let url = format!("{}/api/handshake", self.base_url);
+        let url = format!("{}/api/auth/handshake", self.base_url);
 
         log::info!("=== Starting handshake ===");
         log::info!("Handshake URL: {}", url);
