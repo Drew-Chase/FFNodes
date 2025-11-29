@@ -43,6 +43,7 @@ impl Configuration {
             let mut default_config = Self::default();
             default_config.reset().await?;
             default_config.parse_env()?;
+            default_config.save().await?;
             return Ok(default_config);
         }
         let config_file = tokio::fs::File::open(CONFIG_FILE_NAME).await?;
@@ -65,7 +66,6 @@ impl Configuration {
             .into_iter()
             .filter_map(|p| p.canonicalize().ok())
             .collect();
-        config.parse_env()?;
 
         Ok(config)
     }
@@ -89,15 +89,6 @@ impl Configuration {
 
         if let Ok(ffmpeg_template) = std::env::var("FFNODE_FFMPEG_TEMPLATE") {
             self.ffmpeg_template = ffmpeg_template;
-        }
-        if let Ok(guid) = std::env::var("FFNODE_SERVER_GUID") {
-            self.server_guid = guid;
-        }
-        if let Ok(client_timeout_seconds) = std::env::var("FFNODE_CLIENT_TIMEOUT_SECONDS") {
-            self.client_timeout_seconds = client_timeout_seconds.parse().map_err(|_| anyhow!("FFNODE_CLIENT_TIMEOUT_SECONDS must be a valid integer"))?;
-        }
-        if let Ok(notify_batch_interval_seconds) = std::env::var("FFNODE_NOTIFY_BATCH_INTERVAL_SECONDS") {
-            self.notify_batch_interval_seconds = notify_batch_interval_seconds.parse().map_err(|_| anyhow!("FFNODE_NOTIFY_BATCH_INTERVAL_SECONDS must be a valid integer"))?;
         }
 
         Ok(())
