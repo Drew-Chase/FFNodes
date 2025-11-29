@@ -1399,7 +1399,7 @@ dependencies = [
 
 [[package]]
 name = "ffmpeg"
-version = "0.1.16-beta"
+version = "0.1.17-beta"
 dependencies = [
  "anyhow",
  "encoding_rs",
@@ -1416,7 +1416,7 @@ dependencies = [
 
 [[package]]
 name = "ffnodes_client"
-version = "0.1.16-beta"
+version = "0.1.17-beta"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -1460,7 +1460,7 @@ dependencies = [
 
 [[package]]
 name = "ffnodes_server"
-version = "0.1.16-beta"
+version = "0.1.17-beta"
 dependencies = [
  "actix-multipart",
  "actix-web",
@@ -6346,6 +6346,7 @@ name = "update_version"
 version = "0.1.0"
 dependencies = [
  "regex",
+ "semver",
 ]
 
 [[package]]
