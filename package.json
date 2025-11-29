@@ -11,7 +11,7 @@
     "dev:server": "pnpm --filter ffnodes_server dev",
     "dev:client": "pnpm --filter ffnodes_client tauri-dev",
     "build:server": "pnpm --filter ffnodes_server build",
-    "build:server-frontend": "pnpm --filter ffnodes_server build-frontend",
+    "build:server-frontend": "pnpm --filter ffnodes_server build:frontend",
     "build:server-api": "cargo build --release -p ffnodes_server",
     "build:client": "pnpm --filter ffnodes_client build",
     "build:client-tauri": "pnpm --filter ffnodes_client tauri-build",
