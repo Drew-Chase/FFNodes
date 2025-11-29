@@ -17,7 +17,7 @@ export const Login: React.FC = () =>
     const {setConfig} = useConfigStore();
 
     // State
-    const [step, setStep] = useState<LoginStep>('auth');
+    const [step, setStep] = useState<LoginStep>('display-name');
     const [email, setEmail] = useState("");
     const [displayName, setDisplayName] = useState("");
     const [serverUrl, setServerUrl] = useState("");
@@ -317,13 +317,13 @@ export const Login: React.FC = () =>
                         >
                             {/* Display Name Login */}
                             <div className="bg-content1/95 backdrop-blur-xl rounded-md-2xl shadow-md-6 p-8">
-                                <button
-                                    onClick={() => setStep('auth')}
-                                    className="mb-4 text-foreground/60 hover:text-foreground transition-colors flex items-center gap-2"
-                                >
-                                    <iconify-icon icon="mdi:arrow-left" class="text-xl"/>
-                                    <span className="text-body-md">Back to OAuth</span>
-                                </button>
+                                {/*<button*/}
+                                {/*    onClick={() => setStep('auth')}*/}
+                                {/*    className="mb-4 text-foreground/60 hover:text-foreground transition-colors flex items-center gap-2"*/}
+                                {/*>*/}
+                                {/*    <iconify-icon icon="mdi:arrow-left" class="text-xl"/>*/}
+                                {/*    <span className="text-body-md">Back to OAuth</span>*/}
+                                {/*</button>*/}
 
                                 <div className="text-center mb-8">
                                     <h1 className="text-headline-lg font-normal text-foreground mb-2">
@@ -360,6 +360,11 @@ export const Login: React.FC = () =>
                                         {error}
                                     </motion.div>
                                 )}
+
+                                {/* FFNodes branding */}
+                                <div className="mt-4 text-center text-body-sm text-white/70">
+                                    <span>Powered by FFNodes</span>
+                                </div>
                             </div>
                         </motion.div>
                     )}
