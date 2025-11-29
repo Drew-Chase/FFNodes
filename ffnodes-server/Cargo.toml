@@ -10,7 +10,7 @@ build = "build.rs"
 
 [lib]
 name = "ffnodes_server_lib"
-path = "src/lib.rs"
+path = "src-actix/lib.rs"
 
 [build-dependencies]
 walkdir = "2.5.0"
