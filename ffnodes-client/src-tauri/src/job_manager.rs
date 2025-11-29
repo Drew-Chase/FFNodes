@@ -72,6 +72,11 @@ impl JobManager {
         *cfg = Some(config);
     }
 
+    pub async fn get_config(&self) -> Option<ClientConfig> {
+        let cfg = self.config.lock().await;
+        cfg.clone()
+    }
+
     pub async fn set_gpu_info(&self, gpu: GpuInfo) {
         let mut gpu_info = self.gpu_info.lock().await;
         *gpu_info = Some(gpu);
