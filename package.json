@@ -1,0 +1,31 @@
+{
+  "name": "ffnodes",
+  "version": "1.0.0",
+  "description": "Distributed video encoding system using FFmpeg",
+  "private": true,
+  "workspaces": [
+    "ffnodes-server",
+    "ffnodes-client"
+  ],
+  "scripts": {
+    "dev:server": "pnpm --filter ffnodes_server dev",
+    "dev:server-api": "pnpm --filter ffnodes_server run-api",
+    "dev:client": "pnpm --filter ffnodes_client tauri-dev",
+    "build:server": "pnpm --filter ffnodes_server build",
+    "build:server-frontend": "pnpm --filter ffnodes_server build-frontend",
+    "build:server-api": "cargo build --release -p ffnodes_server",
+    "build:client": "pnpm --filter ffnodes_client build",
+    "build:client-tauri": "pnpm --filter ffnodes_client tauri-build",
+    "build": "pnpm run build:server && pnpm run build:client-tauri",
+    "lint:server": "pnpm --filter ffnodes_server lint",
+    "lint:client": "pnpm --filter ffnodes_client lint",
+    "test": "cargo test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Drew-Chase/FFNodes.git"
+  },
+  "engines": {
+    "pnpm": ">=8.13.1"
+  }
+}
