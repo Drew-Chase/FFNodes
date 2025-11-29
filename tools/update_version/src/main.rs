@@ -7,6 +7,7 @@ fn main() {
         eprintln!("Error: Version argument is missing");
         std::process::exit(1);
     });
+    let new_version = semver::Version::parse(&new_version).unwrap();
     println!("[FFNodes Update Version] New version: {}", new_version);
 
     let cargo_tomls = ["./ffnodes-client/src-tauri/Cargo.toml", "./ffmpeg/Cargo.toml", "./ffnodes-server/Cargo.toml"];
@@ -70,7 +71,7 @@ fn main() {
         };
 
         // Replace only the first occurrence
-        let new_content = json_version_regex.replace(&content, format!(r#""version": "{}""#, new_version));
+        let new_content = json_version_regex.replace(&content, format!(r#""version": "{}.{}.{}""#, new_version.major, new_version.minor, new_version.patch));
 
         if let Err(e) = fs::write(tauri_config, new_content.as_ref()) {
             eprintln!("Error writing to {}: {}", tauri_config, e);
