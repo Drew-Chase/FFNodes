@@ -1,6 +1,6 @@
 [package]
 name = "ffnodes_server"
-version = "0.1.18-beta"
+version = "0.1.19-beta"
 edition = "2024"
 description = ""
 authors = ["Drew Chase"]
@@ -12,12 +12,8 @@ build = "build.rs"
 name = "ffnodes_server_lib"
 path = "src/lib.rs"
 
-
-
-
 [build-dependencies]
 walkdir = "2.5.0"
-
 
 [profile.release]
 opt-level = 3
