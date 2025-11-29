@@ -315,7 +315,6 @@ impl ServerClient {
         Ok(())
     }
 
-    #[allow(dead_code)]
     pub async fn heartbeat(&self, client_id: &str) -> Result<()> {
         let url = format!("{}/api/jobs/heartbeat/{}", self.base_url, client_id);
         self.add_auth_header(self.client.post(&url)).send().await?.error_for_status()?;

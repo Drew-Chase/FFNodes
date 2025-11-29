@@ -226,6 +226,26 @@ pub async fn heartbeat(
     Ok(HttpResponse::Ok().finish())
 }
 
+/// Client disconnect endpoint
+#[post("/clients/{client_id}/disconnect")]
+pub async fn disconnect_client(
+    client_id: web::Path<String>,
+    client_manager: web::Data<Arc<ClientManager>>,
+    job_queue: web::Data<Arc<JobQueue>>,
+) -> Result<HttpResponse, Error> {
+    debug!("Client disconnect request: {}", client_id);
+
+    client_manager
+        .disconnect_and_requeue_jobs(&client_id, &job_queue)
+        .await
+        .map_err(|e| {
+            warn!("Error disconnecting client: {:#}", e);
+            Error::internal_server_error("Error disconnecting client")
+        })?;
+
+    Ok(HttpResponse::Ok().finish())
+}
+
 /// Get active jobs
 #[get("/active")]
 pub async fn get_active_jobs(
@@ -252,6 +272,10 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(cancel_job)
             .service(heartbeat)
             .service(get_active_jobs)
+    );
+    cfg.service(
+        web::scope("/clients")
+            .service(disconnect_client)
             .default_service(web::to(|| async {
                 HttpResponse::NotFound().json(json!({
                     "error": "API endpoint not found".to_string(),

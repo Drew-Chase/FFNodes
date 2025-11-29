@@ -44,6 +44,7 @@ pub struct JobManager {
     encoder: Arc<Encoder>,
     ws_task: Arc<Mutex<Option<JoinHandle<()>>>>,
     processing_task: Arc<Mutex<Option<JoinHandle<()>>>>,
+    heartbeat_task: Arc<Mutex<Option<JoinHandle<()>>>>,
 }
 
 impl JobManager {
@@ -62,6 +63,7 @@ impl JobManager {
             encoder: Arc::new(encoder),
             ws_task: Arc::new(Mutex::new(None)),
             processing_task: Arc::new(Mutex::new(None)),
+            heartbeat_task: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -170,6 +172,37 @@ impl JobManager {
         }
         drop(config_lock);
 
+        // Start heartbeat task to send heartbeats every 5 seconds
+        let config_lock = self.config.lock().await;
+        if let Some(config) = config_lock.as_ref() {
+            if let (Some(client_id), Some(auth_token)) = (&config.client_id, &config.auth_token) {
+                let client = ServerClient::with_auth(config.server_url.clone(), auth_token.clone());
+                let client_id_clone = client_id.clone();
+
+                log::info!("Starting heartbeat task (5-second interval)");
+                let heartbeat_handle = tokio::spawn(async move {
+                    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
+                    loop {
+                        interval.tick().await;
+
+                        match client.heartbeat(&client_id_clone).await {
+                            Ok(_) => {
+                                log::trace!("Heartbeat sent successfully");
+                            }
+                            Err(e) => {
+                                log::warn!("Failed to send heartbeat: {}", e);
+                            }
+                        }
+                    }
+                });
+
+                // Store the heartbeat task handle
+                let mut heartbeat_task = self.heartbeat_task.lock().await;
+                *heartbeat_task = Some(heartbeat_handle);
+            }
+        }
+        drop(config_lock);
+
         // Start the processing loop in a background task
         let manager = Arc::new(self.clone_internals());
         let processing_handle = tokio::spawn(async move {
@@ -187,6 +220,15 @@ impl JobManager {
 
     pub async fn stop(&self) -> Result<()> {
         log::info!("Stopping job manager");
+
+        // Stop heartbeat task
+        let mut heartbeat_task = self.heartbeat_task.lock().await;
+        if let Some(handle) = heartbeat_task.take() {
+            log::info!("Aborting heartbeat task");
+            handle.abort();
+            log::info!("✓ Heartbeat task stopped");
+        }
+        drop(heartbeat_task);
 
         // Stop WebSocket listener
         let mut ws_task = self.ws_task.lock().await;
@@ -239,6 +281,24 @@ impl JobManager {
                     Ok(_) => log::info!("✓ Job {} cancelled on server", job_id),
                     Err(e) => log::warn!("Failed to cancel job {} on server: {}", job_id, e),
                 }
+            }
+        }
+
+        // Send disconnect signal to server
+        let (client_id, auth_token, server_url) = {
+            let config_lock = self.config.lock().await;
+            let client_id = config_lock.as_ref().and_then(|c| c.client_id.clone());
+            let auth_token = config_lock.as_ref().and_then(|c| c.auth_token.clone());
+            let server_url = config_lock.as_ref().map(|c| c.server_url.clone());
+            (client_id, auth_token, server_url)
+        };
+
+        if let (Some(client_id), Some(auth_token), Some(server_url)) = (client_id, auth_token, server_url) {
+            log::info!("Sending disconnect signal to server for client {}", client_id);
+            let client = ServerClient::with_auth(server_url, auth_token);
+            match client.disconnect(&client_id).await {
+                Ok(_) => log::info!("✓ Disconnect signal sent successfully"),
+                Err(e) => log::warn!("Failed to send disconnect signal: {}", e),
             }
         }
 
@@ -303,6 +363,7 @@ impl JobManager {
             encoder: Arc::clone(&self.encoder),
             ws_task: Arc::clone(&self.ws_task),
             processing_task: Arc::clone(&self.processing_task),
+            heartbeat_task: Arc::clone(&self.heartbeat_task),
         }
     }
 
