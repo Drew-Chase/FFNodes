@@ -30,7 +30,7 @@ impl Default for Configuration {
             server_guid: Uuid::new_v4().to_string(),
             jwt_secret: Uuid::new_v4().to_string(),
             ffmpeg_template: r#"-i {INPUT} -map 0 -c:v h264{HWACCEL_CODE} -b:v 5M -maxrate 8M -bufsize 8M -profile:v high -vf "scale='min(1920,iw)':-2" -c:a aac -b:a 320k {OUTPUT}"#.to_string(),
-            output_container: "mp4".to_string(),
+            output_container: "mkv".to_string(),
             client_timeout_seconds: 300,
             notify_batch_interval_seconds: 30,
         }
