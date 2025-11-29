@@ -3,7 +3,8 @@
 # =============================================================================
 # Builder Stage - Compile Rust binary (ffnodes-server ONLY)
 # =============================================================================
-FROM --platform=$TARGETPLATFORM rust:1.91-bookworm AS builder
+FROM rust:1.91-bookworm AS builder
+#FROM --platform=$TARGETPLATFORM rust:1.91-bookworm AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -65,12 +66,12 @@ RUN chmod +x /app/ffnodes_server && \
 # Switch to non-root user
 USER ffnodes
 # Set working directory to /config so config.json and app.db save here
-WORKDIR /config
+WORKDIR /app/config
 
 # Define volumes for persistent data
 # /config - stores config.json, app.db, and logs/
 # /data - default directory for media files to encode
-VOLUME ["/config", "/data"]
+VOLUME ["/app/config", "/app/data"]
 
 # Expose default port
 EXPOSE 7456
@@ -79,7 +80,7 @@ EXPOSE 7456
 ENV RUST_LOG=info
 ENV FFNODE_PORT=7456
 ENV FFNODE_OUTPUT_CONTAINER=mkv
-ENV FFNODE_WATCH_DIRECTORIES="['/data']"
+ENV FFNODE_WATCH_DIRECTORIES='["/app/data"]'
 ENV FFNODE_FFMPEG_TEMPLATE="-i {INPUT} -map 0 -c:v h264{HWACCEL_CODE} -b:v 5M -maxrate 8M -bufsize 8M -profile:v high -vf \"scale='min(1920,iw)':-2\" -c:a aac -b:a 320k {OUTPUT}"
 ENV FFNODE_CLIENT_TIMEOUT_SECONDS=300
 ENV FFNODE_NOTIFY_BATCH_INTERVAL_SECONDS=30
