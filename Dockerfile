@@ -52,10 +52,10 @@ RUN apt-get update && apt-get install -y \
 # Verify FFmpeg installation
 RUN ffmpeg -version && ffprobe -version
 
-# Create non-root user for security
+# Create non-root user for security and create directory structure
 RUN useradd --create-home --shell /bin/bash ffnodes && \
-    mkdir -p /app/data /app/logs && \
-    chown -R ffnodes:ffnodes /app
+    mkdir -p /app /config /data && \
+    chown -R ffnodes:ffnodes /app /config /data
 
 # Copy ONLY the server binary from builder (no client, no library)
 COPY --from=builder /build/ffnodes_server /app/ffnodes_server
@@ -64,11 +64,13 @@ RUN chmod +x /app/ffnodes_server && \
 
 # Switch to non-root user
 USER ffnodes
-WORKDIR /app
-
+# Set working directory to /config so config.json and app.db save here
+WORKDIR /config
 
 # Define volumes for persistent data
-VOLUME ["/app/data", "/app/logs"]
+# /config - stores config.json, app.db, and logs/
+# /data - default directory for media files to encode
+VOLUME ["/config", "/data"]
 
 # Expose default port
 EXPOSE 7456
@@ -76,8 +78,8 @@ EXPOSE 7456
 # Environment variables for runtime configuration
 ENV RUST_LOG=info
 ENV FFNODE_PORT=7456
-ENV FFNODE_OUTPUT_CONTAINER=mp4
-ENV FFNODE_WATCH_DIRECTORIES="[]"
+ENV FFNODE_OUTPUT_CONTAINER=mkv
+ENV FFNODE_WATCH_DIRECTORIES="['/data']"
 ENV FFNODE_FFMPEG_TEMPLATE="-i {INPUT} -map 0 -c:v h264{HWACCEL_CODE} -b:v 5M -maxrate 8M -bufsize 8M -profile:v high -vf \"scale='min(1920,iw)':-2\" -c:a aac -b:a 320k {OUTPUT}"
 ENV FFNODE_CLIENT_TIMEOUT_SECONDS=300
 ENV FFNODE_NOTIFY_BATCH_INTERVAL_SECONDS=30
