@@ -9,9 +9,8 @@
   "type": "module",
   "scripts": {
     "build:api": "cargo build --release",
-    "dev:api": "cargo run --bin ffnodes_server",
+    "dev": "cargo run --bin ffnodes_server",
     "build:frontend": "tsc && vite build",
-    "dev": "pnpm run build:frontend && pnpm run dev:api",
     "build": "pnpm run \"build:frontend\" && pnpm run \"build:api\""
   },
   "dependencies": {

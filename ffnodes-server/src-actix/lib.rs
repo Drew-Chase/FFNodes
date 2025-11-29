@@ -7,6 +7,7 @@ use tracing::{debug, error, info, warn};
 use tracing_appender::rolling;
 use tracing_indicatif::IndicatifLayer;
 use tracing_subscriber::{EnvFilter, Layer, fmt, layer::SubscriberExt, util::SubscriberInitExt};
+use vite_actix::proxy_vite_options::ProxyViteOptions;
 use vite_actix::start_vite_server;
 use crate::asset_endpoint::AssetsAppConfig;
 
@@ -26,9 +27,23 @@ mod stats;
 pub static DEBUG: bool = cfg!(debug_assertions);
 
 pub async fn run() -> Result<()> {
-    if DEBUG {
+    #[cfg(debug_assertions)]
+    {
+        ProxyViteOptions::new().port(5173).working_directory(std::path::Path::new("ffnodes-server").canonicalize()?.to_string_lossy().as_ref()).disable_logging().build()?;
+        std::thread::spawn(|| {
+            loop {
+                info!("Starting Vite server in development mode...");
+                let status = start_vite_server().expect("Failed to start vite server").wait().expect("Vite server crashed!");
+                if !status.success() {
+                    error!("The vite server has crashed!");
+                } else {
+                    break;
+                }
+            }
+        });
         set_current_dir("target/dev-env/server")?;
     }
+
     // Create logs directory if it doesn't exist
     std::fs::create_dir_all("logs")?;
 
@@ -170,6 +185,7 @@ pub async fn run() -> Result<()> {
     let pool_data = web::Data::new(pool.clone());
     let ws_registry_data = web::Data::new(ws_registry.clone());
 
+
     let server = HttpServer::new(move || {
         App::new()
             .wrap(actix_web::middleware::Logger::default())
@@ -233,10 +249,6 @@ pub async fn run() -> Result<()> {
         if DEBUG { "development" } else { "production" },
         port
     );
-
-    if DEBUG {
-        start_vite_server().expect("Failed to start vite server");
-    }
 
     let stop_result = server.await;
     debug!("Server stopped");

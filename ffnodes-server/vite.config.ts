@@ -12,13 +12,13 @@ export default defineConfig({
     clearScreen: false,
     server: {
         host: true,
-        port: 3000,
+        port: 5173,
         strictPort: true,
         hmr: {
             protocol: "ws",
             host: "localhost",
-            port: 3000,
-            clientPort: 3000,
+            port: 5173,
+            clientPort: 5173,
             overlay: true
         },
         watch: {
@@ -26,6 +26,6 @@ export default defineConfig({
         }
     },
     build: {
-        outDir: "target/wwwroot"
+        outDir: "../target/wwwroot"
     }
 });

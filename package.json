@@ -9,7 +9,6 @@
   ],
   "scripts": {
     "dev:server": "pnpm --filter ffnodes_server dev",
-    "dev:server-api": "pnpm --filter ffnodes_server run-api",
     "dev:client": "pnpm --filter ffnodes_client tauri-dev",
     "build:server": "pnpm --filter ffnodes_server build",
     "build:server-frontend": "pnpm --filter ffnodes_server build-frontend",

@@ -53,5 +53,5 @@ tracing-appender = { version = "0.2" }
 tracing-indicatif = { version = "0.3" }
 async-stream = { version = "0.3" }
 jsonwebtoken = { version = "9.3" }
-vite-actix = "0.2.5"
+vite-actix = "0.2.6"
 include_dir = "0.7.4"
