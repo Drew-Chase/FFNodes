@@ -83,6 +83,24 @@ pub fn run() {
                         {
                             tracing::error!("Failed to save window state: {}", e);
                         }
+
+                        // Send disconnect notification to server (fire and forget)
+                        let job_manager = app.state::<Arc<Mutex<JobManager>>>().inner().clone();
+                        tauri::async_runtime::spawn(async move {
+                            let manager = job_manager.lock().await;
+
+                            // Get config to send disconnect
+                            if let Some(config) = manager.get_config().await {
+                                if let (Some(client_id), Some(auth_token)) = (&config.client_id, &config.auth_token) {
+                                    tracing::info!("Sending disconnect notification for client {}", client_id);
+                                    let client = api::ServerClient::with_auth(config.server_url.clone(), auth_token.clone());
+
+                                    // Fire and forget - don't wait for response
+                                    let _ = client.disconnect(client_id).await;
+                                }
+                            }
+                        });
+
                         app.exit(0);
                     }
                     _ => {}

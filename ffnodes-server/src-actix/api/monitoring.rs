@@ -151,3 +151,17 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             })),
     );
 }
+
+pub fn configure_public(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/monitoring")
+            .service(get_status)
+            .service(get_clients)
+            .service(scan_progress)
+            .default_service(web::to(|| async {
+                HttpResponse::NotFound().json(json!({
+                    "error": "API endpoint not found".to_string(),
+                }))
+            })),
+    );
+}

@@ -1,6 +1,6 @@
 [package]
 name = "ffnodes_server"
-version = "0.1.21-beta"
+version = "0.1.22-beta"
 edition = "2024"
 description = ""
 authors = ["Drew Chase"]
@@ -10,10 +10,15 @@ build = "build.rs"
 
 [lib]
 name = "ffnodes_server_lib"
-path = "src/lib.rs"
+path = "src-actix/lib.rs"
+
+[[bin]]
+name = "ffnodes_server"
+path = "src-actix/main.rs"
 
 [build-dependencies]
 walkdir = "2.5.0"
+include_dir = "0.7.4"
 
 [profile.release]
 opt-level = 3
@@ -22,6 +27,7 @@ codegen-units = 1
 
 [dependencies]
 actix-web = "4"
+actix-files = "0.6"
 actix-multipart = "0.6"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0" }
@@ -47,3 +53,5 @@ tracing-appender = { version = "0.2" }
 tracing-indicatif = { version = "0.3" }
 async-stream = { version = "0.3" }
 jsonwebtoken = { version = "9.3" }
+vite-actix = "0.2.6"
+include_dir = "0.7.4"

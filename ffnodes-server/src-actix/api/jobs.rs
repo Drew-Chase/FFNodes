@@ -4,6 +4,7 @@ use crate::http_error::Error;
 use crate::jobs::{JobCompletion, JobFailure, JobQueue, JobResponse, ProgressUpdate};
 use actix_web::{get, post, web, HttpResponse};
 use log::{debug, warn};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
 
@@ -108,6 +109,31 @@ pub async fn update_progress(
             crate::api::websocket::broadcast_event(&ws_registry, event).await;
         }
     }
+
+    Ok(HttpResponse::Ok().finish())
+}
+
+/// Update job phase (downloading, encoding, uploading)
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PhaseUpdate {
+    pub phase: String,
+}
+
+#[post("/{job_id}/phase")]
+pub async fn update_phase(
+    job_id: web::Path<String>,
+    phase: web::Json<PhaseUpdate>,
+    job_queue: web::Data<Arc<JobQueue>>,
+) -> Result<HttpResponse, Error> {
+    debug!("Phase update for job {}: {}", job_id, phase.phase);
+
+    job_queue
+        .update_phase(&job_id, &phase.phase)
+        .await
+        .map_err(|e| {
+            warn!("Error updating phase: {:#}", e);
+            Error::internal_server_error("Error updating phase")
+        })?;
 
     Ok(HttpResponse::Ok().finish())
 }
@@ -226,6 +252,26 @@ pub async fn heartbeat(
     Ok(HttpResponse::Ok().finish())
 }
 
+/// Client disconnect endpoint
+#[post("/clients/{client_id}/disconnect")]
+pub async fn disconnect_client(
+    client_id: web::Path<String>,
+    client_manager: web::Data<Arc<ClientManager>>,
+    job_queue: web::Data<Arc<JobQueue>>,
+) -> Result<HttpResponse, Error> {
+    debug!("Client disconnect request: {}", client_id);
+
+    client_manager
+        .disconnect_and_requeue_jobs(&client_id, &job_queue)
+        .await
+        .map_err(|e| {
+            warn!("Error disconnecting client: {:#}", e);
+            Error::internal_server_error("Error disconnecting client")
+        })?;
+
+    Ok(HttpResponse::Ok().finish())
+}
+
 /// Get active jobs
 #[get("/active")]
 pub async fn get_active_jobs(
@@ -247,10 +293,27 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(request_job)
             .service(start_job)
             .service(update_progress)
+            .service(update_phase)
             .service(complete_job)
             .service(fail_job)
             .service(cancel_job)
             .service(heartbeat)
+            .service(get_active_jobs)
+    );
+    cfg.service(
+        web::scope("/clients")
+            .service(disconnect_client)
+            .default_service(web::to(|| async {
+                HttpResponse::NotFound().json(json!({
+                    "error": "API endpoint not found".to_string(),
+                }))
+            })),
+    );
+}
+
+pub fn configure_public(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/jobs")
             .service(get_active_jobs)
             .default_service(web::to(|| async {
                 HttpResponse::NotFound().json(json!({

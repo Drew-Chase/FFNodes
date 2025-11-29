@@ -46,11 +46,34 @@ pub async fn get_leaderboard(
     Ok(HttpResponse::Ok().json(leaderboard))
 }
 
+/// Get overall system statistics
+/// GET /api/public/stats/overall
+#[get("/overall")]
+pub async fn get_overall_stats(
+    pool: web::Data<SqlitePool>,
+) -> Result<HttpResponse, HttpError> {
+    let stats = queries::get_overall_stats(&pool).await?;
+    Ok(HttpResponse::Ok().json(stats))
+}
+
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/stats")
             .service(get_client_history)
             .service(get_remote_progress)
+            .service(get_leaderboard)
+            .default_service(web::to(|| async {
+                HttpResponse::NotFound().json(json!({
+                    "error": "API endpoint not found".to_string(),
+                }))
+            })),
+    );
+}
+
+pub fn configure_public(cfg: &mut web::ServiceConfig) {
+    cfg.service(
+        web::scope("/stats")
+            .service(get_overall_stats)
             .service(get_leaderboard)
             .default_service(web::to(|| async {
                 HttpResponse::NotFound().json(json!({

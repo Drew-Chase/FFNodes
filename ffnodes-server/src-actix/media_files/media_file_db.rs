@@ -80,6 +80,12 @@ pub async fn initialize() -> Result<()> {
         .await;
     // Ignore error if column already exists
 
+    // Migration: Add current_phase column if it doesn't exist (for existing databases)
+    let _ = pool
+        .execute("ALTER TABLE encoding_jobs ADD COLUMN current_phase TEXT DEFAULT NULL")
+        .await;
+    // Ignore error if column already exists
+
     // Create indexes for client lookups
     pool.execute("CREATE INDEX IF NOT EXISTS idx_clients_computer_name ON clients(computer_name)")
         .await?;

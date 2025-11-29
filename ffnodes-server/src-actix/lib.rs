@@ -7,8 +7,12 @@ use tracing::{debug, error, info, warn};
 use tracing_appender::rolling;
 use tracing_indicatif::IndicatifLayer;
 use tracing_subscriber::{EnvFilter, Layer, fmt, layer::SubscriberExt, util::SubscriberInitExt};
+use vite_actix::proxy_vite_options::ProxyViteOptions;
+use vite_actix::start_vite_server;
+use crate::asset_endpoint::AssetsAppConfig;
 
 mod api;
+mod asset_endpoint;
 mod clients;
 mod configuration;
 mod http_error;
@@ -23,9 +27,23 @@ mod stats;
 pub static DEBUG: bool = cfg!(debug_assertions);
 
 pub async fn run() -> Result<()> {
-    if DEBUG {
+    #[cfg(debug_assertions)]
+    {
+        ProxyViteOptions::new().port(5173).working_directory(std::path::Path::new("ffnodes-server").canonicalize()?.to_string_lossy().as_ref()).disable_logging().build()?;
+        std::thread::spawn(|| {
+            loop {
+                info!("Starting Vite server in development mode...");
+                let status = start_vite_server().expect("Failed to start vite server").wait().expect("Vite server crashed!");
+                if !status.success() {
+                    error!("The vite server has crashed!");
+                } else {
+                    break;
+                }
+            }
+        });
         set_current_dir("target/dev-env/server")?;
     }
+
     // Create logs directory if it doesn't exist
     std::fs::create_dir_all("logs")?;
 
@@ -134,6 +152,41 @@ pub async fn run() -> Result<()> {
     ));
     job_scheduler.start();
 
+    // Start heartbeat monitor to detect stale clients
+    tokio::spawn({
+        let client_manager_clone = Arc::clone(&client_manager);
+        let job_queue_clone = Arc::clone(&job_queue);
+        async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+            loop {
+                interval.tick().await;
+
+                // Get all connected clients
+                if let Ok(clients) = client_manager_clone.get_connected_clients().await {
+                    let now = chrono::Utc::now().timestamp();
+                    let timeout_threshold = now - 60; // 60 seconds timeout
+
+                    for client in clients {
+                        // Check if client hasn't sent heartbeat in 60 seconds
+                        if client.last_heartbeat < timeout_threshold {
+                            info!(
+                                "Client {} ({}) timed out (last heartbeat: {} seconds ago), disconnecting and requeuing jobs",
+                                client.display_name,
+                                client.id,
+                                now - client.last_heartbeat
+                            );
+
+                            // Disconnect client and requeue their jobs
+                            if let Err(e) = client_manager_clone.disconnect_and_requeue_jobs(&client.id, &job_queue_clone).await {
+                                error!("Failed to disconnect stale client {}: {:#}", client.id, e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+
     // Start file watcher
     let file_watcher = Arc::new(media_files::FileWatcher::new(
         Arc::clone(&configuration),
@@ -167,6 +220,7 @@ pub async fn run() -> Result<()> {
     let pool_data = web::Data::new(pool.clone());
     let ws_registry_data = web::Data::new(ws_registry.clone());
 
+
     let server = HttpServer::new(move || {
         App::new()
             .wrap(actix_web::middleware::Logger::default())
@@ -191,6 +245,13 @@ pub async fn run() -> Result<()> {
                 web::scope("api")
                     // Authentication (no middleware required)
                     .configure(api::auth::configure)
+                    // Public endpoints (no JWT required) for dashboard
+                    .service(
+                        web::scope("public")
+                            .configure(api::monitoring::configure_public)
+                            .configure(api::stats::configure_public)
+                            .configure(api::jobs::configure_public)
+                    )
                     // Protected endpoints (JWT required)
                     .service(
                         web::scope("")
@@ -212,6 +273,7 @@ pub async fn run() -> Result<()> {
                         }))
                     }))
             )
+            .configure_frontend_routes()
     })
     .workers(4)
     .bind(format!("0.0.0.0:{port}", port = port))?

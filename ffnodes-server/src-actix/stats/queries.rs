@@ -263,3 +263,88 @@ pub async fn get_leaderboard(
         entries,
     })
 }
+
+/// Get overall system statistics for dashboard
+pub async fn get_overall_stats(pool: &SqlitePool) -> Result<OverallSystemStats> {
+    // Count total media files
+    let total_media_files: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM media_files")
+        .fetch_one(pool)
+        .await?;
+
+    // Count processed files
+    let processed_files: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM media_files WHERE processed = 1")
+        .fetch_one(pool)
+        .await?;
+
+    // Calculate pending files
+    let pending_files = total_media_files.0 - processed_files.0;
+
+    // Sum storage (original scanned size vs current size)
+    let storage_stats: (Option<i64>, Option<i64>) = sqlx::query_as(
+        r#"
+        SELECT
+            SUM(scanned_size) as total_scanned,
+            SUM(COALESCE(size, scanned_size)) as total_current
+        FROM media_files
+        WHERE processed = 1
+        "#
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let total_storage_bytes = storage_stats.0.unwrap_or(0);
+    let current_storage = storage_stats.1.unwrap_or(0);
+    let total_saved_bytes = total_storage_bytes - current_storage;
+
+    // Total processing time (sum of completed job durations)
+    let processing_time: (Option<i64>,) = sqlx::query_as(
+        r#"
+        SELECT SUM(completed_at - started_at)
+        FROM encoding_jobs
+        WHERE status = 'completed'
+        "#
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let total_processing_time_seconds = processing_time.0.unwrap_or(0);
+
+    // Average encoding speed
+    let avg_speed: (Option<f64>,) = sqlx::query_as(
+        r#"
+        SELECT AVG(average_speed)
+        FROM encoding_jobs
+        WHERE status = 'completed'
+        AND average_speed IS NOT NULL
+        "#
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let average_encoding_speed = avg_speed.0.unwrap_or(0.0);
+
+    // Job counts
+    let completed_jobs: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM encoding_jobs WHERE status = 'completed'"
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let failed_jobs: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM encoding_jobs WHERE status = 'failed'"
+    )
+    .fetch_one(pool)
+    .await?;
+
+    Ok(OverallSystemStats {
+        total_media_files: total_media_files.0,
+        processed_files: processed_files.0,
+        pending_files,
+        total_storage_bytes,
+        total_saved_bytes,
+        total_processing_time_seconds,
+        average_encoding_speed,
+        total_jobs_completed: completed_jobs.0,
+        total_jobs_failed: failed_jobs.0,
+    })
+}
