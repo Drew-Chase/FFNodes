@@ -1,4 +1,5 @@
 use actix_web::{App, HttpResponse, HttpServer, web};
+use actix_files as files;
 use anyhow::Result;
 use serde_json::json;
 use std::env::set_current_dir;
@@ -191,6 +192,13 @@ pub async fn run() -> Result<()> {
                 web::scope("api")
                     // Authentication (no middleware required)
                     .configure(api::auth::configure)
+                    // Public endpoints (no JWT required) for dashboard
+                    .service(
+                        web::scope("public")
+                            .configure(api::monitoring::configure_public)
+                            .configure(api::stats::configure_public)
+                            .configure(api::jobs::configure_public)
+                    )
                     // Protected endpoints (JWT required)
                     .service(
                         web::scope("")
@@ -210,6 +218,18 @@ pub async fn run() -> Result<()> {
                         HttpResponse::NotFound().json(json!({
                             "error": "API endpoint not found".to_string(),
                         }))
+                    }))
+            )
+            // Static file serving for dashboard frontend (place after API routes)
+            .service(
+                files::Files::new("/", "target/wwwroot")
+                    .index_file("index.html")
+                    .use_last_modified(true)
+                    .default_handler(web::to(|req: actix_web::HttpRequest| async move {
+                        match files::NamedFile::open_async("target/wwwroot/index.html").await {
+                            Ok(file) => file.into_response(&req),
+                            Err(_) => HttpResponse::NotFound().body("Frontend not built. Run 'pnpm build-frontend' in ffnodes-server directory.")
+                        }
                     }))
             )
     })

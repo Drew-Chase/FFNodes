@@ -90,3 +90,17 @@ pub struct LeaderboardResponse {
     pub category: String,
     pub entries: Vec<LeaderboardEntry>,
 }
+
+/// Overall system statistics for dashboard
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OverallSystemStats {
+    pub total_media_files: i64,
+    pub processed_files: i64,
+    pub pending_files: i64,
+    pub total_storage_bytes: i64,
+    pub total_saved_bytes: i64,
+    pub total_processing_time_seconds: i64,
+    pub average_encoding_speed: f64,
+    pub total_jobs_completed: i64,
+    pub total_jobs_failed: i64,
+}
