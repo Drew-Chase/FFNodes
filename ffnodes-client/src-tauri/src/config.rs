@@ -22,11 +22,10 @@ impl ClientConfig {
             .unwrap_or_else(|| "Unknown".to_string());
 
         // Generate machine ID from hardware fingerprint
-        let machine_id = crate::machine_id::generate_machine_id()
-            .unwrap_or_else(|e| {
-                tracing::warn!("Failed to generate machine ID: {}", e);
-                uuid::Uuid::new_v4().to_string()
-            });
+        let machine_id = crate::machine_id::generate_machine_id().unwrap_or_else(|e| {
+            tracing::warn!("Failed to generate machine ID: {}", e);
+            uuid::Uuid::new_v4().to_string()
+        });
 
         Self {
             server_url,
@@ -52,6 +51,7 @@ impl ClientConfig {
     pub fn load() -> anyhow::Result<Option<Self>> {
         let path = Self::config_path();
         if !path.exists() {
+            log::debug!("Config file does not exist: {}", path.display());
             return Ok(None);
         }
 
@@ -77,11 +77,10 @@ impl ClientConfig {
                 let old_config: OldConfig = serde_json::from_str(&content)?;
 
                 // Generate machine_id for old config
-                let machine_id = crate::machine_id::generate_machine_id()
-                    .unwrap_or_else(|e| {
-                        tracing::warn!("Failed to generate machine ID during migration: {}", e);
-                        uuid::Uuid::new_v4().to_string()
-                    });
+                let machine_id = crate::machine_id::generate_machine_id().unwrap_or_else(|e| {
+                    tracing::warn!("Failed to generate machine ID during migration: {}", e);
+                    uuid::Uuid::new_v4().to_string()
+                });
 
                 tracing::info!("Migrated old config to include machine_id");
 
