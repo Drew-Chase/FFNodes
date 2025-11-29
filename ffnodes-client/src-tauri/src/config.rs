@@ -41,9 +41,9 @@ impl ClientConfig {
     }
 
     fn config_path() -> PathBuf {
-        let config_dir = dirs::config_dir()
+        let config_dir = dirs::data_local_dir()
             .unwrap_or_else(|| PathBuf::from("."))
-            .join("ffnodes-client");
+            .join("FFNodes");
 
         fs::create_dir_all(&config_dir).ok();
         config_dir.join("config.json")
