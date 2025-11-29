@@ -39,21 +39,51 @@ pub async fn run() -> Result<()> {
     let console_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
     let file_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
 
+    // Use consistent formatting for both console and file
     tracing_subscriber::registry()
         .with(
             fmt::layer()
-                .pretty()
+                .with_target(true)
+                .with_thread_ids(false)
+                .with_thread_names(false)
+                .with_file(true)
+                .with_line_number(true)
                 .with_writer(indicatif_layer.get_stderr_writer())
                 .with_filter(console_filter),
         )
         .with(
             fmt::layer()
+                .with_target(true)
+                .with_thread_ids(false)
+                .with_thread_names(false)
+                .with_file(true)
+                .with_line_number(true)
                 .with_writer(file_appender)
                 .with_ansi(false)
                 .with_filter(file_filter),
         )
         .with(indicatif_layer)
         .init();
+
+    // Set up panic hook to log panics
+    std::panic::set_hook(Box::new(|panic_info| {
+        let payload = panic_info.payload();
+        let message = if let Some(s) = payload.downcast_ref::<&str>() {
+            *s
+        } else if let Some(s) = payload.downcast_ref::<String>() {
+            s.as_str()
+        } else {
+            "Box<dyn Any>"
+        };
+
+        let location = if let Some(location) = panic_info.location() {
+            format!(" at {}:{}:{}", location.file(), location.line(), location.column())
+        } else {
+            String::new()
+        };
+
+        error!("thread panicked with message: {}{}", message, location);
+    }));
 
     serde_hash::hashids::SerdeHashOptions::new()
         .with_min_length(16)
