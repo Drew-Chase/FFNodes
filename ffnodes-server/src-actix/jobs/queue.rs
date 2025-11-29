@@ -168,6 +168,21 @@ impl JobQueue {
         Ok(())
     }
 
+    /// Update job's current phase
+    pub async fn update_phase(&self, job_id: &str, phase: &str) -> Result<()> {
+        sqlx::query(
+            r#"UPDATE encoding_jobs
+            SET current_phase = ?
+            WHERE id = ?"#,
+        )
+        .bind(phase)
+        .bind(job_id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
     /// Complete a job with transaction isolation
     /// Both encoding_jobs and media_files updates are atomic
     pub async fn complete_job(

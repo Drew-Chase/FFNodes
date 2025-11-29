@@ -4,6 +4,7 @@ use crate::http_error::Error;
 use crate::jobs::{JobCompletion, JobFailure, JobQueue, JobResponse, ProgressUpdate};
 use actix_web::{get, post, web, HttpResponse};
 use log::{debug, warn};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::sync::Arc;
 
@@ -108,6 +109,31 @@ pub async fn update_progress(
             crate::api::websocket::broadcast_event(&ws_registry, event).await;
         }
     }
+
+    Ok(HttpResponse::Ok().finish())
+}
+
+/// Update job phase (downloading, encoding, uploading)
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PhaseUpdate {
+    pub phase: String,
+}
+
+#[post("/{job_id}/phase")]
+pub async fn update_phase(
+    job_id: web::Path<String>,
+    phase: web::Json<PhaseUpdate>,
+    job_queue: web::Data<Arc<JobQueue>>,
+) -> Result<HttpResponse, Error> {
+    debug!("Phase update for job {}: {}", job_id, phase.phase);
+
+    job_queue
+        .update_phase(&job_id, &phase.phase)
+        .await
+        .map_err(|e| {
+            warn!("Error updating phase: {:#}", e);
+            Error::internal_server_error("Error updating phase")
+        })?;
 
     Ok(HttpResponse::Ok().finish())
 }
@@ -267,6 +293,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(request_job)
             .service(start_job)
             .service(update_progress)
+            .service(update_phase)
             .service(complete_job)
             .service(fail_job)
             .service(cancel_job)

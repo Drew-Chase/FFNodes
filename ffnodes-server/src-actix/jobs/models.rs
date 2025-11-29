@@ -53,6 +53,7 @@ pub struct EncodingJob {
     pub output_size: Option<i64>,
     pub output_bitrate: Option<i64>,
     pub average_speed: Option<f64>,
+    pub current_phase: Option<String>, // "downloading", "encoding", "uploading"
     pub created_at: i64,
 }
 
@@ -73,6 +74,7 @@ impl EncodingJob {
             output_size: None,
             output_bitrate: None,
             average_speed: None,
+            current_phase: None,
             created_at: now,
         }
     }

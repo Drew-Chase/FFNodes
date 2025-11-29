@@ -42,6 +42,7 @@ export interface EncodingJob {
   output_size: number | null;
   output_bitrate: number | null;
   average_speed: number | null;
+  current_phase: string | null; // "downloading", "encoding", "uploading"
   created_at: number;
 }
 

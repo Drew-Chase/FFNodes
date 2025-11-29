@@ -1,10 +1,22 @@
 import { useEffect } from 'react';
 import { BentoCard, BentoCardHeader, BentoCardContent } from '../layout/BentoGrid';
-import { Progress } from '../ui/Progress';
 import { useDashboardStore } from '../../stores/useDashboardStore';
 
 function getFilename(path: string): string {
   return path.split(/[\\/]/).pop() || path;
+}
+
+function getPhaseDisplay(phase: string | null): { text: string; color: string; icon: string } {
+  switch (phase) {
+    case 'downloading':
+      return { text: 'Downloading', color: 'text-secondary', icon: 'mdi:download' };
+    case 'encoding':
+      return { text: 'Encoding', color: 'text-primary', icon: 'mdi:cog' };
+    case 'uploading':
+      return { text: 'Uploading', color: 'text-success', icon: 'mdi:upload' };
+    default:
+      return { text: 'Processing', color: 'text-foreground/70', icon: 'mdi:dots-horizontal' };
+  }
 }
 
 export function CurrentJobsBento() {
@@ -14,8 +26,8 @@ export function CurrentJobsBento() {
     // Initial fetch
     fetchActiveJobs();
 
-    // Poll every 5 seconds
-    const interval = setInterval(fetchActiveJobs, 5000);
+    // Poll every 2 seconds for more responsive updates
+    const interval = setInterval(fetchActiveJobs, 2000);
 
     return () => clearInterval(interval);
   }, [fetchActiveJobs]);
@@ -40,10 +52,7 @@ export function CurrentJobsBento() {
               const filename = getFilename(job.media_file_path);
               const isInProgress = job.status === 'in_progress';
               const isAssigned = job.status === 'assigned';
-
-              // For now, we don't have real-time progress in the job object
-              // This will be updated when SSE is implemented
-              const progress = isInProgress ? 50 : isAssigned ? 0 : 100;
+              const phaseDisplay = getPhaseDisplay(job.current_phase);
 
               return (
                 <div
@@ -73,25 +82,15 @@ export function CurrentJobsBento() {
                     </div>
                   </div>
 
-                  {/* Progress bar */}
-                  {isInProgress || isAssigned ? (
-                    <div className="mt-3">
-                      <Progress
-                        value={progress}
-                        showPercentage={true}
-                        height="md"
-                        color={isInProgress ? "primary" : "secondary"}
-                      />
-                      <div className="flex justify-between items-center mt-2 text-body-sm text-foreground/70">
-                        <span>
-                          {isInProgress ? 'Encoding...' : 'Starting...'}
-                        </span>
-                        {job.average_speed && (
-                          <span>{job.average_speed.toFixed(2)}x</span>
-                        )}
-                      </div>
+                  {/* Phase indicator */}
+                  {(isInProgress || isAssigned) && job.current_phase && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <iconify-icon icon={phaseDisplay.icon} class={`text-lg ${phaseDisplay.color}`} />
+                      <span className={`text-body-sm font-medium ${phaseDisplay.color}`}>
+                        {phaseDisplay.text}
+                      </span>
                     </div>
-                  ) : null}
+                  )}
 
                   {/* Error message for failed jobs */}
                   {job.status === 'failed' && job.error_message && (
