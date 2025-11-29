@@ -8,13 +8,11 @@
   "repository": "",
   "type": "module",
   "scripts": {
-    "build-api": "cargo build --release",
-    "run-api": "cargo run --bin ffnodes_server",
-    "dev": "vite",
-    "build-frontend": "tsc && vite build",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "watch": "cargo watch -x \"run --bin ffnodes_server\" -C dist -N --why -w ../src-actix/",
-    "build": "npm run \"build-frontend\" && npm run \"build-api\""
+    "build:api": "cargo build --release",
+    "dev:api": "cargo run --bin ffnodes_server",
+    "build:frontend": "tsc && vite build",
+    "dev": "pnpm run build:frontend && pnpm run dev:api",
+    "build": "pnpm run \"build:frontend\" && pnpm run \"build:api\""
   },
   "dependencies": {
     "@heroui/react": "^2.8.5",

@@ -10,7 +10,7 @@ use vite_actix::vite_app_factory::ViteAppFactory;
 // This static directory is used to embed files into the binary at compile time.
 // The `WWWROOT` directory will be used to serve static files such as `index.html`.
 // Path is relative to workspace root since this is a workspace member.
-static WWWROOT: Dir = include_dir!("ffnodes-server/target/wwwroot");
+static WWWROOT: Dir = include_dir!("target/wwwroot");
 
 // Handles the request for the index.html file.
 //
