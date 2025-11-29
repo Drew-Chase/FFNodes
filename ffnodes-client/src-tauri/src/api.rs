@@ -133,15 +133,111 @@ impl ServerClient {
 
     pub async fn handshake(&self, request: HandshakeRequest) -> Result<HandshakeResponse> {
         let url = format!("{}/api/handshake", self.base_url);
-        let response = self
+
+        log::info!("=== Starting handshake ===");
+        log::info!("Handshake URL: {}", url);
+        log::info!("Base URL: {}", self.base_url);
+
+        // Log request details
+        log::debug!("Handshake request details:");
+        log::debug!("  server_guid: {}", request.server_guid);
+        log::debug!("  display_name: {}", request.display_name);
+        log::debug!("  computer_name: {}", request.computer_name);
+        log::debug!("  machine_id: {}", request.machine_id);
+
+        // Serialize request to see exact JSON being sent
+        match serde_json::to_string_pretty(&request) {
+            Ok(json_str) => log::trace!("Request body JSON:\n{}", json_str),
+            Err(e) => log::warn!("Failed to serialize request for logging: {}", e),
+        }
+
+        log::debug!("Sending POST request...");
+        let response = match self
             .client
             .post(&url)
             .json(&request)
             .send()
-            .await?
-            .error_for_status()?;
+            .await
+        {
+            Ok(resp) => {
+                log::debug!("✓ Request sent successfully");
+                resp
+            }
+            Err(e) => {
+                log::error!("✗ Failed to send handshake request");
+                log::error!("Error type: {:?}", e);
+                log::error!("Error details: {:#}", e);
 
-        let handshake_response: HandshakeResponse = response.json().await?;
+                // Check for common network errors
+                if e.is_timeout() {
+                    log::error!("→ Connection timed out - server may be unreachable");
+                } else if e.is_connect() {
+                    log::error!("→ Connection failed - check if server is running and URL is correct");
+                } else if e.is_request() {
+                    log::error!("→ Request construction failed - invalid URL or headers");
+                }
+
+                return Err(e.into());
+            }
+        };
+
+        // Log response status and headers
+        let status = response.status();
+        log::info!("Response status: {} {}", status.as_u16(), status.canonical_reason().unwrap_or(""));
+        log::trace!("Response headers: {:#?}", response.headers());
+
+        // Check status code before reading body
+        if !status.is_success() {
+            log::error!("✗ Server returned error status: {}", status);
+
+            // Try to read error body for more details
+            match response.text().await {
+                Ok(body) => {
+                    log::error!("Error response body: {}", body);
+                    return Err(anyhow::anyhow!("Handshake failed with status {}: {}", status, body));
+                }
+                Err(e) => {
+                    log::error!("Failed to read error response body: {}", e);
+                    return Err(anyhow::anyhow!("Handshake failed with status {}", status));
+                }
+            }
+        }
+
+        // Read response body as text first for logging
+        log::debug!("Reading response body...");
+        let response_text = match response.text().await {
+            Ok(text) => {
+                log::debug!("✓ Response body received ({} bytes)", text.len());
+                log::trace!("Raw response body:\n{}", text);
+                text
+            }
+            Err(e) => {
+                log::error!("✗ Failed to read response body: {}", e);
+                return Err(e.into());
+            }
+        };
+
+        // Parse JSON response
+        log::debug!("Parsing JSON response...");
+        let handshake_response: HandshakeResponse = match serde_json::from_str(&response_text) {
+            Ok(parsed) => {
+                log::debug!("✓ Successfully parsed handshake response");
+                parsed
+            }
+            Err(e) => {
+                log::error!("✗ Failed to parse JSON response");
+                log::error!("Parse error: {}", e);
+                log::error!("Response text that failed to parse: {}", response_text);
+                return Err(anyhow::anyhow!("Failed to parse handshake response: {}", e));
+            }
+        };
+
+        log::info!("✓ Handshake successful!");
+        log::info!("Client ID: {}", handshake_response.client_id);
+        log::info!("Auth token: {}...", &handshake_response.auth_token.chars().take(10).collect::<String>());
+        log::debug!("FFmpeg template: {}", handshake_response.ffmpeg_template);
+        log::info!("=== Handshake complete ===");
+
         Ok(handshake_response)
     }
 
