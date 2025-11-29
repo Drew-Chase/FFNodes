@@ -5,22 +5,50 @@ import {OverallStatsBento} from "./stats/OverallStatsBento";
 import {CurrentJobsBento} from "./stats/CurrentJobsBento";
 import {ConnectedClientsBento} from "./stats/ConnectedClientsBento";
 import {LeaderboardBento} from "./stats/LeaderboardBento";
+import {ScanProgressBento} from "./stats/ScanProgressBento";
 import {useDashboardStore} from "../stores/useDashboardStore";
 import {useTheme} from "../contexts/ThemeContext";
 import {Button} from "./ui/Button.tsx";
 import {Icon} from "@iconify-icon/react";
 import {Tooltip} from "@heroui/react";
+import {createReconnectingSSE} from "../lib/sse";
+import type {ScanProgress} from "../types/api";
 
 export function Dashboard()
 {
-    const {fetchAllData, systemStatus} = useDashboardStore();
+    const {fetchAllData, systemStatus, updateScanProgress, addScanFile, setScanSSEConnected} = useDashboardStore();
     const {theme, toggleTheme} = useTheme();
 
     useEffect(() =>
     {
         // Initial data fetch
         fetchAllData();
-    }, [fetchAllData]);
+
+        // Set up scan progress SSE connection
+        const cleanupScanSSE = createReconnectingSSE(
+            '/api/public/monitoring/scan/progress',
+            (data) => {
+                // Handle SSE messages
+                if (typeof data === 'object' && 'total_files' in data) {
+                    const progress = data as ScanProgress;
+                    updateScanProgress(progress);
+
+                    // Add file to history if present
+                    if (progress.current_file) {
+                        addScanFile(progress.current_file);
+                    }
+                }
+            },
+            (connected) => {
+                setScanSSEConnected(connected);
+            }
+        );
+
+        // Cleanup on unmount
+        return () => {
+            cleanupScanSSE();
+        };
+    }, [fetchAllData, updateScanProgress, addScanFile, setScanSSEConnected]);
 
     return (
         <div className="min-h-screen bg-background p-6 md:p-8">
@@ -85,6 +113,9 @@ export function Dashboard()
                     </div>
                 </BentoCard>
             </motion.header>
+
+            {/* Scan Progress Indicator - shown only when scanning */}
+            <ScanProgressBento />
 
             {/* Main Dashboard Grid */}
             <BentoGrid columns={6} gap="md">

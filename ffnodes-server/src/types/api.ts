@@ -104,6 +104,20 @@ export interface ProgressUpdate {
   speed: string;
 }
 
+// Scan progress types
+
+export interface ScanProgress {
+  total_files: number;
+  completed_files: number;
+  current_file: string | null;
+  operation: string;
+}
+
+export interface ScanFileLog {
+  file: string;
+  timestamp: number;
+}
+
 // Dashboard-specific types
 
 export interface DashboardEvent {

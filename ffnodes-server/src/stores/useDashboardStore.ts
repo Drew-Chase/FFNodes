@@ -6,6 +6,8 @@ import type {
   ClientStatus,
   LeaderboardResponse,
   LeaderboardCategory,
+  ScanProgress,
+  ScanFileLog,
 } from '../types/api';
 import {
   fetchSystemStatus,
@@ -23,6 +25,12 @@ interface DashboardState {
   connectedClients: ClientStatus[];
   leaderboard: LeaderboardResponse | null;
   selectedLeaderboardCategory: LeaderboardCategory;
+
+  // Scan Progress
+  scanProgress: ScanProgress | null;
+  scanFileHistory: ScanFileLog[];
+  isScanActive: boolean;
+  scanSSEConnected: boolean;
 
   // UI State
   loading: boolean;
@@ -45,6 +53,12 @@ interface DashboardState {
   markJobFailed: (jobId: string, error: string) => void;
   addClient: (client: ClientStatus) => void;
   removeClient: (clientId: string) => void;
+
+  // Scan Progress Actions
+  updateScanProgress: (progress: ScanProgress) => void;
+  addScanFile: (file: string) => void;
+  setScanSSEConnected: (connected: boolean) => void;
+  clearScanProgress: () => void;
 }
 
 export const useDashboardStore = create<DashboardState>((set, get) => ({
@@ -55,6 +69,10 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   connectedClients: [],
   leaderboard: null,
   selectedLeaderboardCategory: 'most_jobs',
+  scanProgress: null,
+  scanFileHistory: [],
+  isScanActive: false,
+  scanSSEConnected: false,
   loading: false,
   error: null,
   lastUpdate: null,
@@ -180,5 +198,47 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     set((state) => ({
       connectedClients: state.connectedClients.filter((c) => c.id !== clientId),
     }));
+  },
+
+  // Scan Progress Actions
+  updateScanProgress: (progress: ScanProgress) => {
+    const isComplete = progress.operation === 'Complete';
+    set({
+      scanProgress: progress,
+      isScanActive: !isComplete,
+    });
+
+    // Auto-clear after 5 seconds when scan completes
+    if (isComplete) {
+      setTimeout(() => {
+        get().clearScanProgress();
+      }, 5000);
+    }
+  },
+
+  addScanFile: (file: string) => {
+    set((state) => {
+      const newLog: ScanFileLog = {
+        file,
+        timestamp: Date.now(),
+      };
+
+      // Keep only last 10 files in history (performance limit)
+      const updatedHistory = [newLog, ...state.scanFileHistory].slice(0, 10);
+
+      return { scanFileHistory: updatedHistory };
+    });
+  },
+
+  setScanSSEConnected: (connected: boolean) => {
+    set({ scanSSEConnected: connected });
+  },
+
+  clearScanProgress: () => {
+    set({
+      scanProgress: null,
+      scanFileHistory: [],
+      isScanActive: false,
+    });
   },
 }));

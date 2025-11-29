@@ -44,3 +44,28 @@ body{
 input:focus-visible,textarea:focus-visible {
   outline: none !important;
 }
+
+/* Custom scrollbar for scan progress log */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: hsl(var(--heroui-content2) / 0.3);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--heroui-primary) / 0.5);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--heroui-primary) / 0.7);
+}
+
+/* Firefox scrollbar */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--heroui-primary) / 0.5) hsl(var(--heroui-content2) / 0.3);
+}
