@@ -1,5 +1,4 @@
 use actix_web::{App, HttpResponse, HttpServer, web};
-use actix_files as files;
 use anyhow::Result;
 use serde_json::json;
 use std::env::set_current_dir;
@@ -8,8 +7,11 @@ use tracing::{debug, error, info, warn};
 use tracing_appender::rolling;
 use tracing_indicatif::IndicatifLayer;
 use tracing_subscriber::{EnvFilter, Layer, fmt, layer::SubscriberExt, util::SubscriberInitExt};
+use vite_actix::start_vite_server;
+use crate::asset_endpoint::AssetsAppConfig;
 
 mod api;
+mod asset_endpoint;
 mod clients;
 mod configuration;
 mod http_error;
@@ -220,18 +222,7 @@ pub async fn run() -> Result<()> {
                         }))
                     }))
             )
-            // Static file serving for dashboard frontend (place after API routes)
-            .service(
-                files::Files::new("/", "target/wwwroot")
-                    .index_file("index.html")
-                    .use_last_modified(true)
-                    .default_handler(web::to(|req: actix_web::HttpRequest| async move {
-                        match files::NamedFile::open_async("target/wwwroot/index.html").await {
-                            Ok(file) => file.into_response(&req),
-                            Err(_) => HttpResponse::NotFound().body("Frontend not built. Run 'pnpm build-frontend' in ffnodes-server directory.")
-                        }
-                    }))
-            )
+            .configure_frontend_routes()
     })
     .workers(4)
     .bind(format!("0.0.0.0:{port}", port = port))?
@@ -242,6 +233,10 @@ pub async fn run() -> Result<()> {
         if DEBUG { "development" } else { "production" },
         port
     );
+
+    if DEBUG {
+        start_vite_server().expect("Failed to start vite server");
+    }
 
     let stop_result = server.await;
     debug!("Server stopped");
