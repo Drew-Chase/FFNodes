@@ -18,7 +18,8 @@ import {LeaderboardBento} from "../components/stats/LeaderboardBento";
 import {SettingsModal} from "../components/SettingsModal";
 import {ScanProgressBento} from "../components/stats/ScanProgressBento";
 import {OverallStatsBento} from "../components/stats/OverallStatsBento";
-import {useSystemStatsStore} from "../stores/useSystemStatsStore";
+import {useSystemStatsStore, ScanProgress} from "../stores/useSystemStatsStore";
+import {createReconnectingSSE} from "../lib/sse";
 
 export function Dashboard()
 {
@@ -29,7 +30,7 @@ export function Dashboard()
     const [gpuInfo, setGpuInfo] = useState<any>(null);
     const [isPaused, setIsPaused] = useState(true); // Start paused by default
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const {setOverallStats, setSystemStatus} = useSystemStatsStore();
+    const {setOverallStats, setSystemStatus, updateScanProgress, addScanFile} = useSystemStatsStore();
 
     // Create logger for Dashboard
     const logger = new Logger("Dashboard");
@@ -166,6 +167,35 @@ export function Dashboard()
 
         return () => clearInterval(interval);
     }, [config, setOverallStats, setSystemStatus]);
+
+    // Set up SSE connection for scan progress
+    useEffect(() => {
+        if (!config) return;
+
+        const serverUrl = config.server_url || '';
+        const cleanupScanSSE = createReconnectingSSE(
+            `${serverUrl}/api/public/monitoring/scan/progress`,
+            (data) => {
+                // Handle SSE messages
+                if (typeof data === 'object' && 'total_files' in data) {
+                    const progress = data as ScanProgress;
+                    updateScanProgress(progress);
+
+                    // Add file to history if present
+                    if (progress.current_file) {
+                        addScanFile(progress.current_file);
+                    }
+                }
+            },
+            (connected) => {
+                logger.info(`Scan progress SSE ${connected ? 'connected' : 'disconnected'}`);
+            }
+        );
+
+        return () => {
+            cleanupScanSSE();
+        };
+    }, [config, updateScanProgress, addScanFile]);
 
     // Set up event listeners for job updates
     useEffect(() =>
