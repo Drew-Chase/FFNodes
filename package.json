@@ -1,6 +1,6 @@
 {
   "name": "ffnodes",
-  "version": "0.1.29-beta",
+  "version": "0.1.30-beta",
   "description": "Distributed video encoding system using FFmpeg",
   "private": true,
   "workspaces": [
