@@ -39,12 +39,13 @@ impl JobQueue {
         Ok(job)
     }
 
-    /// Get next pending job with highest priority
+    /// Get next pending job with highest priority, excluding already processed files
     pub async fn get_next_job(&self) -> Result<Option<EncodingJob>> {
         let job: Option<EncodingJob> = sqlx::query_as(
-            r#"SELECT * FROM encoding_jobs
-            WHERE status = 'pending'
-            ORDER BY priority DESC, created_at ASC
+            r#"SELECT ej.* FROM encoding_jobs ej
+            INNER JOIN media_files mf ON ej.media_file_path = mf.path
+            WHERE ej.status = 'pending' AND mf.processed = 0
+            ORDER BY ej.priority DESC, ej.created_at ASC
             LIMIT 1"#,
         )
         .fetch_optional(&self.pool)
@@ -61,11 +62,12 @@ impl JobQueue {
         // Use a transaction to ensure atomicity
         let mut tx = self.pool.begin().await?;
 
-        // Get the next pending job
+        // Get the next pending job, excluding already processed files
         let job: Option<EncodingJob> = sqlx::query_as(
-            r#"SELECT * FROM encoding_jobs
-            WHERE status = 'pending'
-            ORDER BY priority DESC, created_at ASC
+            r#"SELECT ej.* FROM encoding_jobs ej
+            INNER JOIN media_files mf ON ej.media_file_path = mf.path
+            WHERE ej.status = 'pending' AND mf.processed = 0
+            ORDER BY ej.priority DESC, ej.created_at ASC
             LIMIT 1"#,
         )
         .fetch_optional(&mut *tx)
@@ -219,8 +221,8 @@ impl JobQueue {
             return Err(anyhow!("Job not found"));
         }
 
-        // Update media_files table
-        sqlx::query(
+        // Update media_files table - mark as processed and update metrics
+        let media_result = sqlx::query(
             r#"UPDATE media_files
             SET processed = 1, size = ?, bit_rate = ?
             WHERE path = (SELECT media_file_path FROM encoding_jobs WHERE id = ?)"#,
@@ -230,6 +232,12 @@ impl JobQueue {
         .bind(job_id)
         .execute(&mut *tx)
         .await?;
+
+        // Validate that the media file was actually updated
+        if media_result.rows_affected() == 0 {
+            tx.rollback().await?;
+            return Err(anyhow!("Media file not found for job {}", job_id));
+        }
 
         // Commit both updates together
         tx.commit().await?;
@@ -400,9 +408,10 @@ impl JobQueue {
         .await?;
 
         let count = files.len();
-        for (path, size, complexity) in files {
-
-            let priority = size.saturating_add(complexity);
+        for (path, _size, complexity) in files {
+            // Priority based on encoding complexity only (resolution × bitrate × duration)
+            // Divide by 1000 to keep numbers manageable
+            let priority = complexity / 1000;
             match self.create_job(path.clone(), priority).await {
                 Ok(job) => {
                     tracing::info!("Created job {} for existing file: {}", job.id, path);

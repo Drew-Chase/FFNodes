@@ -112,6 +112,25 @@ pub async fn initialize() -> Result<()> {
     )
     .await?;
 
+    // Create index on processed flag for fast filtering
+    pool.execute(
+        "CREATE INDEX IF NOT EXISTS idx_media_files_processed ON media_files(processed)"
+    )
+    .await?;
+
+    // Create composite index on encoding_jobs for faster job queries
+    pool.execute(
+        "CREATE INDEX IF NOT EXISTS idx_encoding_jobs_status_priority ON encoding_jobs(status, priority DESC)"
+    )
+    .await?;
+
+    // Create unique partial index to prevent duplicate active jobs for the same file
+    // Only one pending/assigned/in_progress job per media_file_path at a time
+    pool.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_encoding_jobs_unique_pending ON encoding_jobs(media_file_path) WHERE status IN ('pending', 'assigned', 'in_progress')"
+    )
+    .await?;
+
     Ok(())
 }
 

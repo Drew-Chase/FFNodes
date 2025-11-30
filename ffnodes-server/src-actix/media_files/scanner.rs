@@ -139,27 +139,39 @@ impl Scanner {
                                 Ok(_) => {
                                     debug!("Inserted {:?} into database", file);
 
-                                    // Create encoding job for this file
-                                    let priority = (media_file.scanned_size as i64)
-                                        .saturating_add(media_file.encoding_complexity as i64);
-                                    match job_queue
-                                        .create_job(
-                                            media_file.path.to_string_lossy().to_string(),
-                                            priority,
-                                        )
-                                        .await
-                                    {
-                                        Ok(job) => {
-                                            info!(
-                                                "Created encoding job for {:?}: {}",
-                                                file, job.id
-                                            );
-                                            1
+                                    // Only create job if file is not already processed
+                                    if !media_file.processed {
+                                        // Priority based on encoding complexity (resolution × bitrate × duration)
+                                        // Divide by 1000 to keep numbers manageable
+                                        let priority = (media_file.encoding_complexity as i64) / 1000;
+                                        match job_queue
+                                            .create_job(
+                                                media_file.path.to_string_lossy().to_string(),
+                                                priority,
+                                            )
+                                            .await
+                                        {
+                                            Ok(job) => {
+                                                info!(
+                                                    "Created encoding job for {:?}: {} (priority: {})",
+                                                    file, job.id, priority
+                                                );
+                                                1
+                                            }
+                                            Err(e) => {
+                                                // Handle UNIQUE constraint violations gracefully
+                                                if e.to_string().contains("UNIQUE constraint") {
+                                                    debug!("Job already exists for {:?}", file);
+                                                    0
+                                                } else {
+                                                    error!("Failed to create job for {:?}: {:#}", file, e);
+                                                    0
+                                                }
+                                            }
                                         }
-                                        Err(e) => {
-                                            error!("Failed to create job for {:?}: {:#}", file, e);
-                                            0
-                                        }
+                                    } else {
+                                        debug!("Skipping job creation for already processed file: {:?}", file);
+                                        0
                                     }
                                 }
                                 Err(e) => {
