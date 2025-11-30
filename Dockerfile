@@ -41,6 +41,11 @@ COPY ffnodes-server/ ./ffnodes-server/
 
 # Install frontend dependencies
 WORKDIR /build/ffnodes-server
+
+# Remove workspace config to avoid pnpm workspace issues in Docker
+RUN rm -f pnpm-workspace.yaml
+
+# Install dependencies
 RUN pnpm install --frozen-lockfile
 
 # Build frontend (outputs to ../target/wwwroot)
