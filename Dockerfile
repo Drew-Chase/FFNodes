@@ -3,21 +3,21 @@
 # =============================================================================
 # Builder Stage - Compile Rust binary (ffnodes-server ONLY)
 # =============================================================================
-FROM rust:1.91-bookworm AS builder
-#FROM --platform=$TARGETPLATFORM rust:1.91-bookworm AS builder
+FROM rust:1.91-alpine AS builder
+#FROM --platform=$TARGETPLATFORM rust:1.91-alpine AS builder
 
 # Install build dependencies
-RUN apt-get update && apt-get install -y \
-    pkg-config \
-    libssl-dev \
+RUN apk add --no-cache \
+    musl-dev \
+    pkgconfig \
+    openssl-dev \
+    openssl-libs-static \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    nodejs \
+    npm
 
-# Install Node.js 20.x LTS and pnpm
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
-    npm install -g pnpm@8.13.1 && \
-    rm -rf /var/lib/apt/lists/*
+# Install pnpm
+RUN npm install -g pnpm@8.13.1
 
 WORKDIR /build
 
@@ -62,20 +62,19 @@ RUN strip /build/ffnodes_server
 # =============================================================================
 # Runtime Stage - Minimal image with FFmpeg and server binary ONLY
 # =============================================================================
-FROM debian:bookworm-slim
+FROM alpine:latest
 
 # Install FFmpeg and CA certificates (required for HTTPS)
-RUN apt-get update && apt-get install -y \
+RUN apk add --no-cache \
     ffmpeg \
     ca-certificates \
-    wget \
-    && rm -rf /var/lib/apt/lists/*
+    wget
 
 # Verify FFmpeg installation
 RUN ffmpeg -version && ffprobe -version
 
 # Create non-root user for security and create directory structure
-RUN useradd --create-home --shell /bin/bash ffnodes && \
+RUN adduser -D -h /home/ffnodes -s /bin/sh ffnodes && \
     mkdir -p /app /config /data && \
     chown -R ffnodes:ffnodes /app /config /data
 
