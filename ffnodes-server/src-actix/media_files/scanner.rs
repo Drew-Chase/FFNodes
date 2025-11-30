@@ -109,10 +109,11 @@ impl Scanner {
                         .to_string();
 
                     // Truncate filename if too long
-                    let display_name = if filename.len() > 50 {
-                        format!("{}...", &filename[..47])
+                    let display_name = if filename.chars().count() > 50 {
+                        let truncated: String = filename.chars().take(47).collect();
+                        format!("{}...", truncated)
                     } else {
-                        filename.clone()
+                        filename
                     };
 
                     // Update progress bar message
