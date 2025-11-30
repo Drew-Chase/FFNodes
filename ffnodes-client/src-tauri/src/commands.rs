@@ -172,3 +172,17 @@ pub async fn get_leaderboard(config: ClientConfig, category: String) -> Result<c
     let client = ServerClient::with_auth(config.server_url, auth_token);
     client.get_leaderboard(&category).await.map_err(|e| e.to_string())
 }
+
+/// Get system status
+#[tauri::command]
+pub async fn get_system_status(config: ClientConfig) -> Result<crate::api::SystemStatus, String> {
+    let client = ServerClient::new(config.server_url);
+    client.get_system_status().await.map_err(|e| e.to_string())
+}
+
+/// Get overall system statistics
+#[tauri::command]
+pub async fn get_overall_stats(config: ClientConfig) -> Result<crate::api::OverallSystemStats, String> {
+    let client = ServerClient::new(config.server_url);
+    client.get_overall_stats().await.map_err(|e| e.to_string())
+}

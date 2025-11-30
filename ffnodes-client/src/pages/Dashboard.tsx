@@ -16,6 +16,9 @@ import {HistoryBento} from "../components/stats/HistoryBento";
 import {RemoteUsersBento} from "../components/stats/RemoteUsersBento";
 import {LeaderboardBento} from "../components/stats/LeaderboardBento";
 import {SettingsModal} from "../components/SettingsModal";
+import {ScanProgressBento} from "../components/stats/ScanProgressBento";
+import {OverallStatsBento} from "../components/stats/OverallStatsBento";
+import {useSystemStatsStore} from "../stores/useSystemStatsStore";
 
 export function Dashboard()
 {
@@ -26,6 +29,7 @@ export function Dashboard()
     const [gpuInfo, setGpuInfo] = useState<any>(null);
     const [isPaused, setIsPaused] = useState(true); // Start paused by default
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const {setOverallStats, setSystemStatus} = useSystemStatsStore();
 
     // Create logger for Dashboard
     const logger = new Logger("Dashboard");
@@ -59,6 +63,21 @@ export function Dashboard()
                 const gpu = await invoke("get_gpu_info");
                 logger.info("✓ GPU info retrieved", gpu);
                 setGpuInfo(gpu);
+
+                // Load system statistics
+                logger.info("Loading system statistics...");
+                try {
+                    const [overallStats, systemStatus] = await Promise.all([
+                        invoke("get_overall_stats", { config: savedConfig }),
+                        invoke("get_system_status", { config: savedConfig })
+                    ]);
+                    logger.info("✓ System statistics loaded", { overallStats, systemStatus });
+                    setOverallStats(overallStats as any);
+                    setSystemStatus(systemStatus as any);
+                } catch (statsError) {
+                    logger.warn("Failed to load system statistics:", statsError);
+                    // Don't fail the entire initialization if stats fail to load
+                }
 
                 // Load active jobs
                 logger.info("Loading active jobs from server...");
@@ -118,7 +137,30 @@ export function Dashboard()
         // Note: Removed cleanup effect that stopped job processing on unmount
         // Processing now continues even when navigating within the app
         // This allows settings modal to open without stopping encoding
-    }, [navigate, setConfig, setJobQueue, setProcessing]);
+    }, [navigate, setConfig, setJobQueue, setProcessing, setOverallStats, setSystemStatus]);
+
+    // Set up periodic refresh for system statistics
+    useEffect(() => {
+        if (!config) return;
+
+        const refreshStats = async () => {
+            try {
+                const [overallStats, systemStatus] = await Promise.all([
+                    invoke("get_overall_stats", { config }),
+                    invoke("get_system_status", { config })
+                ]);
+                setOverallStats(overallStats as any);
+                setSystemStatus(systemStatus as any);
+            } catch (error) {
+                logger.error("Failed to refresh system statistics:", error);
+            }
+        };
+
+        // Refresh every 30 seconds
+        const interval = setInterval(refreshStats, 30000);
+
+        return () => clearInterval(interval);
+    }, [config, setOverallStats, setSystemStatus]);
 
     // Set up event listeners for job updates
     useEffect(() =>
@@ -443,6 +485,12 @@ export function Dashboard()
                         </div>
                     </BentoCard>
                 </motion.header>
+
+                {/* Scan Progress Indicator - shown only when scanning */}
+                <ScanProgressBento />
+
+                {/* Overall System Statistics */}
+                <OverallStatsBento />
 
                 {/* Bento Grid Layout */}
                 <BentoGrid columns={6} gap="md">

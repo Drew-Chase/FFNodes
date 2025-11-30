@@ -630,6 +630,20 @@ impl ServerClient {
         Ok(leaderboard)
     }
 
+    pub async fn get_system_status(&self) -> Result<SystemStatus> {
+        let url = format!("{}/api/public/monitoring/system/status", self.base_url);
+        let response = self.client.get(&url).send().await?.error_for_status()?;
+        let status: SystemStatus = response.json().await?;
+        Ok(status)
+    }
+
+    pub async fn get_overall_stats(&self) -> Result<OverallSystemStats> {
+        let url = format!("{}/api/public/monitoring/system/overall-stats", self.base_url);
+        let response = self.client.get(&url).send().await?.error_for_status()?;
+        let stats: OverallSystemStats = response.json().await?;
+        Ok(stats)
+    }
+
     /// Connect to WebSocket for real-time progress updates
     /// Returns a receiver channel for incoming WebSocket events
     pub async fn connect_websocket(&self, client_id: &str) -> Result<mpsc::UnboundedReceiver<WsEvent>> {
@@ -753,5 +767,34 @@ pub struct LeaderboardEntry {
 pub struct LeaderboardResponse {
     pub category: String,
     pub entries: Vec<LeaderboardEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SystemStatus {
+    pub total_media_files: i64,
+    pub pending_jobs: i64,
+    pub active_jobs: i64,
+    pub connected_clients: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OverallSystemStats {
+    pub total_media_files: i64,
+    pub processed_files: i64,
+    pub pending_files: i64,
+    pub total_storage_bytes: i64,
+    pub total_saved_bytes: i64,
+    pub total_processing_time_seconds: i64,
+    pub average_encoding_speed: f64,
+    pub total_jobs_completed: i64,
+    pub total_jobs_failed: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScanProgress {
+    pub total_files: i64,
+    pub completed_files: i64,
+    pub current_file: Option<String>,
+    pub operation: String,
 }
 

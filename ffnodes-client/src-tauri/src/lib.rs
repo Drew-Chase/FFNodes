@@ -177,7 +177,9 @@ pub fn run() {
             refresh_oauth_token,
             get_client_history,
             get_remote_progress,
-            get_leaderboard
+            get_leaderboard,
+            get_system_status,
+            get_overall_stats
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
