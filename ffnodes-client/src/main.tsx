@@ -27,6 +27,8 @@ function App() {
         }
     }, [theme]);
 
+    $(document).on("contextmenu", (e) => e.preventDefault());
+
     return (
         <HeroUIProvider>
             <ToastProvider placement="bottom-right" maxVisibleToasts={3} />
