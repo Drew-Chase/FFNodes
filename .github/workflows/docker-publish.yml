@@ -137,6 +137,13 @@ jobs:
           else
             VERSION="${GITHUB_REF#refs/tags/}"
           fi
+
+          # If VERSION is empty (e.g., running locally with act), use a default
+          if [[ -z "$VERSION" ]]; then
+            echo "Warning: No version specified, using 'test' as version"
+            VERSION="test"
+          fi
+
           echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
           echo "version_with_v=${VERSION}" >> $GITHUB_OUTPUT
 
