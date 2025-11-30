@@ -66,15 +66,17 @@ export function Dashboard()
 
                 // Load system statistics
                 logger.info("Loading system statistics...");
-                try {
+                try
+                {
                     const [overallStats, systemStatus] = await Promise.all([
-                        invoke("get_overall_stats", { config: savedConfig }),
-                        invoke("get_system_status", { config: savedConfig })
+                        invoke("get_overall_stats", {config: savedConfig}),
+                        invoke("get_system_status", {config: savedConfig})
                     ]);
-                    logger.info("✓ System statistics loaded", { overallStats, systemStatus });
+                    logger.info("✓ System statistics loaded", {overallStats, systemStatus});
                     setOverallStats(overallStats as any);
                     setSystemStatus(systemStatus as any);
-                } catch (statsError) {
+                } catch (statsError)
+                {
                     logger.warn("Failed to load system statistics:", statsError);
                     // Don't fail the entire initialization if stats fail to load
                 }
@@ -102,8 +104,7 @@ export function Dashboard()
                         description: state.is_paused ? "Job processing paused. Click Resume to continue." : "Job processing active.",
                         color: "primary"
                     });
-                }
-                else
+                } else
                 {
                     // Not running - user must manually start
                     logger.info("Job processing not active. User must click Resume to start.");
@@ -140,18 +141,22 @@ export function Dashboard()
     }, [navigate, setConfig, setJobQueue, setProcessing, setOverallStats, setSystemStatus]);
 
     // Set up periodic refresh for system statistics
-    useEffect(() => {
+    useEffect(() =>
+    {
         if (!config) return;
 
-        const refreshStats = async () => {
-            try {
+        const refreshStats = async () =>
+        {
+            try
+            {
                 const [overallStats, systemStatus] = await Promise.all([
-                    invoke("get_overall_stats", { config }),
-                    invoke("get_system_status", { config })
+                    invoke("get_overall_stats", {config}),
+                    invoke("get_system_status", {config})
                 ]);
                 setOverallStats(overallStats as any);
                 setSystemStatus(systemStatus as any);
-            } catch (error) {
+            } catch (error)
+            {
                 logger.error("Failed to refresh system statistics:", error);
             }
         };
@@ -174,8 +179,8 @@ export function Dashboard()
                 logger.info("📥 Received job-started event", event.payload);
                 setCurrentJob(event.payload.job);
                 updateProgress({
-                    phase: 'downloading',
-                    totalFrames: event.payload.total_frames || 0,
+                    phase: "downloading",
+                    totalFrames: event.payload.total_frames || 0
                 });
                 addToast({
                     title: "Info",
@@ -200,7 +205,7 @@ export function Dashboard()
             {
                 const progress = event.payload;
                 updateProgress({
-                    phase: 'encoding',
+                    phase: "encoding",
                     frame: progress.frame,
                     fps: progress.fps,
                     bitrate: progress.bitrate,
@@ -216,11 +221,11 @@ export function Dashboard()
             {
                 logger.info("📥 Download started", event.payload);
                 updateProgress({
-                    phase: 'downloading',
+                    phase: "downloading",
                     totalTransferBytes: event.payload.total_bytes,
                     transferredBytes: 0,
                     transferSpeed: 0,
-                    percentage: 0,
+                    percentage: 0
                 });
             })
         );
@@ -231,11 +236,11 @@ export function Dashboard()
             {
                 const progress = event.payload;
                 updateProgress({
-                    phase: 'downloading',
+                    phase: "downloading",
                     transferredBytes: progress.transferred_bytes,
                     totalTransferBytes: progress.total_bytes,
                     transferSpeed: progress.bytes_per_second,
-                    percentage: progress.percentage,
+                    percentage: progress.percentage
                 });
             })
         );
@@ -249,7 +254,7 @@ export function Dashboard()
                 updateProgress({
                     transferredBytes: undefined,
                     totalTransferBytes: undefined,
-                    transferSpeed: undefined,
+                    transferSpeed: undefined
                 });
             })
         );
@@ -260,11 +265,11 @@ export function Dashboard()
             {
                 logger.info("📤 Upload started", event.payload);
                 updateProgress({
-                    phase: 'uploading',
+                    phase: "uploading",
                     totalTransferBytes: event.payload.total_bytes,
                     transferredBytes: 0,
                     transferSpeed: 0,
-                    percentage: 0,
+                    percentage: 0
                 });
             })
         );
@@ -275,11 +280,11 @@ export function Dashboard()
             {
                 const progress = event.payload;
                 updateProgress({
-                    phase: 'uploading',
+                    phase: "uploading",
                     transferredBytes: progress.transferred_bytes,
                     totalTransferBytes: progress.total_bytes,
                     transferSpeed: progress.bytes_per_second,
-                    percentage: progress.percentage,
+                    percentage: progress.percentage
                 });
             })
         );
@@ -290,8 +295,9 @@ export function Dashboard()
             {
                 logger.info("✓ Upload completed", event.payload);
                 // Keep stats at 100% for 2 seconds before transitioning
-                setTimeout(() => {
-                    updateProgress({ phase: 'completing' });
+                setTimeout(() =>
+                {
+                    updateProgress({phase: "completing"});
                 }, 2000);
             })
         );
@@ -357,8 +363,7 @@ export function Dashboard()
                         description: "Job processing started",
                         color: "success"
                     });
-                }
-                else
+                } else
                 {
                     // Resume existing processing
                     await invoke("resume_job_processing");
@@ -486,14 +491,14 @@ export function Dashboard()
                     </BentoCard>
                 </motion.header>
 
-                {/* Scan Progress Indicator - shown only when scanning */}
-                <ScanProgressBento />
-
-                {/* Overall System Statistics */}
-                <OverallStatsBento />
-
                 {/* Bento Grid Layout */}
                 <BentoGrid columns={6} gap="md">
+                    {/* Scan Progress Indicator - shown only when scanning */}
+                    <ScanProgressBento/>
+
+                    {/* Overall System Statistics */}
+                    <OverallStatsBento/>
+
                     {/* Current Job - Large card spanning 4 columns and 2 rows */}
                     <BentoCard
                         colSpan={4}
@@ -517,13 +522,13 @@ export function Dashboard()
                     </BentoCard>
 
                     {/* History Bento Box */}
-                    <HistoryBento />
+                    <HistoryBento/>
 
                     {/* Remote Users Bento Box */}
-                    <RemoteUsersBento />
+                    <RemoteUsersBento/>
 
                     {/* Leaderboard Bento Box */}
-                    <LeaderboardBento />
+                    <LeaderboardBento/>
 
                     {/* Connection Status Card */}
                     <BentoCard
