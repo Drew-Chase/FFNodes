@@ -10,7 +10,14 @@ FROM rust:1.91-bookworm AS builder
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 20.x LTS and pnpm
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    npm install -g pnpm@8.13.1 && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 
@@ -28,10 +35,19 @@ RUN sed -i '/"tools\/update_version"/d' Cargo.toml
 RUN sed -i '/"tools\/publish_docker"/d' Cargo.toml
 
 # Copy ONLY server and library source (NOT client)
+# This includes all frontend source files (src/, index.html, vite.config.ts, etc.)
 COPY ffmpeg/ ./ffmpeg/
 COPY ffnodes-server/ ./ffnodes-server/
 
-# Build the actual server binary - native build for target platform
+# Install frontend dependencies
+WORKDIR /build/ffnodes-server
+RUN pnpm install --frozen-lockfile
+
+# Build frontend (outputs to ../target/wwwroot)
+RUN pnpm run build:frontend
+
+# Build backend (embeds target/wwwroot via include_dir!)
+WORKDIR /build
 RUN cargo build --release --bin ffnodes_server && \
     cp target/release/ffnodes_server /build/ffnodes_server
 
