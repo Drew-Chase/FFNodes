@@ -180,7 +180,7 @@ impl Scanner {
                     result
                 }
             })
-            .buffer_unordered(100)
+            .buffer_unordered(4)
             .fold(0, |acc, count| async move { acc + count })
             .await;
 
