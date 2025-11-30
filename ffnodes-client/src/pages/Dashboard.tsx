@@ -491,12 +491,12 @@ export function Dashboard()
                     </BentoCard>
                 </motion.header>
 
+                {/* Scan Progress Indicator - shown only when scanning */}
+                <ScanProgressBento />
+
                 {/* Bento Grid Layout */}
                 <BentoGrid columns={6} gap="md">
-                    {/* Scan Progress Indicator - shown only when scanning */}
-                    <ScanProgressBento/>
-
-                    {/* Overall System Statistics */}
+                    {/* Overall System Statistics - Full Width */}
                     <OverallStatsBento/>
 
                     {/* Current Job - Large card spanning 4 columns and 2 rows */}

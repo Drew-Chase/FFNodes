@@ -631,14 +631,14 @@ impl ServerClient {
     }
 
     pub async fn get_system_status(&self) -> Result<SystemStatus> {
-        let url = format!("{}/api/public/monitoring/system/status", self.base_url);
+        let url = format!("{}/api/public/monitoring/status", self.base_url);
         let response = self.client.get(&url).send().await?.error_for_status()?;
         let status: SystemStatus = response.json().await?;
         Ok(status)
     }
 
     pub async fn get_overall_stats(&self) -> Result<OverallSystemStats> {
-        let url = format!("{}/api/public/monitoring/system/overall-stats", self.base_url);
+        let url = format!("{}/api/public/stats/overall", self.base_url);
         let response = self.client.get(&url).send().await?.error_for_status()?;
         let stats: OverallSystemStats = response.json().await?;
         Ok(stats)
