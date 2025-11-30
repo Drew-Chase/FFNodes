@@ -11,7 +11,7 @@ fn main() {
     println!("[FFNodes Update Version] New version: {}", new_version);
 
     let cargo_tomls = ["./ffnodes-client/src-tauri/Cargo.toml", "./ffmpeg/Cargo.toml", "./ffnodes-server/Cargo.toml"];
-    let package_json = ["./ffnodes-client/package.json"];
+    let package_json = ["./ffnodes-client/package.json", "./ffnodes-server/package.json", "./package.json"];
     let tauri_config = "ffnodes-client/src-tauri/tauri.conf.json";
 
     // Regex for TOML: matches `version = "x.y.z"` (first occurrence after [package])
