@@ -13,7 +13,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/ffnodes-server
+  # Docker requires lowercase repository names - hardcoded to avoid case issues
+  IMAGE_NAME: drew-chase/ffnodes/ffnodes-server
 
 jobs:
   build-amd64:
