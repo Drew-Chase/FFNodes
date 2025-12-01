@@ -1,6 +1,6 @@
 use crate::configuration::Configuration;
 use crate::http_error::Error;
-use crate::jobs::JobQueue;
+use crate::job_actor::{ActorError, JobActorHandle};
 use crate::path_security;
 use actix_multipart::Multipart;
 use actix_web::{get, post, web, HttpResponse};
@@ -15,25 +15,44 @@ use std::sync::Arc;
 use tokio::fs::File as TokioFile;
 use tokio::io::AsyncReadExt;
 
+/// Convert actor error to HTTP error
+fn map_actor_error(err: ActorError) -> Error {
+    match err {
+        ActorError::NotInitialized => {
+            Error::service_unavailable("Server is still initializing, please try again")
+        }
+        ActorError::DatabaseError(msg) => {
+            error!("Database error: {}", msg);
+            Error::internal_server_error(&msg)
+        }
+        ActorError::NotFound => {
+            Error::not_found("Resource not found")
+        }
+        ActorError::InvalidState(msg) => {
+            error!("Invalid state: {}", msg);
+            Error::internal_server_error(&msg)
+        }
+    }
+}
+
 /// Download input file for a job
 /// GET /api/files/{job_id}/input
 #[get("/{job_id}/input")]
-#[instrument(name = "download_input", skip(job_queue, config), fields(job_id = %job_id.as_ref()))]
+#[instrument(name = "download_input", skip(actor, config), fields(job_id = %job_id.as_ref()))]
 pub async fn download_input(
     job_id: web::Path<String>,
-    job_queue: web::Data<Arc<JobQueue>>,
+    actor: web::Data<JobActorHandle>,
     config: web::Data<Arc<Configuration>>,
 ) -> Result<HttpResponse, Error> {
     info!("Starting input file download");
 
     // Get job
-    let job = job_queue
-        .get_job(&job_id)
+    let job = actor
+        .get_job(job_id.to_string())
         .await
-        .context(format!("Failed to retrieve job from database: job_id={}", job_id))
         .map_err(|e| {
             error!("Error getting job: {:#}", e);
-            Error::internal_server_error("Error getting job")
+            map_actor_error(e)
         })?;
 
     let job = job.ok_or_else(|| {
@@ -128,23 +147,22 @@ pub async fn download_input(
 /// Upload output file for a job
 /// POST /api/files/{job_id}/output
 #[post("/{job_id}/output")]
-#[instrument(name = "upload_output", skip(payload, job_queue, config), fields(job_id = %job_id.as_ref()))]
+#[instrument(name = "upload_output", skip(payload, actor, config), fields(job_id = %job_id.as_ref()))]
 pub async fn upload_output(
     job_id: web::Path<String>,
     mut payload: Multipart,
-    job_queue: web::Data<Arc<JobQueue>>,
+    actor: web::Data<JobActorHandle>,
     config: web::Data<Arc<Configuration>>,
 ) -> Result<HttpResponse, Error> {
     info!("Starting output file upload");
 
     // Get job
-    let job = job_queue
-        .get_job(&job_id)
+    let job = actor
+        .get_job(job_id.to_string())
         .await
-        .context(format!("Failed to retrieve job from database: job_id={}", job_id))
         .map_err(|e| {
             error!("Error getting job: {:#}", e);
-            Error::internal_server_error("Error getting job")
+            map_actor_error(e)
         })?;
 
     let job = job.ok_or_else(|| {
