@@ -4,6 +4,7 @@ use crate::FFMpeg;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
+use tokio::process::Command;
 use tokio::sync::Mutex;
 
 /// FFmpeg command builder with fluent API
@@ -71,8 +72,9 @@ impl FromStr for FFmpegBuilder {
         let mut builder = FFmpegBuilder::new(ffmpeg);
 
         // Parse the command string using shlex for proper quote handling
-        let args = shlex::split(s)
-            .ok_or_else(|| BuilderError::ParseError("Failed to parse command string".to_string()))?;
+        let args = shlex::split(s).ok_or_else(|| {
+            BuilderError::ParseError("Failed to parse command string".to_string())
+        })?;
 
         // Parse arguments and build the command
         let mut i = 0;
@@ -677,7 +679,12 @@ impl FFmpegBuilder {
     }
 
     /// Select specific stream by type and index
-    pub fn select_stream(self, stream_type: StreamType, input_index: usize, stream_index: usize) -> Self {
+    pub fn select_stream(
+        self,
+        stream_type: StreamType,
+        input_index: usize,
+        stream_index: usize,
+    ) -> Self {
         let map_spec = format!("{}:{}:{}", input_index, stream_type, stream_index);
         self.map(map_spec)
     }
@@ -688,10 +695,13 @@ impl FFmpegBuilder {
     pub fn metadata(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         if let Some(output) = &mut self.current_output {
             output.options.push("-metadata".to_string());
-            output.options.push(format!("{}={}", key.into(), value.into()));
+            output
+                .options
+                .push(format!("{}={}", key.into(), value.into()));
         } else {
             self.post_input_args.push("-metadata".to_string());
-            self.post_input_args.push(format!("{}={}", key.into(), value.into()));
+            self.post_input_args
+                .push(format!("{}={}", key.into(), value.into()));
         }
         self
     }
@@ -825,6 +835,12 @@ impl FFmpegCommand {
         &self.args
     }
 
+    pub fn command(&self, working_dir: Option<PathBuf>) -> Command {
+        let args: Vec<&str> = self.args.iter().map(|s| s.as_str()).collect();
+        let working_dir = working_dir.unwrap_or_else(|| PathBuf::from("."));
+        self.ffmpeg.command(true, &args, working_dir)
+    }
+
     /// Execute the command
     pub async fn execute(
         &self,
@@ -852,7 +868,8 @@ impl FFmpegCommand {
         };
 
         // Execute and wait for completion
-        let result = self.ffmpeg
+        let result = self
+            .ffmpeg
             .exec_ffmpeg(&args, working_dir, actual_sender)
             .await
             .map_err(|e| BuilderError::ExecutionError(e.to_string()));
@@ -893,7 +910,8 @@ impl FFmpegCommand {
         };
 
         // Execute with PID storage and wait for completion
-        let result = self.ffmpeg
+        let result = self
+            .ffmpeg
             .exec_ffmpeg_with_pid(&args, working_dir, actual_sender, pid_storage)
             .await
             .map_err(|e| BuilderError::ExecutionError(e.to_string()));
@@ -907,10 +925,7 @@ impl FFmpegCommand {
     }
 
     /// Execute the command and wait for completion
-    pub async fn execute_blocking(
-        &self,
-        working_dir: Option<PathBuf>,
-    ) -> Result<Vec<String>> {
+    pub async fn execute_blocking(&self, working_dir: Option<PathBuf>) -> Result<Vec<String>> {
         let (tx, mut rx) = tokio::sync::mpsc::channel(100);
         let mut output = Vec::new();
 

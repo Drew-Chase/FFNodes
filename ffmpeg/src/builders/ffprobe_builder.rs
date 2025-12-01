@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use encoding_rs::UTF_16LE;
 use log::error;
+use tokio::process::Command;
 
 /// FFprobe command builder with fluent API
 ///
@@ -210,6 +211,12 @@ impl FFprobeCommand {
     /// Get the command arguments as a vector of strings
     pub fn args(&self) -> &[String] {
         &self.args
+    }
+
+    pub fn command(&self, working_dir: Option<PathBuf>) -> Command {
+        let args: Vec<&str> = self.args.iter().map(|s| s.as_str()).collect();
+        let working_dir = working_dir.unwrap_or_else(|| PathBuf::from("."));
+        self.ffmpeg.command(false, &args, working_dir)
     }
 
     /// Execute the command and return raw output

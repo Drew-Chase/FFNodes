@@ -1,6 +1,6 @@
 use crate::configuration::Configuration;
-use anyhow::{anyhow, Result};
-use ffmpeg::builders::{ContainerFormat, HardwareAccel, ProbeFormat, VideoCodec};
+use anyhow::{Result, anyhow};
+use ffmpeg::builders::{ContainerFormat, HardwareAccel, ProbeFormat, ProbeResult, VideoCodec};
 use log::{debug, error, info};
 use serde_hash::HashIds;
 use std::path::{Path, PathBuf};
@@ -60,102 +60,113 @@ impl MediaFile {
         info!("Probing media file {:?}", file_path.as_ref());
 
         // Try fast probe first, then retry with slow frame counting if needed
-            let builder = config
-                .ffmpeg
-                .ffprobe_command_builder()
-                .input(file_path.as_ref().to_string_lossy().to_string())?
-                .show_streams()
-                .log_level(1)
-                .output_format(ProbeFormat::JSON)
-                .show_format();
+        let builder = config
+            .ffmpeg
+            .ffprobe_command_builder()
+            .input(file_path.as_ref().to_string_lossy().to_string())?
+            .show_streams()
+            .log_level(1)
+            .output_format(ProbeFormat::JSON)
+            .show_format();
 
-            let probe = builder
-                .build()
-                .map_err(|e| {
-                    error!("Failed to build ffprobe command: {}", e);
-                    e
-                })?
-                .execute_json()
-                .await
-                .map_err(|e| {
-                    error!("Failed to execute ffprobe command: {}", e);
-                    e
-                })?;
-
-            let format = probe.format.as_ref().ok_or_else(|| {
-                error!("Failed to parse ffprobe output - missing format data");
-                anyhow!("Failed to parse ffprobe output")
-            })?;
-            let (width, height) = probe.video_resolution().ok_or_else(|| {
-                error!("Failed to parse ffprobe output - missing video resolution");
-                anyhow!("Failed to parse ffprobe output")
+        let probe = builder
+            .build()
+            .map_err(|e| {
+                error!("Failed to build ffprobe command: {}", e);
+                e
+            })?
+            .execute_json()
+            .await
+            .map_err(|e| {
+                error!("Failed to execute ffprobe command: {}", e);
+                e
             })?;
 
-            // Try to extract frame count from various sources
-            let frames_result = Self::extract_frame_count(&probe).await?;
+        let format = probe.format.as_ref().ok_or_else(|| {
+            error!("Failed to parse ffprobe output - missing format data");
+            anyhow!("Failed to parse ffprobe output")
+        })?;
+        let (width, height) = probe.video_resolution().ok_or_else(|| {
+            error!("Failed to parse ffprobe output - missing video resolution");
+            anyhow!("Failed to parse ffprobe output")
+        })?;
 
-            let frames = match frames_result {
-                Some(frames) => frames,
-                None => {
-                        // Even with slow counting, couldn't get frame count
-                        return Err(anyhow!("Failed to determine frame count"));
-                }
-            };
+        // Try to extract frame count from various sources
+        let frames_result = match Self::extract_frame_count(&probe).await? {
+            Some(frames) => Some(frames),
+            None => {
+                let output = config
+                    .ffmpeg
+                    .ffprobe_command_builder()
+                    .count_frames()
+                    .log_level(0)
+                    .input(file_path.as_ref().to_string_lossy().to_string())?
+                    .build()?
+                    .command(None)
+                    .output()
+                    .await?;
 
-            let duration: f32 = {
-                if let Some(duration) = format.duration.as_ref() {
-                    if let Ok(duration) = duration.parse::<f32>() {
-                        duration
-                    } else {
-                        return Err(anyhow!("Failed to parse duration"));
-                    }
+                let probe: ProbeResult = serde_json::from_str(&String::from_utf8_lossy(&output.stdout))?;
+                Self::extract_frame_count(&probe).await?
+            }
+        };
+
+        let frames = frames_result.ok_or_else(|| anyhow!("Failed to determine frame count: {}", file_path.as_ref().display()))?;
+
+        let duration: f32 = {
+            if let Some(duration) = format.duration.as_ref() {
+                if let Ok(duration) = duration.parse::<f32>() {
+                    duration
                 } else {
-                    0.0f32
+                    return Err(anyhow!("Failed to parse duration"));
                 }
-            };
+            } else {
+                0.0f32
+            }
+        };
 
-            let last_modified = tokio::fs::metadata(&file_path)
-                .await?
-                .modified()?
-                .duration_since(UNIX_EPOCH)?
-                .as_secs();
+        let last_modified = tokio::fs::metadata(&file_path)
+            .await?
+            .modified()?
+            .duration_since(UNIX_EPOCH)?
+            .as_secs();
 
-            let scanned_bit_rate = format
-                .bit_rate
+        let scanned_bit_rate = format
+            .bit_rate
+            .as_ref()
+            .map(|bit_rate| bit_rate.parse().unwrap_or(0))
+            .unwrap_or(0);
+
+        // Calculate encoding complexity: (width × height) × bitrate × duration
+        let encoding_complexity = ((width as u64 * height as u64) as f64
+            * scanned_bit_rate as f64
+            * duration as f64) as u64;
+
+        debug!("Parsed ffprobe output successfully");
+
+        Ok(Self {
+            path: file_path.as_ref().to_path_buf(),
+            scanned_size: format
+                .size
                 .as_ref()
-                .map(|bit_rate| bit_rate.parse().unwrap_or(0))
-                .unwrap_or(0);
-
-            // Calculate encoding complexity: (width × height) × bitrate × duration
-            let encoding_complexity = ((width as u64 * height as u64) as f64
-                * scanned_bit_rate as f64
-                * duration as f64) as u64;
-
-            debug!("Parsed ffprobe output successfully");
-
-            Ok(Self {
-                path: file_path.as_ref().to_path_buf(),
-                scanned_size: format
-                    .size
-                    .as_ref()
-                    .and_then(|s| s.parse().ok())
-                    .unwrap_or(0),
-                size: None,
-                scanned_bit_rate,
-                bit_rate: None,
-                duration,
-                width: width as u64,
-                height: height as u64,
-                frames,
-                last_modified,
-                encoding_complexity,
-                retry_count: 0,
-                processed: false,
-            })
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0),
+            size: None,
+            scanned_bit_rate,
+            bit_rate: None,
+            duration,
+            width: width as u64,
+            height: height as u64,
+            frames,
+            last_modified,
+            encoding_complexity,
+            retry_count: 0,
+            processed: false,
+        })
     }
 
     /// Extract frame count from probe output, trying multiple sources
-    async fn extract_frame_count(probe: &ffmpeg::builders::ProbeResult) -> Result<Option<u64>> {
+    async fn extract_frame_count(probe: &ProbeResult) -> Result<Option<u64>> {
         let stream = probe
             .first_video_stream()
             .ok_or_else(|| anyhow!("No video stream found"))?;
@@ -183,43 +194,38 @@ impl MediaFile {
 
         // If unable to get the frame count from the probe output, use ffmpeg to try to get the frame count.
         let config = Configuration::load().await?;
-        let cmd = config
+        let filepath = probe
+            .clone()
+            .format
+            .ok_or_else(|| anyhow!("Failed to get the probe format"))?
+            .filename;
+        let output = config
             .ffmpeg
             .ffmpeg_command_builder()
             .hardware_accel(HardwareAccel::Auto)
             .video_codec(VideoCodec::Copy)
             .format(ContainerFormat::NULL)
-            .input(
-                probe
-                    .clone()
-                    .format
-                    .ok_or_else(|| anyhow!("Failed to get the probe format"))?
-                    .filename,
-            )?
+            .input(&filepath)?
             .output("-")?
-            .build()?;
-        let (sender, mut receiver) = tokio::sync::mpsc::channel::<String>(100);
+            .build()?
+            .command(None)
+            .output()
+            .await?;
 
-        // Execute in background while we drain the receiver
-        let execute_task = tokio::spawn(async move {
-            cmd.execute(None, Some(sender)).await
-        });
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
 
-        // Drain receiver concurrently with execution
-        let mut frame_count = None;
-        while let Some(output) = receiver.recv().await {
-            if output.contains("frame=")
-                && let Some(section) = output.split("frame=").last()
+        for output in [stdout, stderr] {
+            let last_line = output.lines().last().unwrap_or("").trim();
+            if last_line.contains("frame=")
+                && let Some(section) = last_line.split("frame=").last()
                 && let Some(count_str) = section.split_whitespace().next()
                 && let Ok(count) = count_str.trim().parse::<u64>()
             {
-                frame_count = Some(count);
+                return Ok(Some(count));
             }
         }
 
-        // Wait for execution to complete
-        execute_task.await??;
-
-        Ok(frame_count)
+        Ok(None)
     }
 }

@@ -320,14 +320,10 @@ impl FFMpeg {
 		self.exec(false, args, working_dir, sender, None).await
 	}
 
-	pub async fn exec(
-		&self,
-		ffmpeg: bool,
-		args: &[&str],
-		working_dir: impl Into<PathBuf>,
-		sender: tokio::sync::mpsc::Sender<String>,
-		pid_storage: Option<Arc<Mutex<Option<u32>>>>,
-	) -> Result<()> {
+	pub fn command(&self, ffmpeg: bool,
+	               args: &[&str],
+	               working_dir: impl Into<PathBuf>,) ->Command{
+
 		let binary_path = if ffmpeg {
 			&self.ffmpeg_path
 		} else {
@@ -336,13 +332,11 @@ impl FFMpeg {
 
 		let working_dir: PathBuf = working_dir.into();
 
-		log::debug!("Executing: {:?} with args: {:?} in {:?}", binary_path, args, working_dir);
-
 		let mut cmd = Command::new(binary_path);
 		cmd.args(args)
-			.current_dir(&working_dir)
-			.stdout(std::process::Stdio::piped())
-			.stderr(std::process::Stdio::piped());
+		   .current_dir(&working_dir)
+		   .stdout(std::process::Stdio::piped())
+		   .stderr(std::process::Stdio::piped());
 
 		// On Windows, prevent creating a new console window
 		#[cfg(target_os = "windows")]
@@ -350,6 +344,20 @@ impl FFMpeg {
 			cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
 		}
 
+		log::debug!("Executing: {:?} with args: {:?} in {:?}", binary_path, args, working_dir);
+		cmd
+	}
+
+	pub async fn exec(
+		&self,
+		ffmpeg: bool,
+		args: &[&str],
+		working_dir: impl Into<PathBuf>,
+		sender: tokio::sync::mpsc::Sender<String>,
+		pid_storage: Option<Arc<Mutex<Option<u32>>>>,
+	) -> Result<()> {
+		let working_dir: PathBuf = working_dir.into();
+		let mut cmd = self.command(ffmpeg, args, &working_dir);
 		let mut child = cmd.spawn()?;
 
 		// Store the process ID if requested
