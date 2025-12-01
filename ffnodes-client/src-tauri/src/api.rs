@@ -110,7 +110,11 @@ pub struct ServerClient {
 impl ServerClient {
     pub fn new(base_url: String) -> Self {
         Self {
-            client: Client::new(),
+            client: Client::builder()
+                .timeout(std::time::Duration::from_secs(300)) // 5 minute timeout for large transfers
+                .connect_timeout(std::time::Duration::from_secs(30))
+                .build()
+                .unwrap(),
             base_url,
             auth_token: None,
         }
@@ -118,7 +122,11 @@ impl ServerClient {
 
     pub fn with_auth(base_url: String, auth_token: String) -> Self {
         Self {
-            client: Client::new(),
+            client: Client::builder()
+                .timeout(std::time::Duration::from_secs(300)) // 5 minute timeout for large transfers
+                .connect_timeout(std::time::Duration::from_secs(30))
+                .build()
+                .unwrap(),
             base_url,
             auth_token: Some(auth_token),
         }
@@ -505,8 +513,8 @@ impl ServerClient {
         let speed_ema_clone = speed_ema.clone();
         let callback_clone = callback.clone();
 
-        // Create reader stream
-        let mut reader_stream = ReaderStream::new(file);
+        // Create reader stream with 1MB buffer for efficient uploads
+        let mut reader_stream = ReaderStream::with_capacity(file, 1024 * 1024);
 
         let stream = async_stream::stream! {
             while let Some(chunk) = reader_stream.next().await {

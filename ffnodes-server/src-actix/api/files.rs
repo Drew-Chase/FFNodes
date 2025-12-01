@@ -8,8 +8,6 @@ use anyhow::Context;
 use futures_util::StreamExt;
 use tracing::{debug, warn, error, info, instrument};
 use serde_json::json;
-use std::fs::File;
-use std::io::Write as _;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::fs::File as TokioFile;
@@ -129,7 +127,7 @@ pub async fn download_input(
     // Create a streaming response
     let stream = async_stream::stream! {
         let mut file = file;
-        let mut buffer = vec![0u8; 8192]; // 8KB chunks
+        let mut buffer = vec![0u8; 5*1024 * 1024]; // 5MB chunks for efficient video streaming
 
         loop {
             match file.read(&mut buffer).await {
@@ -235,9 +233,20 @@ pub async fn upload_output(
 
     debug!("✓ Path security validated: {:?}", validated_path);
 
-    // Process multipart stream
-    debug!("Processing multipart upload stream...");
-    let mut file_data: Option<Vec<u8>> = None;
+    // Create output file for streaming write (async I/O)
+    let mut file = TokioFile::create(&validated_path)
+        .await
+        .context(format!("Failed to create output file: path={:?}", validated_path))
+        .map_err(|e| {
+            error!("Error creating output file: {:#}", e);
+            Error::internal_server_error("Error creating output file")
+        })?;
+
+    debug!("Output file created, starting streaming upload...");
+
+    // Stream multipart data directly to disk
+    let mut total_bytes = 0u64;
+    let mut found_field = false;
 
     while let Some(item) = payload.next().await {
         let mut field = item.map_err(|e| {
@@ -245,46 +254,56 @@ pub async fn upload_output(
             Error::bad_request_with_code("Invalid multipart data", "MULTIPART_INVALID")
         })?;
 
-        debug!("Reading multipart field...");
-        // Read field data
-        let mut data = Vec::new();
+        found_field = true;
+        debug!("Processing multipart field...");
+
+        // Stream chunks directly to disk
         while let Some(chunk) = field.next().await {
             let chunk = chunk.map_err(|e| {
                 error!("Error reading chunk from multipart stream: {:?}", e);
                 Error::bad_request_with_code("Error reading file data", "MULTIPART_INVALID")
             })?;
-            data.extend_from_slice(&chunk);
+
+            // Write chunk to disk using async I/O
+            tokio::io::AsyncWriteExt::write_all(&mut file, &chunk)
+                .await
+                .context(format!("Failed to write chunk to output file: path={:?}", validated_path))
+                .map_err(|e| {
+                    error!("Error writing chunk to file: {:#}", e);
+                    Error::internal_server_error("Error writing file data")
+                })?;
+
+            total_bytes += chunk.len() as u64;
         }
 
-        debug!("Field data size: {} bytes", data.len());
-        file_data = Some(data);
+        debug!("Field processed - {} bytes written so far", total_bytes);
     }
 
-    let file_data = file_data.ok_or_else(|| {
+    if !found_field {
         error!("No file data received in multipart upload for job {}", job_id);
-        Error::bad_request_with_code("No file provided", "MULTIPART_INVALID")
-    })?;
+        return Err(Error::bad_request_with_code("No file provided", "MULTIPART_INVALID"));
+    }
 
-    debug!("✓ Multipart upload processed - total size: {} bytes", file_data.len());
-
-    // Write file to output path
-    let mut file = File::create(&validated_path)
-        .context(format!("Failed to create output file: path={:?}", validated_path))
+    // Flush and sync to ensure data is written to disk
+    tokio::io::AsyncWriteExt::flush(&mut file)
+        .await
+        .context("Failed to flush file")
         .map_err(|e| {
-            error!("Error creating output file: {:#}", e);
-            Error::internal_server_error("Error creating output file")
+            error!("Error flushing file: {:#}", e);
+            Error::internal_server_error("Error finalizing file")
         })?;
 
-    file.write_all(&file_data)
-        .context(format!("Failed to write to output file: path={:?}, size={}", validated_path, file_data.len()))
+    file.sync_all()
+        .await
+        .context("Failed to sync file to disk")
         .map_err(|e| {
-            error!("Error writing output file: {:#}", e);
-            Error::internal_server_error("Error writing output file")
+            error!("Error syncing file to disk: {:#}", e);
+            Error::internal_server_error("Error finalizing file")
         })?;
 
     info!(
         "Successfully uploaded {} bytes to {}",
-        file_data.len(),
+        total_bytes,
         validated_path.display()
     );
 
@@ -308,7 +327,7 @@ pub async fn upload_output(
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "message": "File uploaded successfully",
-        "size": file_data.len(),
+        "size": total_bytes,
         "path": validated_path.display().to_string(),
         "original_deleted": original_path != validated_path && !original_path.exists()
     })))

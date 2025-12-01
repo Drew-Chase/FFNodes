@@ -240,6 +240,10 @@ pub async fn run() -> Result<()> {
                         .into()
                     }),
             )
+            .app_data(
+                web::PayloadConfig::default()
+                    .limit(10 * 1024 * 1024 * 1024) // 10GB limit for large video file uploads
+            )
             .service(
                 web::scope("api")
                     // Authentication (no middleware required)
@@ -276,6 +280,9 @@ pub async fn run() -> Result<()> {
             .configure_frontend_routes()
     })
     .workers(4)
+    .keep_alive(std::time::Duration::from_secs(300)) // 5 minute keep-alive for large file transfers
+    .client_request_timeout(std::time::Duration::from_secs(300)) // 5 minute timeout for large downloads
+    .client_disconnect_timeout(std::time::Duration::from_secs(5)) // Quick cleanup of disconnected clients
     .bind(format!("0.0.0.0:{port}", port = port))?
     .run();
 
