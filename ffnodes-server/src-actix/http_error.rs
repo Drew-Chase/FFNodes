@@ -229,6 +229,14 @@ impl Error {
             status: StatusCode::FORBIDDEN,
         }
     }
+
+    pub fn service_unavailable(message: impl Into<String>) -> Self {
+        Error::WithCode {
+            message: message.into(),
+            code: "SERVICE_UNAVAILABLE".to_string(),
+            status: StatusCode::SERVICE_UNAVAILABLE,
+        }
+    }
 }
 
 /// Helper to parse the backtrace into structured JSON data

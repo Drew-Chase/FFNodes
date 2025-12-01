@@ -16,6 +16,7 @@ mod asset_endpoint;
 mod clients;
 mod configuration;
 mod http_error;
+mod job_actor;
 mod jobs;
 mod media_files;
 mod templates;
@@ -26,29 +27,34 @@ mod stats;
 
 pub static DEBUG: bool = cfg!(debug_assertions);
 
-pub async fn run() -> Result<()> {
-    #[cfg(debug_assertions)]
-    {
-        ProxyViteOptions::new().port(5173).working_directory(std::path::Path::new("ffnodes-server").canonicalize()?.to_string_lossy().as_ref()).disable_logging().build()?;
-        std::thread::spawn(|| {
-            loop {
-                info!("Starting Vite server in development mode...");
-                let status = start_vite_server().expect("Failed to start vite server").wait().expect("Vite server crashed!");
-                if !status.success() {
-                    error!("The vite server has crashed!");
-                } else {
-                    break;
-                }
-            }
-        });
-        set_current_dir("target/dev-env/server")?;
-    }
+/// Set up logging with custom rotation
+async fn setup_logging() -> Result<()> {
+    use std::path::Path;
+    use std::fs;
 
     // Create logs directory if it doesn't exist
     std::fs::create_dir_all("logs")?;
 
-    // Set up rolling file appender (daily rotation + 500MB size limit)
-    let file_appender = rolling::daily("logs", "ffnodes.log");
+    let latest_log = Path::new("logs/ffnodes-server.latest.log");
+
+    // Archive previous log file if it exists
+    if latest_log.exists() {
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let mut archived_log = format!("logs/ffnodes-server.{}.log", today);
+
+        // Handle multiple runs on same day (append counter)
+        let mut counter = 1;
+        while Path::new(&archived_log).exists() {
+            archived_log = format!("logs/ffnodes-server.{}.{}.log", today, counter);
+            counter += 1;
+        }
+
+        fs::rename(latest_log, &archived_log)?;
+        info!("Rotated previous log to: {}", archived_log);
+    }
+
+    // Create file appender for latest.log (never rotate during runtime)
+    let file_appender = rolling::never("logs", "ffnodes-server.latest.log");
 
     // Create indicatif layer for progress bar integration
     let indicatif_layer = IndicatifLayer::new();
@@ -103,120 +109,93 @@ pub async fn run() -> Result<()> {
         error!("thread panicked with message: {}{}", message, location);
     }));
 
+    Ok(())
+}
+
+pub async fn run() -> Result<()> {
+    #[cfg(debug_assertions)]
+    {
+        ProxyViteOptions::new().port(5173).working_directory(std::path::Path::new("ffnodes-server").canonicalize()?.to_string_lossy().as_ref()).disable_logging().build()?;
+        std::thread::spawn(|| {
+            loop {
+                info!("Starting Vite server in development mode...");
+                let status = start_vite_server().expect("Failed to start vite server").wait().expect("Vite server crashed!");
+                if !status.success() {
+                    error!("The vite server has crashed!");
+                } else {
+                    break;
+                }
+            }
+        });
+        set_current_dir("target/dev-env/server")?;
+    }
+
+    // Set up logging with custom rotation
+    setup_logging().await?;
+
+    // Initialize serde_hash
     serde_hash::hashids::SerdeHashOptions::new()
         .with_min_length(16)
         .build();
 
+    // Load configuration
     let configuration = Arc::new(configuration::Configuration::load().await?);
     let port: u16 = configuration.port;
-    let watch_directories = configuration.watch_directories.clone();
-    let server_guid = configuration.server_guid.clone();
 
-    info!("Server GUID: {}", server_guid);
-
-    // Initialize database
-    media_files::initialize().await?;
-
-    // Open database pool
-    let pool = media_files::media_file_db::open_pool().await?;
-
-    // Initialize job queue
-    let job_queue = Arc::new(jobs::JobQueue::new(pool.clone()));
-
-    // Initialize client manager
-    let client_manager = Arc::new(clients::ClientManager::new(pool.clone()));
+    info!("Server GUID: {}", configuration.server_guid);
 
     // Initialize progress broadcaster
     let _progress_broadcaster = media_files::progress::init_broadcaster(100);
     info!("Progress broadcaster initialized");
 
-    // Create jobs for any existing unprocessed media files
-    info!("Checking for unprocessed media files...");
-    match job_queue.create_jobs_for_unprocessed_files().await {
-        Ok(count) => {
-            if count > 0 {
-                info!("Created {} encoding jobs for existing unprocessed files", count);
-            } else {
-                info!("No unprocessed files found");
-            }
-        }
-        Err(e) => {
-            error!("Failed to create jobs for unprocessed files: {:#}", e);
-        }
-    }
+    // Create WebSocket registry
+    let ws_registry = api::websocket::create_ws_registry();
 
-    // Start job scheduler
-    let job_scheduler = Arc::new(jobs::JobScheduler::new(
-        Arc::clone(&job_queue),
-        configuration.client_timeout_seconds as i64,
-    ));
-    job_scheduler.start();
+    // Initialize database (for stats queries and actor)
+    info!("Initializing database...");
+    media_files::initialize().await?;
+    let pool = media_files::media_file_db::open_pool().await?;
+    info!("Database initialized");
 
-    // Start heartbeat monitor to detect stale clients
+    // Create actor command channel (buffer: 1000 commands)
+    let (actor_tx, actor_rx) = tokio::sync::mpsc::channel(1000);
+    let actor_handle = job_actor::JobActorHandle::new(actor_tx.clone());
+
+    // Spawn job management actor (pass pool for faster initialization)
+    let actor = job_actor::JobActor::new(Arc::clone(&configuration), Some(pool.clone()));
+    tokio::spawn(async move {
+        actor.run(actor_rx).await;
+    });
+
+    info!("Job management actor spawned, HTTP server starting immediately");
+
+    // Optional: Monitor initialization progress
     tokio::spawn({
-        let client_manager_clone = Arc::clone(&client_manager);
-        let job_queue_clone = Arc::clone(&job_queue);
+        let handle = actor_handle.clone();
         async move {
-            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
             loop {
-                interval.tick().await;
-
-                // Get all connected clients
-                if let Ok(clients) = client_manager_clone.get_connected_clients().await {
-                    let now = chrono::Utc::now().timestamp();
-                    let timeout_threshold = now - 60; // 60 seconds timeout
-
-                    for client in clients {
-                        // Check if client hasn't sent heartbeat in 60 seconds
-                        if client.last_heartbeat < timeout_threshold {
-                            info!(
-                                "Client {} ({}) timed out (last heartbeat: {} seconds ago), disconnecting and requeuing jobs",
-                                client.display_name,
-                                client.id,
-                                now - client.last_heartbeat
-                            );
-
-                            // Disconnect client and requeue their jobs
-                            if let Err(e) = client_manager_clone.disconnect_and_requeue_jobs(&client.id, &job_queue_clone).await {
-                                error!("Failed to disconnect stale client {}: {:#}", client.id, e);
-                            }
-                        }
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                match handle.get_initialization_status().await {
+                    job_actor::InitializationStatus::Complete => {
+                        info!("Job management actor fully initialized");
+                        break;
                     }
+                    job_actor::InitializationStatus::Failed { error } => {
+                        error!("Actor initialization failed: {}", error);
+                        break;
+                    }
+                    job_actor::InitializationStatus::InProgress { stage } => {
+                        info!("Initialization: {}", stage);
+                    }
+                    _ => {}
                 }
             }
         }
     });
 
-    // Start file watcher
-    let file_watcher = Arc::new(media_files::FileWatcher::new(
-        Arc::clone(&configuration),
-        pool.clone(),
-        Arc::clone(&job_queue),
-    ));
-    if let Err(e) = file_watcher.start().await {
-        warn!("Failed to start file watcher: {:#}", e);
-    } else {
-        info!("File watcher started");
-    }
-
-    // Initial scan
-    tokio::spawn({
-        let config = Arc::clone(&configuration);
-        let job_queue_clone = Arc::clone(&job_queue);
-        async move {
-            if let Err(e) = media_files::Scanner::scan(watch_directories, config, job_queue_clone).await {
-                error!("Media file scanner error: {}", e);
-            }
-        }
-    });
-
-    // Create WebSocket registry
-    let ws_registry = api::websocket::create_ws_registry();
-
-    // Clone for HttpServer closure
+    // Prepare HTTP server data
     let config_data = web::Data::new(Arc::clone(&configuration));
-    let job_queue_data = web::Data::new(Arc::clone(&job_queue));
-    let client_manager_data = web::Data::new(Arc::clone(&client_manager));
+    let actor_data = web::Data::new(actor_handle.clone());
     let pool_data = web::Data::new(pool.clone());
     let ws_registry_data = web::Data::new(ws_registry.clone());
 
@@ -225,8 +204,7 @@ pub async fn run() -> Result<()> {
         App::new()
             .wrap(actix_web::middleware::Logger::default())
             .app_data(config_data.clone())
-            .app_data(job_queue_data.clone())
-            .app_data(client_manager_data.clone())
+            .app_data(actor_data.clone())
             .app_data(pool_data.clone())
             .app_data(ws_registry_data.clone())
             .app_data(
@@ -287,6 +265,15 @@ pub async fn run() -> Result<()> {
 
     let stop_result = server.await;
     debug!("Server stopped");
+
+    // Send shutdown command to actor
+    info!("Shutting down job management actor...");
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    if let Err(e) = actor_tx.send(job_actor::ActorCommand::Shutdown { respond_to: tx }).await {
+        warn!("Failed to send shutdown command to actor: {}", e);
+    } else if let Err(e) = tokio::time::timeout(std::time::Duration::from_secs(5), rx).await {
+        warn!("Actor shutdown timeout: {}", e);
+    }
 
     Ok(stop_result?)
 }

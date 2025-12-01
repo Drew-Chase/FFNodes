@@ -1,13 +1,31 @@
-use crate::clients::ClientManager;
 use crate::http_error::Error;
-use crate::jobs::JobQueue;
+use crate::job_actor::{ActorError, JobActorHandle};
 use crate::media_files::progress;
 use actix_web::{get, web, HttpResponse, HttpRequest};
 use tracing::{debug, warn, error};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use std::time::Duration;
 use serde_json::json;
+
+/// Convert actor error to HTTP error
+fn map_actor_error(err: ActorError) -> Error {
+    match err {
+        ActorError::NotInitialized => {
+            Error::service_unavailable("Server is still initializing, please try again")
+        }
+        ActorError::DatabaseError(msg) => {
+            error!("Database error: {}", msg);
+            Error::internal_server_error(&msg)
+        }
+        ActorError::NotFound => {
+            Error::not_found("Resource not found")
+        }
+        ActorError::InvalidState(msg) => {
+            error!("Invalid state: {}", msg);
+            Error::internal_server_error(&msg)
+        }
+    }
+}
 
 /// System status response
 #[derive(Debug, Serialize, Deserialize)]
@@ -21,24 +39,23 @@ pub struct SystemStatus {
 /// Get overall system status
 #[get("/status")]
 pub async fn get_status(
-    job_queue: web::Data<Arc<JobQueue>>,
-    client_manager: web::Data<Arc<ClientManager>>,
+    actor: web::Data<JobActorHandle>,
 ) -> Result<HttpResponse, Error> {
     debug!("Getting system status");
 
-    let pending_jobs = job_queue.get_pending_count().await.map_err(|e| {
+    let pending_jobs = actor.get_pending_count().await.map_err(|e| {
         warn!("Error getting pending jobs count: {:#}", e);
-        Error::internal_server_error("Error getting pending jobs count")
+        map_actor_error(e)
     })?;
 
-    let active_jobs = job_queue.get_active_count().await.map_err(|e| {
+    let active_jobs = actor.get_active_count().await.map_err(|e| {
         warn!("Error getting active jobs count: {:#}", e);
-        Error::internal_server_error("Error getting active jobs count")
+        map_actor_error(e)
     })?;
 
-    let clients = client_manager.get_connected_clients().await.map_err(|e| {
+    let clients = actor.get_connected_clients().await.map_err(|e| {
         warn!("Error getting connected clients: {:#}", e);
-        Error::internal_server_error("Error getting connected clients")
+        map_actor_error(e)
     })?;
 
     let status = SystemStatus {
@@ -54,16 +71,16 @@ pub async fn get_status(
 /// Get all connected clients with their statuses
 #[get("/clients")]
 pub async fn get_clients(
-    client_manager: web::Data<Arc<ClientManager>>,
+    actor: web::Data<JobActorHandle>,
 ) -> Result<HttpResponse, Error> {
     debug!("Getting all clients");
 
-    let clients = client_manager
+    let clients = actor
         .get_all_client_statuses()
         .await
         .map_err(|e| {
             warn!("Error getting client statuses: {:#}", e);
-            Error::internal_server_error("Error getting client statuses")
+            map_actor_error(e)
         })?;
 
     Ok(HttpResponse::Ok().json(clients))
