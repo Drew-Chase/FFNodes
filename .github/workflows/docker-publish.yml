@@ -33,8 +33,11 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{version}}-amd64
             type=semver,pattern={{major}}.{{minor}}-amd64
+            type=raw,value=latest
             type=raw,value=amd64
           labels: |
             org.opencontainers.image.title=FFNodes Server (AMD64)
@@ -63,6 +66,43 @@ jobs:
           cache-to: type=gha,mode=max,scope=amd64
           build-args: |
             BUILDKIT_INLINE_CACHE=1
+
+  publish-info:
+    name: Display Image Info
+    runs-on: ubuntu-latest
+    needs: [build-amd64]
+    steps:
+      - name: Extract version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+
+          if [[ -z "$VERSION" ]]; then
+            echo "Warning: No version specified, using 'test' as version"
+            VERSION="test"
+          fi
+
+          echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
+
+      - name: Image details
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+
+          echo "Published ffnodes-server image (AMD64 only)"
+          echo "Version: ${VERSION}"
+          echo "Registry: ${IMAGE}"
+          echo ""
+          echo "Pull commands:"
+          echo "  docker pull ${IMAGE}:latest"
+          echo "  docker pull ${IMAGE}:${VERSION}"
+          echo "  docker pull ${IMAGE}:${VERSION}-amd64"
+          echo ""
+          echo "NOTE: ARM64 builds are temporarily disabled due to slow QEMU emulation"
 
   # TEMPORARILY DISABLED: ARM64 build is too slow with QEMU emulation
   # Uncomment when native ARM64 runners are available or build time is acceptable
@@ -117,71 +157,3 @@ jobs:
   #         cache-to: type=gha,mode=max,scope=arm64
   #         build-args: |
   #           BUILDKIT_INLINE_CACHE=1
-
-  tag-images:
-    name: Tag AMD64 Images
-    runs-on: ubuntu-latest
-    needs: [build-amd64]
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Extract version
-        id: version
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            VERSION="${{ github.event.inputs.version }}"
-          else
-            VERSION="${GITHUB_REF#refs/tags/}"
-          fi
-
-          # If VERSION is empty (e.g., running locally with act), use a default
-          if [[ -z "$VERSION" ]]; then
-            echo "Warning: No version specified, using 'test' as version"
-            VERSION="test"
-          fi
-
-          echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
-          echo "version_with_v=${VERSION}" >> $GITHUB_OUTPUT
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create version and latest tags
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
-
-          # Tag AMD64 image as version (without architecture suffix)
-          docker buildx imagetools create -t ${IMAGE}:${VERSION} \
-            ${IMAGE}:${VERSION}-amd64
-
-          # Tag AMD64 image as latest
-          docker buildx imagetools create -t ${IMAGE}:latest \
-            ${IMAGE}:${VERSION}-amd64
-
-          echo "Created tags for ${IMAGE}:${VERSION} and ${IMAGE}:latest (AMD64 only)"
-
-      - name: Image details
-        id: details
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
-
-          echo "Published ffnodes-server image (AMD64 only)"
-          echo "Version: ${VERSION}"
-          echo "Registry: ${IMAGE}"
-          echo ""
-          echo "Pull commands:"
-          echo "  docker pull ${IMAGE}:latest"
-          echo "  docker pull ${IMAGE}:${VERSION}"
-          echo "  docker pull ${IMAGE}:${VERSION}-amd64"
-          echo ""
-          echo "NOTE: ARM64 builds are temporarily disabled due to slow QEMU emulation"
