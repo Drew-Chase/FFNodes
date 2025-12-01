@@ -27,10 +27,11 @@ pub fn run() {
         .plugin(tauri_plugin_oauth::init())
         .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
-            let _ = app
+            let window = app
                 .get_webview_window("main")
-                .expect("no main window")
-                .set_focus();
+                .expect("no main window");
+            window.show().expect("Failed to show the window!");
+            window.set_focus().expect("Failed to set focus on the window!");
         }))
         .setup(|app| {
             // Initialize logging
