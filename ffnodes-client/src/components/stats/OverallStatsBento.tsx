@@ -4,10 +4,16 @@ import { useSystemStatsStore } from '../../stores/useSystemStatsStore';
 // Utility functions for formatting
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
+
+  const isNegative = bytes < 0;
+  const absoluteBytes = Math.abs(bytes);
+
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+  const i = Math.floor(Math.log(absoluteBytes) / Math.log(k));
+  const formatted = `${(absoluteBytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+
+  return isNegative ? `+${formatted}` : formatted;
 }
 
 function formatDuration(seconds: number): string {
@@ -78,11 +84,11 @@ export function OverallStatsBento() {
           {/* Storage Saved */}
           <div className="flex flex-col">
             <div className="text-body-sm text-foreground/60 mb-1">Storage Saved</div>
-            <div className="text-title-lg font-medium text-success">
+            <div className={`text-title-lg font-medium ${total_saved_bytes < 0 ? 'text-danger' : 'text-success'}`}>
               {formatBytes(total_saved_bytes)}
             </div>
             <div className="text-body-sm text-foreground/70 mt-1">
-              {total_saved_bytes > 0 ? 'Space reclaimed' : 'No savings yet'}
+              {total_saved_bytes > 0 ? 'Space reclaimed' : total_saved_bytes < 0 ? 'Space increased' : 'No savings yet'}
             </div>
           </div>
 

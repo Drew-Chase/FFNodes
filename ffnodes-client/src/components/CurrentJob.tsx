@@ -25,10 +25,17 @@ function getPhaseColor(phase: string): 'default' | 'primary' | 'success' {
 
 function formatBytes(bytes?: number): string {
   if (!bytes || bytes === 0) return '0 B';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+
+  const isNegative = bytes < 0;
+  const absoluteBytes = Math.abs(bytes);
+
+  let formatted: string;
+  if (absoluteBytes < 1024) formatted = `${absoluteBytes} B`;
+  else if (absoluteBytes < 1024 * 1024) formatted = `${(absoluteBytes / 1024).toFixed(2)} KB`;
+  else if (absoluteBytes < 1024 * 1024 * 1024) formatted = `${(absoluteBytes / (1024 * 1024)).toFixed(2)} MB`;
+  else formatted = `${(absoluteBytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+
+  return isNegative ? `+${formatted}` : formatted;
 }
 
 function formatSpeed(bytesPerSecond?: number): string {

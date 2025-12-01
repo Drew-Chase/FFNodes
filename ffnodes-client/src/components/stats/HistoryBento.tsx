@@ -73,10 +73,16 @@ export function HistoryBento() {
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 B';
+
+    const isNegative = bytes < 0;
+    const absoluteBytes = Math.abs(bytes);
+
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+    const i = Math.floor(Math.log(absoluteBytes) / Math.log(k));
+    const formatted = `${(absoluteBytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+
+    return isNegative ? `+${formatted}` : formatted;
   };
 
   const formatDuration = (seconds: number) => {
@@ -173,10 +179,10 @@ export function HistoryBento() {
           transition={{ duration: 0.2 }}
         >
           <div className="flex items-center gap-2 mb-1">
-            <iconify-icon icon="mdi:content-save-outline" class="text-success text-lg" />
+            <iconify-icon icon="mdi:content-save-outline" class={`text-lg ${history.overall.total_size_saved < 0 ? 'text-danger' : 'text-success'}`} />
             <span className="text-xs text-foreground/70">Total Saved</span>
           </div>
-          <p className="text-2xl font-bold text-success">
+          <p className={`text-2xl font-bold ${history.overall.total_size_saved < 0 ? 'text-danger' : 'text-success'}`}>
             {formatBytes(history.overall.total_size_saved)}
           </p>
         </motion.div>
@@ -226,7 +232,7 @@ export function HistoryBento() {
                 <p className="text-sm font-medium text-foreground truncate flex-1">
                   {job.filename}
                 </p>
-                <span className="text-xs text-success ml-2">
+                <span className={`text-xs ml-2 ${job.size_reduction_percent < 0 ? 'text-danger' : 'text-success'}`}>
                   {job.size_reduction_percent.toFixed(1)}%
                 </span>
               </div>
@@ -239,8 +245,8 @@ export function HistoryBento() {
                   <iconify-icon icon="mdi:clock-outline" />
                   {formatDuration(job.duration_seconds)}
                 </span>
-                <span className="flex items-center gap-1">
-                  <iconify-icon icon="mdi:arrow-down" />
+                <span className={`flex items-center gap-1 ${job.size_saved < 0 ? 'text-danger' : ''}`}>
+                  <iconify-icon icon={job.size_saved < 0 ? "mdi:arrow-up" : "mdi:arrow-down"} />
                   {formatBytes(job.size_saved)}
                 </span>
               </div>
