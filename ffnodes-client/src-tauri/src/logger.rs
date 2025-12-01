@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use tracing_appender::rolling;
 use tracing_subscriber::{EnvFilter, Layer, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
-/// Initialize file and console logging
+/// Initialize file and console logging with custom rotation
 pub fn init() -> Result<PathBuf> {
     let log_dir = dirs::data_local_dir()
         .unwrap_or_else(|| PathBuf::from("."))
@@ -12,8 +12,26 @@ pub fn init() -> Result<PathBuf> {
 
     std::fs::create_dir_all(&log_dir)?;
 
-    // Create rolling file appender (daily rotation, keeps last 7 days)
-    let file_appender = rolling::daily(&log_dir, "ffnodes-client");
+    let latest_log = log_dir.join("ffnodes-client.latest.log");
+
+    // Archive previous log file if it exists
+    if latest_log.exists() {
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let mut archived_log = log_dir.join(format!("ffnodes-client.{}.log", today));
+
+        // Handle multiple runs on same day (append counter)
+        let mut counter = 1;
+        while archived_log.exists() {
+            archived_log = log_dir.join(format!("ffnodes-client.{}.{}.log", today, counter));
+            counter += 1;
+        }
+
+        std::fs::rename(&latest_log, &archived_log)?;
+        // Log after tracing is initialized
+    }
+
+    // Create file appender for latest.log (never rotate during runtime)
+    let file_appender = rolling::never(&log_dir, "ffnodes-client.latest.log");
 
     // Create formatting layer for file with trace level
     let file_layer = fmt::layer()
