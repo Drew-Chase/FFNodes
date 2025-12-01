@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::path::PathBuf;
 use tracing_appender::rolling;
-use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt, Layer};
+use tracing_subscriber::{EnvFilter, Layer, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 /// Initialize file and console logging
 pub fn init() -> Result<PathBuf> {

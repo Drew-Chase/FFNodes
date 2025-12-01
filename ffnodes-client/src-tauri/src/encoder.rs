@@ -4,8 +4,8 @@ use base64::{Engine as _, engine::general_purpose};
 use ffmpeg::FFMpeg;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tokio::fs;
+use tokio::sync::Mutex;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct EncodingProgress {
@@ -188,12 +188,8 @@ impl Encoder {
         log::debug!("FFmpeg template: {}", ffmpeg_template);
 
         // Parse template and build FFmpeg command
-        let mut args = self.build_ffmpeg_args(
-            input_path,
-            output_path,
-            gpu_info,
-            ffmpeg_template,
-        )?;
+        let mut args =
+            self.build_ffmpeg_args(input_path, output_path, gpu_info, ffmpeg_template)?;
         log::debug!("FFmpeg args before progress: {:?}", args);
 
         // Insert -progress pipe:2 before the last argument (output file)
@@ -243,7 +239,8 @@ impl Encoder {
 
         // Execute in background and process progress with PID storage
         let pid_storage = self.current_ffmpeg_pid.clone();
-        let handle = tokio::spawn(async move { cmd.execute_with_pid(None, Some(tx), pid_storage).await });
+        let handle =
+            tokio::spawn(async move { cmd.execute_with_pid(None, Some(tx), pid_storage).await });
 
         // Process progress updates with stateful accumulation
         let mut progress_state = ProgressState::default();
@@ -293,7 +290,11 @@ impl Encoder {
         } else {
             0.0
         };
-        log::debug!("Average encoding speed: {:.2}x (from {} samples)", average_speed, speed_samples.len());
+        log::debug!(
+            "Average encoding speed: {:.2}x (from {} samples)",
+            average_speed,
+            speed_samples.len()
+        );
 
         Ok((output_size, output_bitrate, average_speed))
     }

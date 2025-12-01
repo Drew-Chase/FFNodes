@@ -1,13 +1,13 @@
 use anyhow::Result;
+use futures_util::{SinkExt, StreamExt};
 use reqwest::{Client, multipart};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-use futures_util::{StreamExt, SinkExt};
-use tokio_util::io::ReaderStream;
-use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tokio::sync::mpsc;
+use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio_util::io::ReaderStream;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HandshakeRequest {
@@ -152,13 +152,7 @@ impl ServerClient {
         }
 
         log::debug!("Sending POST request...");
-        let response = match self
-            .client
-            .post(&url)
-            .json(&request)
-            .send()
-            .await
-        {
+        let response = match self.client.post(&url).json(&request).send().await {
             Ok(resp) => {
                 log::debug!("✓ Request sent successfully");
                 resp
@@ -172,7 +166,9 @@ impl ServerClient {
                 if e.is_timeout() {
                     log::error!("→ Connection timed out - server may be unreachable");
                 } else if e.is_connect() {
-                    log::error!("→ Connection failed - check if server is running and URL is correct");
+                    log::error!(
+                        "→ Connection failed - check if server is running and URL is correct"
+                    );
                 } else if e.is_request() {
                     log::error!("→ Request construction failed - invalid URL or headers");
                 }
@@ -183,7 +179,11 @@ impl ServerClient {
 
         // Log response status and headers
         let status = response.status();
-        log::info!("Response status: {} {}", status.as_u16(), status.canonical_reason().unwrap_or(""));
+        log::info!(
+            "Response status: {} {}",
+            status.as_u16(),
+            status.canonical_reason().unwrap_or("")
+        );
         log::trace!("Response headers: {:#?}", response.headers());
 
         // Check status code before reading body
@@ -194,7 +194,11 @@ impl ServerClient {
             match response.text().await {
                 Ok(body) => {
                     log::error!("Error response body: {}", body);
-                    return Err(anyhow::anyhow!("Handshake failed with status {}: {}", status, body));
+                    return Err(anyhow::anyhow!(
+                        "Handshake failed with status {}: {}",
+                        status,
+                        body
+                    ));
                 }
                 Err(e) => {
                     log::error!("Failed to read error response body: {}", e);
@@ -234,7 +238,14 @@ impl ServerClient {
 
         log::info!("✓ Handshake successful!");
         log::info!("Client ID: {}", handshake_response.client_id);
-        log::info!("Auth token: {}...", &handshake_response.auth_token.chars().take(10).collect::<String>());
+        log::info!(
+            "Auth token: {}...",
+            &handshake_response
+                .auth_token
+                .chars()
+                .take(10)
+                .collect::<String>()
+        );
         log::debug!("FFmpeg template: {}", handshake_response.ffmpeg_template);
         log::info!("=== Handshake complete ===");
 
@@ -256,17 +267,17 @@ impl ServerClient {
 
     pub async fn start_job(&self, job_id: &str) -> Result<()> {
         let url = format!("{}/api/jobs/{}/start", self.base_url, job_id);
-        self.add_auth_header(self.client.post(&url)).send().await?.error_for_status()?;
+        self.add_auth_header(self.client.post(&url))
+            .send()
+            .await?
+            .error_for_status()?;
         Ok(())
     }
 
     pub async fn update_progress(&self, job_id: &str, progress: ProgressUpdate) -> Result<()> {
         let url = format!("{}/api/jobs/{}/progress", self.base_url, job_id);
-        self.add_auth_header(
-            self.client
-                .post(&url)
-                .json(&progress)
-        ).send()
+        self.add_auth_header(self.client.post(&url).json(&progress))
+            .send()
             .await?
             .error_for_status()?;
         Ok(())
@@ -274,11 +285,8 @@ impl ServerClient {
 
     pub async fn complete_job(&self, job_id: &str, completion: JobCompletion) -> Result<()> {
         let url = format!("{}/api/jobs/{}/complete", self.base_url, job_id);
-        self.add_auth_header(
-            self.client
-                .post(&url)
-                .json(&completion)
-        ).send()
+        self.add_auth_header(self.client.post(&url).json(&completion))
+            .send()
             .await?
             .error_for_status()?;
         Ok(())
@@ -287,11 +295,8 @@ impl ServerClient {
     pub async fn fail_job(&self, job_id: &str, error: String) -> Result<()> {
         let url = format!("{}/api/jobs/{}/fail", self.base_url, job_id);
         let body = serde_json::json!({ "error": error });
-        self.add_auth_header(
-            self.client
-                .post(&url)
-                .json(&body)
-        ).send()
+        self.add_auth_header(self.client.post(&url).json(&body))
+            .send()
             .await?
             .error_for_status()?;
         Ok(())
@@ -317,7 +322,10 @@ impl ServerClient {
 
     pub async fn heartbeat(&self, client_id: &str) -> Result<()> {
         let url = format!("{}/api/jobs/heartbeat/{}", self.base_url, client_id);
-        self.add_auth_header(self.client.post(&url)).send().await?.error_for_status()?;
+        self.add_auth_header(self.client.post(&url))
+            .send()
+            .await?
+            .error_for_status()?;
         Ok(())
     }
 
@@ -335,7 +343,11 @@ impl ServerClient {
         log::debug!("Download URL: {}", url);
         log::debug!("Output path: {:?}", output_path);
 
-        let response = self.add_auth_header(self.client.get(&url)).send().await?.error_for_status()?;
+        let response = self
+            .add_auth_header(self.client.get(&url))
+            .send()
+            .await?
+            .error_for_status()?;
 
         // Get total size from Content-Length header
         let total_bytes = response
@@ -413,8 +425,16 @@ impl ServerClient {
 
         // Verify we downloaded the expected amount
         if downloaded_bytes != total_bytes {
-            log::error!("Download incomplete: expected {} bytes, got {} bytes", total_bytes, downloaded_bytes);
-            return Err(anyhow::anyhow!("Incomplete download: expected {} bytes, got {} bytes", total_bytes, downloaded_bytes));
+            log::error!(
+                "Download incomplete: expected {} bytes, got {} bytes",
+                total_bytes,
+                downloaded_bytes
+            );
+            return Err(anyhow::anyhow!(
+                "Incomplete download: expected {} bytes, got {} bytes",
+                total_bytes,
+                downloaded_bytes
+            ));
         }
 
         Ok(())
@@ -574,11 +594,9 @@ impl ServerClient {
         log::debug!("✓ Multipart form created");
 
         log::trace!("Sending POST request...");
-        let response = self.add_auth_header(
-            self.client
-                .post(&url)
-                .multipart(form)
-        ).send()
+        let response = self
+            .add_auth_header(self.client.post(&url).multipart(form))
+            .send()
             .await
             .map_err(|e| {
                 log::error!("Upload request failed: {:#}", e);
@@ -589,7 +607,10 @@ impl ServerClient {
         log::debug!("Response status: {}", status);
 
         if !status.is_success() {
-            let body = response.text().await.unwrap_or_else(|_| "Could not read response body".to_string());
+            let body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Could not read response body".to_string());
             log::error!("Upload failed with status {}: {}", status, body);
             return Err(anyhow::anyhow!("Upload failed: {} - {}", status, body));
         }
@@ -600,7 +621,11 @@ impl ServerClient {
 
     pub async fn get_active_jobs(&self) -> Result<Vec<EncodingJob>> {
         let url = format!("{}/api/jobs/active", self.base_url);
-        let response = self.add_auth_header(self.client.get(&url)).send().await?.error_for_status()?;
+        let response = self
+            .add_auth_header(self.client.get(&url))
+            .send()
+            .await?
+            .error_for_status()?;
         let jobs: Vec<EncodingJob> = response.json().await?;
         Ok(jobs)
     }
@@ -608,24 +633,42 @@ impl ServerClient {
     // Statistics endpoints
     pub async fn get_client_history(&self, client_id: &str) -> Result<ClientHistoryResponse> {
         let url = format!("{}/api/stats/client/{}/history", self.base_url, client_id);
-        let response = self.add_auth_header(self.client.get(&url)).send().await?.error_for_status()?;
+        let response = self
+            .add_auth_header(self.client.get(&url))
+            .send()
+            .await?
+            .error_for_status()?;
         let history: ClientHistoryResponse = response.json().await?;
         Ok(history)
     }
 
-    pub async fn get_remote_progress(&self, exclude_client_id: Option<&str>) -> Result<RemoteProgressResponse> {
+    pub async fn get_remote_progress(
+        &self,
+        exclude_client_id: Option<&str>,
+    ) -> Result<RemoteProgressResponse> {
         let mut url = format!("{}/api/stats/remote-progress", self.base_url);
         if let Some(client_id) = exclude_client_id {
             url = format!("{}?exclude_self={}", url, client_id);
         }
-        let response = self.add_auth_header(self.client.get(&url)).send().await?.error_for_status()?;
+        let response = self
+            .add_auth_header(self.client.get(&url))
+            .send()
+            .await?
+            .error_for_status()?;
         let progress: RemoteProgressResponse = response.json().await?;
         Ok(progress)
     }
 
     pub async fn get_leaderboard(&self, category: &str) -> Result<LeaderboardResponse> {
-        let url = format!("{}/api/stats/leaderboard?category={}", self.base_url, category);
-        let response = self.add_auth_header(self.client.get(&url)).send().await?.error_for_status()?;
+        let url = format!(
+            "{}/api/stats/leaderboard?category={}",
+            self.base_url, category
+        );
+        let response = self
+            .add_auth_header(self.client.get(&url))
+            .send()
+            .await?
+            .error_for_status()?;
         let leaderboard: LeaderboardResponse = response.json().await?;
         Ok(leaderboard)
     }
@@ -646,9 +689,13 @@ impl ServerClient {
 
     /// Connect to WebSocket for real-time progress updates
     /// Returns a receiver channel for incoming WebSocket events
-    pub async fn connect_websocket(&self, client_id: &str) -> Result<mpsc::UnboundedReceiver<WsEvent>> {
+    pub async fn connect_websocket(
+        &self,
+        client_id: &str,
+    ) -> Result<mpsc::UnboundedReceiver<WsEvent>> {
         // Convert http/https URL to ws/wss
-        let ws_url = self.base_url
+        let ws_url = self
+            .base_url
             .replace("http://", "ws://")
             .replace("https://", "wss://");
         let ws_url = format!("{}/api/ws/progress?client_id={}", ws_url, client_id);
@@ -656,7 +703,8 @@ impl ServerClient {
         log::info!("Connecting to WebSocket: {}", ws_url);
 
         // Connect to WebSocket
-        let (ws_stream, _) = connect_async(&ws_url).await
+        let (ws_stream, _) = connect_async(&ws_url)
+            .await
             .map_err(|e| anyhow::anyhow!("Failed to connect to WebSocket: {}", e))?;
 
         log::info!("✓ WebSocket connected");
@@ -797,4 +845,3 @@ pub struct ScanProgress {
     pub current_file: Option<String>,
     pub operation: String,
 }
-

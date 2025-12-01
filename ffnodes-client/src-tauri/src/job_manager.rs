@@ -1,4 +1,6 @@
-use crate::api::{EncodingJob, JobCompletion, ProgressUpdate, ServerClient, TransferProgress, WsEvent};
+use crate::api::{
+    EncodingJob, JobCompletion, ProgressUpdate, ServerClient, TransferProgress, WsEvent,
+};
 use crate::config::ClientConfig;
 use crate::encoder::{Encoder, EncodingProgress};
 use crate::gpu::GpuInfo;
@@ -102,7 +104,8 @@ impl JobManager {
         if let Some(config) = config_lock.as_ref() {
             if let Some(client_id) = &config.client_id {
                 if let Some(auth_token) = &config.auth_token {
-                    let client = ServerClient::with_auth(config.server_url.clone(), auth_token.clone());
+                    let client =
+                        ServerClient::with_auth(config.server_url.clone(), auth_token.clone());
 
                     match client.connect_websocket(client_id).await {
                         Ok(mut ws_rx) => {
@@ -117,7 +120,13 @@ impl JobManager {
 
                                     // Forward event to frontend based on type
                                     match &event {
-                                        WsEvent::Progress { job_id, client_id: remote_client_id, frame, fps, speed } => {
+                                        WsEvent::Progress {
+                                            job_id,
+                                            client_id: remote_client_id,
+                                            frame,
+                                            fps,
+                                            speed,
+                                        } => {
                                             let progress = serde_json::json!({
                                                 "job_id": job_id,
                                                 "client_id": remote_client_id,
@@ -127,14 +136,22 @@ impl JobManager {
                                             });
                                             let _ = app_handle.emit("remote-progress", &progress);
                                         }
-                                        WsEvent::JobCompleted { job_id, client_id: remote_client_id } => {
+                                        WsEvent::JobCompleted {
+                                            job_id,
+                                            client_id: remote_client_id,
+                                        } => {
                                             let payload = serde_json::json!({
                                                 "job_id": job_id,
                                                 "client_id": remote_client_id
                                             });
-                                            let _ = app_handle.emit("remote-job-completed", &payload);
+                                            let _ =
+                                                app_handle.emit("remote-job-completed", &payload);
                                         }
-                                        WsEvent::JobFailed { job_id, client_id: remote_client_id, error } => {
+                                        WsEvent::JobFailed {
+                                            job_id,
+                                            client_id: remote_client_id,
+                                            error,
+                                        } => {
                                             let payload = serde_json::json!({
                                                 "job_id": job_id,
                                                 "client_id": remote_client_id,
@@ -142,18 +159,25 @@ impl JobManager {
                                             });
                                             let _ = app_handle.emit("remote-job-failed", &payload);
                                         }
-                                        WsEvent::ClientConnected { client_id: remote_client_id, display_name } => {
+                                        WsEvent::ClientConnected {
+                                            client_id: remote_client_id,
+                                            display_name,
+                                        } => {
                                             let payload = serde_json::json!({
                                                 "client_id": remote_client_id,
                                                 "display_name": display_name
                                             });
-                                            let _ = app_handle.emit("remote-client-connected", &payload);
+                                            let _ = app_handle
+                                                .emit("remote-client-connected", &payload);
                                         }
-                                        WsEvent::ClientDisconnected { client_id: remote_client_id } => {
+                                        WsEvent::ClientDisconnected {
+                                            client_id: remote_client_id,
+                                        } => {
                                             let payload = serde_json::json!({
                                                 "client_id": remote_client_id
                                             });
-                                            let _ = app_handle.emit("remote-client-disconnected", &payload);
+                                            let _ = app_handle
+                                                .emit("remote-client-disconnected", &payload);
                                         }
                                         _ => {
                                             // Ignore other events or log them
@@ -169,7 +193,10 @@ impl JobManager {
                             *ws_task = Some(ws_handle);
                         }
                         Err(e) => {
-                            log::warn!("Failed to connect to WebSocket: {} - continuing without real-time updates", e);
+                            log::warn!(
+                                "Failed to connect to WebSocket: {} - continuing without real-time updates",
+                                e
+                            );
                         }
                     }
                 }
@@ -264,10 +291,8 @@ impl JobManager {
 
             // Get config for cancel request
             let config_lock = self.config.lock().await;
-            let auth_token = config_lock.as_ref()
-                .and_then(|c| c.auth_token.clone());
-            let server_url = config_lock.as_ref()
-                .map(|c| c.server_url.clone());
+            let auth_token = config_lock.as_ref().and_then(|c| c.auth_token.clone());
+            let server_url = config_lock.as_ref().map(|c| c.server_url.clone());
 
             (job_id, auth_token, server_url)
         };
@@ -298,8 +323,13 @@ impl JobManager {
             (client_id, auth_token, server_url)
         };
 
-        if let (Some(client_id), Some(auth_token), Some(server_url)) = (client_id, auth_token, server_url) {
-            log::info!("Sending disconnect signal to server for client {}", client_id);
+        if let (Some(client_id), Some(auth_token), Some(server_url)) =
+            (client_id, auth_token, server_url)
+        {
+            log::info!(
+                "Sending disconnect signal to server for client {}",
+                client_id
+            );
             let client = ServerClient::with_auth(server_url, auth_token);
             match client.disconnect(&client_id).await {
                 Ok(_) => log::info!("✓ Disconnect signal sent successfully"),
@@ -557,11 +587,14 @@ impl JobManager {
             let mut progress_callback = move |progress: TransferProgress| {
                 // Emit download-started on first progress update
                 if first_progress {
-                    let _ = app_handle_clone.emit("download-started", TransferStartedPayload {
-                        job_id: job_id_clone.clone(),
-                        filename: filename_clone.clone(),
-                        total_bytes: progress.total_bytes,
-                    });
+                    let _ = app_handle_clone.emit(
+                        "download-started",
+                        TransferStartedPayload {
+                            job_id: job_id_clone.clone(),
+                            filename: filename_clone.clone(),
+                            total_bytes: progress.total_bytes,
+                        },
+                    );
                     first_progress = false;
                 }
 
@@ -570,7 +603,9 @@ impl JobManager {
             };
 
             // Download with progress tracking
-            client.download_input_file(&job_id, &input_path, progress_callback).await?;
+            client
+                .download_input_file(&job_id, &input_path, progress_callback)
+                .await?;
 
             // Emit download-completed event
             let download_duration = download_start.elapsed().as_secs_f64();
@@ -580,14 +615,21 @@ impl JobManager {
 
                 log::info!("✓ Downloaded input file to {:?}", input_path);
                 log::debug!("File size: {} bytes", total_bytes);
-                log::debug!("Download duration: {:.2}s, avg speed: {:.2} MB/s", download_duration, avg_speed_mbps);
+                log::debug!(
+                    "Download duration: {:.2}s, avg speed: {:.2} MB/s",
+                    download_duration,
+                    avg_speed_mbps
+                );
 
-                let _ = self.app_handle.emit("download-completed", TransferCompletedPayload {
-                    job_id: job_id.clone(),
-                    total_bytes,
-                    duration_secs: download_duration,
-                    avg_speed_mbps,
-                });
+                let _ = self.app_handle.emit(
+                    "download-completed",
+                    TransferCompletedPayload {
+                        job_id: job_id.clone(),
+                        total_bytes,
+                        duration_secs: download_duration,
+                        avg_speed_mbps,
+                    },
+                );
             }
 
             // Extract frame for background
@@ -607,7 +649,8 @@ impl JobManager {
             }
 
             // Prepare output path using server-provided container format
-            let output_path = temp_dir.join(format!("output_{}.{}", job_id, job_resp.output_container));
+            let output_path =
+                temp_dir.join(format!("output_{}.{}", job_id, job_resp.output_container));
             log::debug!("Output file will be saved to: {:?}", output_path);
             log::debug!("Output container: {}", job_resp.output_container);
 
@@ -642,31 +685,32 @@ impl JobManager {
             let total_frames = job_resp.total_frames;
 
             let encoding_handle = tokio::spawn(async move {
-                encoder_clone.encode_video(
-                    &input_path_clone,
-                    &output_path_clone,
-                    &gpu_info_clone,
-                    &ffmpeg_template_clone,
-                    total_frames,
-                    move |progress: EncodingProgress| {
-                        // Emit progress event
-                        let _ = app_handle.emit("encoding-progress", &progress);
+                encoder_clone
+                    .encode_video(
+                        &input_path_clone,
+                        &output_path_clone,
+                        &gpu_info_clone,
+                        &ffmpeg_template_clone,
+                        total_frames,
+                        move |progress: EncodingProgress| {
+                            // Emit progress event
+                            let _ = app_handle.emit("encoding-progress", &progress);
 
-                        // Send progress update to server (throttled)
-                        let client = client_clone.clone();
-                        let job_id = job_id_clone.clone();
-                        tokio::spawn(async move {
-                            let update = ProgressUpdate {
-                                frame: progress.frame,
-                                fps: progress.fps,
-                                bitrate: progress.bitrate,
-                                speed: progress.speed,
-                            };
-                            let _ = client.update_progress(&job_id, update).await;
-                        });
-                    },
-                )
-                .await
+                            // Send progress update to server (throttled)
+                            let client = client_clone.clone();
+                            let job_id = job_id_clone.clone();
+                            tokio::spawn(async move {
+                                let update = ProgressUpdate {
+                                    frame: progress.frame,
+                                    fps: progress.fps,
+                                    bitrate: progress.bitrate,
+                                    speed: progress.speed,
+                                };
+                                let _ = client.update_progress(&job_id, update).await;
+                            });
+                        },
+                    )
+                    .await
             });
 
             // Wait for encoding to complete
@@ -698,11 +742,14 @@ impl JobManager {
                 .to_string();
 
             // Emit upload-started event
-            self.app_handle.emit("upload-started", TransferStartedPayload {
-                job_id: job_id.clone(),
-                filename: upload_filename.clone(),
-                total_bytes: upload_total_bytes,
-            })?;
+            self.app_handle.emit(
+                "upload-started",
+                TransferStartedPayload {
+                    job_id: job_id.clone(),
+                    filename: upload_filename.clone(),
+                    total_bytes: upload_total_bytes,
+                },
+            )?;
 
             // Track upload start time
             let upload_start = std::time::Instant::now();
@@ -716,21 +763,30 @@ impl JobManager {
             };
 
             // Upload with progress tracking
-            client.upload_output_file(&job_id, &output_path, upload_progress_callback).await?;
+            client
+                .upload_output_file(&job_id, &output_path, upload_progress_callback)
+                .await?;
 
             // Emit upload-completed event
             let upload_duration = upload_start.elapsed().as_secs_f64();
             let avg_upload_speed_mbps = (upload_total_bytes as f64 / upload_duration) / 1_000_000.0;
 
             log::info!("✓ Upload completed successfully for job {}", job_id);
-            log::debug!("Upload duration: {:.2}s, avg speed: {:.2} MB/s", upload_duration, avg_upload_speed_mbps);
+            log::debug!(
+                "Upload duration: {:.2}s, avg speed: {:.2} MB/s",
+                upload_duration,
+                avg_upload_speed_mbps
+            );
 
-            self.app_handle.emit("upload-completed", TransferCompletedPayload {
-                job_id: job_id.clone(),
-                total_bytes: upload_total_bytes,
-                duration_secs: upload_duration,
-                avg_speed_mbps: avg_upload_speed_mbps,
-            })?;
+            self.app_handle.emit(
+                "upload-completed",
+                TransferCompletedPayload {
+                    job_id: job_id.clone(),
+                    total_bytes: upload_total_bytes,
+                    duration_secs: upload_duration,
+                    avg_speed_mbps: avg_upload_speed_mbps,
+                },
+            )?;
 
             // Clean up temp files
             log::debug!("Cleaning up temporary files...");
