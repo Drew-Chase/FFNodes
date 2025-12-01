@@ -7,8 +7,10 @@ async fn main() {
     // gh act --container-options "--privileged --user 0"
     let mut child = Command::new("gh")
         .arg("act")
+        .arg("docker-publish")
         .arg("--container-options")
         .arg("--privileged --user 0")
+        .args(std::env::args().skip(1))
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .current_dir("./")
