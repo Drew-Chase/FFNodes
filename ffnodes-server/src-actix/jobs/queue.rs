@@ -1,8 +1,9 @@
 use super::models::{EncodingJob, EncodingProgress, JobStatus, ProgressUpdate};
-use anyhow::{Result, anyhow};
+use anyhow::{Result, anyhow, Context};
 use sqlx::SqlitePool;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tracing::{debug, error, info, warn};
 
 /// Job queue manager
 pub struct JobQueue {
@@ -21,7 +22,7 @@ impl JobQueue {
 
     /// Create a new job
     pub async fn create_job(&self, media_file_path: String, priority: i64) -> Result<EncodingJob> {
-        let job = EncodingJob::new(media_file_path, priority);
+        let job = EncodingJob::new(media_file_path.clone(), priority);
 
         sqlx::query(
             r#"INSERT INTO encoding_jobs
@@ -34,8 +35,10 @@ impl JobQueue {
         .bind(job.priority)
         .bind(job.created_at)
         .execute(&self.pool)
-        .await?;
+        .await
+        .context(format!("Failed to insert job into database: job_id={}, path={}", job.id, media_file_path))?;
 
+        info!("Created new encoding job: job_id={}, path={}, priority={}", job.id, media_file_path, priority);
         Ok(job)
     }
 
@@ -49,8 +52,12 @@ impl JobQueue {
             LIMIT 1"#,
         )
         .fetch_optional(&self.pool)
-        .await?;
+        .await
+        .context("Failed to query next pending job from database")?;
 
+        if let Some(ref job) = job {
+            debug!("Found next pending job: job_id={}, priority={}", job.id, job.priority);
+        }
         Ok(job)
     }
 
@@ -60,7 +67,8 @@ impl JobQueue {
         let now = chrono::Utc::now().timestamp();
 
         // Use a transaction to ensure atomicity
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.begin().await
+            .context("Failed to begin database transaction for job claiming")?;
 
         // Get the next pending job, excluding already processed files
         let job: Option<EncodingJob> = sqlx::query_as(
@@ -71,7 +79,8 @@ impl JobQueue {
             LIMIT 1"#,
         )
         .fetch_optional(&mut *tx)
-        .await?;
+        .await
+        .context("Failed to query next pending job in transaction")?;
 
         if let Some(job) = job {
             // Immediately assign it in the same transaction
@@ -85,15 +94,21 @@ impl JobQueue {
             .bind(now)
             .bind(&job.id)
             .execute(&mut *tx)
-            .await?;
+            .await
+            .context(format!("Failed to update job assignment: job_id={}, client_id={}", job.id, client_id))?;
 
             if result.rows_affected() == 0 {
                 // Job was claimed by another process between SELECT and UPDATE
-                tx.rollback().await?;
+                warn!("Job claim race condition detected: job_id={}, already claimed by another client", job.id);
+                tx.rollback().await
+                    .context(format!("Failed to rollback transaction after race condition: job_id={}", job.id))?;
                 return Ok(None);
             }
 
-            tx.commit().await?;
+            tx.commit().await
+                .context(format!("Failed to commit job claim transaction: job_id={}, client_id={}", job.id, client_id))?;
+
+            info!("Job claimed atomically: job_id={}, client_id={}", job.id, client_id);
 
             // Return the updated job
             Ok(Some(EncodingJob {
@@ -103,7 +118,9 @@ impl JobQueue {
                 ..job
             }))
         } else {
-            tx.rollback().await?;
+            debug!("No pending jobs available for claiming");
+            tx.rollback().await
+                .context("Failed to rollback transaction when no jobs available")?;
             Ok(None)
         }
     }
@@ -122,12 +139,15 @@ impl JobQueue {
         .bind(now)
         .bind(job_id)
         .execute(&self.pool)
-        .await?;
+        .await
+        .context(format!("Failed to assign job to client: job_id={}, client_id={}", job_id, client_id))?;
 
         if result.rows_affected() == 0 {
+            error!("Job assignment failed - job not found or already assigned: job_id={}", job_id);
             return Err(anyhow!("Job not found or already assigned"));
         }
 
+        info!("Job assigned to client: job_id={}, client_id={}", job_id, client_id);
         Ok(())
     }
 
@@ -135,7 +155,7 @@ impl JobQueue {
     pub async fn start_job(&self, job_id: &str) -> Result<()> {
         let now = chrono::Utc::now().timestamp();
 
-        sqlx::query(
+        let result = sqlx::query(
             r#"UPDATE encoding_jobs
             SET status = ?, started_at = ?
             WHERE id = ?"#,
@@ -144,14 +164,21 @@ impl JobQueue {
         .bind(now)
         .bind(job_id)
         .execute(&self.pool)
-        .await?;
+        .await
+        .context(format!("Failed to mark job as in progress: job_id={}", job_id))?;
+
+        if result.rows_affected() == 0 {
+            warn!("Job start failed - job not found: job_id={}", job_id);
+        } else {
+            info!("Job started: job_id={}", job_id);
+        }
 
         Ok(())
     }
 
     /// Update job progress
     pub async fn update_progress(&self, job_id: &str, update: ProgressUpdate) -> Result<()> {
-        let progress = EncodingProgress::new(job_id.to_string(), update);
+        let progress = EncodingProgress::new(job_id.to_string(), update.clone());
 
         sqlx::query(
             r#"INSERT OR REPLACE INTO encoding_progress
@@ -165,8 +192,10 @@ impl JobQueue {
         .bind(&progress.speed)
         .bind(progress.updated_at)
         .execute(&self.pool)
-        .await?;
+        .await
+        .context(format!("Failed to update job progress: job_id={}, frame={}", job_id, update.frame))?;
 
+        debug!("Progress updated: job_id={}, frame={}, fps={:.2}", job_id, update.frame, update.fps);
         Ok(())
     }
 
@@ -180,8 +209,10 @@ impl JobQueue {
         .bind(phase)
         .bind(job_id)
         .execute(&self.pool)
-        .await?;
+        .await
+        .context(format!("Failed to update job phase: job_id={}, phase={}", job_id, phase))?;
 
+        debug!("Phase updated: job_id={}, phase={}", job_id, phase);
         Ok(())
     }
 
@@ -198,7 +229,8 @@ impl JobQueue {
         let now = chrono::Utc::now().timestamp();
 
         // Use a transaction to ensure both updates succeed or both fail
-        let mut tx = self.pool.begin().await?;
+        let mut tx = self.pool.begin().await
+            .context(format!("Failed to begin transaction for job completion: job_id={}", job_id))?;
 
         // Update encoding_jobs table
         let result = sqlx::query(
@@ -214,10 +246,13 @@ impl JobQueue {
         .bind(average_speed)
         .bind(job_id)
         .execute(&mut *tx)
-        .await?;
+        .await
+        .context(format!("Failed to update encoding_jobs table for completion: job_id={}", job_id))?;
 
         if result.rows_affected() == 0 {
-            tx.rollback().await?;
+            error!("Job completion failed - job not found: job_id={}", job_id);
+            tx.rollback().await
+                .context(format!("Failed to rollback transaction after job not found: job_id={}", job_id))?;
             return Err(anyhow!("Job not found"));
         }
 
@@ -231,17 +266,22 @@ impl JobQueue {
         .bind(output_bitrate)
         .bind(job_id)
         .execute(&mut *tx)
-        .await?;
+        .await
+        .context(format!("Failed to update media_files table for completion: job_id={}", job_id))?;
 
         // Validate that the media file was actually updated
         if media_result.rows_affected() == 0 {
-            tx.rollback().await?;
+            error!("Job completion failed - media file not found: job_id={}", job_id);
+            tx.rollback().await
+                .context(format!("Failed to rollback transaction after media file not found: job_id={}", job_id))?;
             return Err(anyhow!("Media file not found for job {}", job_id));
         }
 
         // Commit both updates together
-        tx.commit().await?;
+        tx.commit().await
+            .context(format!("Failed to commit job completion transaction: job_id={}", job_id))?;
 
+        info!("Job completed: job_id={}, output_size={}, output_bitrate={}", job_id, output_size, output_bitrate);
         Ok(())
     }
 
@@ -257,7 +297,8 @@ impl JobQueue {
         )
         .bind(job_id)
         .execute(&self.pool)
-        .await?;
+        .await
+        .context(format!("Failed to increment retry count for failed job: job_id={}", job_id))?;
 
         sqlx::query(
             r#"UPDATE encoding_jobs
@@ -266,17 +307,19 @@ impl JobQueue {
         )
         .bind(JobStatus::Failed.as_str())
         .bind(now)
-        .bind(error_message)
+        .bind(&error_message)
         .bind(job_id)
         .execute(&self.pool)
-        .await?;
+        .await
+        .context(format!("Failed to mark job as failed: job_id={}, error={}", job_id, error_message))?;
 
+        warn!("Job failed: job_id={}, error={}", job_id, error_message);
         Ok(())
     }
 
     /// Requeue a failed or stale job
     pub async fn requeue_job(&self, job_id: &str) -> Result<()> {
-        sqlx::query(
+        let result = sqlx::query(
             r#"UPDATE encoding_jobs
             SET status = ?, assigned_client = NULL, assigned_at = NULL, started_at = NULL, error_message = NULL
             WHERE id = ?"#,
@@ -284,7 +327,14 @@ impl JobQueue {
         .bind(JobStatus::Pending.as_str())
         .bind(job_id)
         .execute(&self.pool)
-        .await?;
+        .await
+        .context(format!("Failed to requeue job: job_id={}", job_id))?;
+
+        if result.rows_affected() > 0 {
+            info!("Job requeued: job_id={}", job_id);
+        } else {
+            warn!("Job requeue failed - job not found: job_id={}", job_id);
+        }
 
         Ok(())
     }
@@ -295,7 +345,8 @@ impl JobQueue {
             sqlx::query_as(r#"SELECT * FROM encoding_jobs WHERE id = ?"#)
                 .bind(job_id)
                 .fetch_optional(&self.pool)
-                .await?;
+                .await
+                .context(format!("Failed to query job by ID: job_id={}", job_id))?;
 
         Ok(job)
     }
@@ -308,8 +359,10 @@ impl JobQueue {
             ORDER BY assigned_at DESC"#,
         )
         .fetch_all(&self.pool)
-        .await?;
+        .await
+        .context("Failed to query active jobs from database")?;
 
+        debug!("Retrieved {} active jobs", jobs.len());
         Ok(jobs)
     }
 
@@ -322,8 +375,10 @@ impl JobQueue {
         )
         .bind(client_id)
         .fetch_all(&self.pool)
-        .await?;
+        .await
+        .context(format!("Failed to query client jobs: client_id={}", client_id))?;
 
+        debug!("Retrieved {} jobs for client: {}", jobs.len(), client_id);
         Ok(jobs)
     }
 
@@ -341,9 +396,14 @@ impl JobQueue {
         )
         .bind(cutoff)
         .execute(&self.pool)
-        .await?;
+        .await
+        .context(format!("Failed to requeue stale jobs: timeout_seconds={}", timeout_seconds))?;
 
-        Ok(result.rows_affected())
+        let count = result.rows_affected();
+        if count > 0 {
+            warn!("Requeued {} stale jobs (timeout: {}s)", count, timeout_seconds);
+        }
+        Ok(count)
     }
 
     /// Get stale jobs (assigned but not started within timeout)
@@ -357,8 +417,12 @@ impl JobQueue {
         )
         .bind(cutoff)
         .fetch_all(&self.pool)
-        .await?;
+        .await
+        .context(format!("Failed to query stale jobs: timeout_seconds={}", timeout_seconds))?;
 
+        if !jobs.is_empty() {
+            debug!("Found {} stale jobs", jobs.len());
+        }
         Ok(jobs)
     }
 
@@ -369,7 +433,8 @@ impl JobQueue {
             sqlx::query_as(r#"SELECT * FROM encoding_progress WHERE job_id = ?"#)
                 .bind(job_id)
                 .fetch_optional(&self.pool)
-                .await?;
+                .await
+                .context(format!("Failed to query job progress: job_id={}", job_id))?;
 
         Ok(progress)
     }
@@ -379,7 +444,8 @@ impl JobQueue {
         let count: (i64,) =
             sqlx::query_as(r#"SELECT COUNT(*) FROM encoding_jobs WHERE status = 'pending'"#)
                 .fetch_one(&self.pool)
-                .await?;
+                .await
+                .context("Failed to count pending jobs")?;
 
         Ok(count.0)
     }
@@ -390,7 +456,8 @@ impl JobQueue {
             r#"SELECT COUNT(*) FROM encoding_jobs WHERE status IN ('assigned', 'in_progress')"#,
         )
         .fetch_one(&self.pool)
-        .await?;
+        .await
+        .context("Failed to count active jobs")?;
 
         Ok(count.0)
     }
@@ -405,7 +472,8 @@ impl JobQueue {
             WHERE mf.processed = 0 AND ej.id IS NULL"#,
         )
         .fetch_all(&self.pool)
-        .await?;
+        .await
+        .context("Failed to query unprocessed media files for job creation")?;
 
         let count = files.len();
         for (path, _size, complexity) in files {
@@ -431,7 +499,8 @@ impl JobQueue {
             sqlx::query_as(r#"SELECT frames FROM media_files WHERE path = ?"#)
                 .bind(media_file_path)
                 .fetch_optional(&self.pool)
-                .await?;
+                .await
+                .context(format!("Failed to query frame count for media file: path={}", media_file_path))?;
 
         Ok(frames.map(|f| f.0))
     }

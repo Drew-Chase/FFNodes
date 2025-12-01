@@ -34,12 +34,17 @@ pub mod http_error;
     // Specific error for header parsing failures
     #[error("unable to parse headers: {0:?}")]
     HeaderParse(ToStrError),
+
+    // Error with machine-readable error code for client debugging
+    #[error("{message}")]
+    WithCode { message: String, code: String, status: StatusCode },
 }
 
 impl ResponseError for Error {
     fn status_code(&self) -> StatusCode {
         match &self {
             Self::Internal(_) | Self::Other(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::WithCode { status, .. } => *status,
             _ => StatusCode::BAD_REQUEST,
         }
     }
@@ -66,6 +71,12 @@ impl ResponseError for Error {
             _ => error_message,
         };
 
+        // Include error code if present
+        let error_code = match self {
+            Error::WithCode { code, .. } => Some(code.clone()),
+            _ => None,
+        };
+
         #[cfg(debug_assertions)]
         {
             // Capture backtrace
@@ -75,24 +86,36 @@ impl ResponseError for Error {
             // Parse backtrace into a structured format
             let frames = parse_backtrace(&backtrace_str);
 
+            let mut response = json!({
+                "message": error_message,
+                "status": status_code.as_u16(),
+                "stacktrace": frames
+            });
+
+            if let Some(code) = error_code {
+                response["code"] = json!(code);
+            }
+
             HttpResponse::build(status_code)
                 .content_type("application/json")
-                .json(json!({
-                    "message": error_message,
-                    "status": status_code.as_u16(),
-                    "stacktrace": frames
-                }))
+                .json(response)
         }
 
         #[cfg(not(debug_assertions))]
         {
             // For production - no stacktrace
+            let mut response = json!({
+                "message": error_message,
+                "status": status_code.as_u16()
+            });
+
+            if let Some(code) = error_code {
+                response["code"] = json!(code);
+            }
+
             HttpResponse::build(status_code)
                 .content_type("application/json")
-                .json(json!({
-                    "message": error_message,
-                    "status": status_code.as_u16()
-                }))
+                .json(response)
         }
     }
 }
@@ -151,20 +174,60 @@ impl Error {
         Error::Anyhow(anyhow!(message.into()))
     }
 
+    pub fn bad_request_with_code(message: impl Into<String>, code: impl Into<String>) -> Self {
+        Error::WithCode {
+            message: message.into(),
+            code: code.into(),
+            status: StatusCode::BAD_REQUEST,
+        }
+    }
+
     pub fn unauthorized(message: impl Into<String>) -> Self {
         Error::Anyhow(anyhow!(message.into()))
+    }
+
+    pub fn unauthorized_with_code(message: impl Into<String>, code: impl Into<String>) -> Self {
+        Error::WithCode {
+            message: message.into(),
+            code: code.into(),
+            status: StatusCode::UNAUTHORIZED,
+        }
     }
 
     pub fn not_found(message: impl Into<String>) -> Self {
         Error::Anyhow(anyhow!(message.into()))
     }
 
+    pub fn not_found_with_code(message: impl Into<String>, code: impl Into<String>) -> Self {
+        Error::WithCode {
+            message: message.into(),
+            code: code.into(),
+            status: StatusCode::NOT_FOUND,
+        }
+    }
+
     pub fn internal_server_error(message: impl Into<String>) -> Self {
         Error::Internal(anyhow!(message.into()))
     }
 
+    pub fn internal_server_error_with_code(message: impl Into<String>, code: impl Into<String>) -> Self {
+        Error::WithCode {
+            message: message.into(),
+            code: code.into(),
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+
     pub fn forbidden(message: impl Into<String>) -> Self {
         Error::Anyhow(anyhow!(message.into()))
+    }
+
+    pub fn forbidden_with_code(message: impl Into<String>, code: impl Into<String>) -> Self {
+        Error::WithCode {
+            message: message.into(),
+            code: code.into(),
+            status: StatusCode::FORBIDDEN,
+        }
     }
 }
 
