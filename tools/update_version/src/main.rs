@@ -3,19 +3,34 @@ use std::fs;
 use std::process::Command;
 
 fn main() {
+    // Regex for TOML: matches `version = "x.y.z"` (first occurrence after [package])
+    let toml_version_regex = Regex::new(r#"(?m)^version\s*=\s*"[^"]*""#).unwrap();
+    // Regex for JSON: matches "version": "x.y.z"
+    let json_version_regex = Regex::new(r#""version"\s*:\s*"[^"]*""#).unwrap();
+
     let new_version = std::env::args().nth(1).unwrap_or_else(|| {
+        if let Ok(content) = fs::read_to_string("./ffnodes-server/Cargo.toml") {
+            if let Some(version) = toml_version_regex.find(&content) {
+                let version = version.as_str().trim_start_matches("version = \"").trim_end_matches("\"");
+                let mut semver = semver::Version::parse(version).unwrap();
+                semver.patch += 1;
+                return semver.to_string();
+            } else {
+                eprintln!("Error: Version not found in Cargo.toml")
+            }
+        } else {
+            eprintln!("Error: Cargo.toml file not found or invalid format")
+        }
         eprintln!("Error: Version argument is missing");
         std::process::exit(1);
     });
+    
     let new_version = semver::Version::parse(&new_version).unwrap();
     println!("[FFNodes Update Version] New version: {}", new_version);
 
     let cargo_tomls = ["./ffnodes-client/src-tauri/Cargo.toml", "./ffmpeg/Cargo.toml", "./ffnodes-server/Cargo.toml"];
     let package_json = ["./ffnodes-client/package.json", "./ffnodes-server/package.json", "./package.json"];
     let tauri_config = "ffnodes-client/src-tauri/tauri.conf.json";
-
-    // Regex for TOML: matches `version = "x.y.z"` (first occurrence after [package])
-    let toml_version_regex = Regex::new(r#"(?m)^version\s*=\s*"[^"]*""#).unwrap();
 
     // Update Cargo.toml files
     for cargo in cargo_tomls {
@@ -36,9 +51,6 @@ fn main() {
         }
         println!("Updated {}", cargo);
     }
-
-    // Regex for JSON: matches "version": "x.y.z"
-    let json_version_regex = Regex::new(r#""version"\s*:\s*"[^"]*""#).unwrap();
 
     // Update package.json files
     for package in package_json {
@@ -71,7 +83,8 @@ fn main() {
         };
 
         // Replace only the first occurrence
-        let new_content = json_version_regex.replace(&content, format!(r#""version": "{}.{}.{}""#, new_version.major, new_version.minor, new_version.patch));
+        let new_content =
+            json_version_regex.replace(&content, format!(r#""version": "{}.{}.{}""#, new_version.major, new_version.minor, new_version.patch));
 
         if let Err(e) = fs::write(tauri_config, new_content.as_ref()) {
             eprintln!("Error writing to {}: {}", tauri_config, e);
