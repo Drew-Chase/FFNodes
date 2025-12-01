@@ -30,7 +30,21 @@ export function createReconnectingSSE(
 
     // Handle errors
     eventSource.onerror = (e) => {
-      console.error('SSE connection error:', e);
+      console.error('SSE connection error:', {
+        readyState: eventSource?.readyState,
+        url: eventSource?.url,
+        error: e,
+        errorType: (e as any).type,
+      });
+
+      // Log readyState meaning
+      const states = {
+        0: 'CONNECTING',
+        1: 'OPEN',
+        2: 'CLOSED'
+      };
+      console.log('SSE State:', states[(eventSource?.readyState ?? 2) as 0 | 1 | 2]);
+
       eventSource?.close();
       onConnectionChange?.(false);
 

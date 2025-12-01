@@ -172,9 +172,11 @@ export function Dashboard()
     useEffect(() => {
         if (!config) return;
 
-        const serverUrl = config.server_url || '';
+        const serverUrl = (config.server_url || '').replace(/\/+$/, ''); // Remove trailing slashes
+        const url = `${serverUrl}/api/public/monitoring/scan/progress`;
+        console.log("Connecting to SSE:", url);
         const cleanupScanSSE = createReconnectingSSE(
-            `${serverUrl}/api/public/monitoring/scan/progress`,
+            url,
             (data) => {
                 // Handle SSE messages
                 if (typeof data === 'object' && 'total_files' in data) {
@@ -265,6 +267,7 @@ export function Dashboard()
             listen("download-progress", (event: any) =>
             {
                 const progress = event.payload;
+                console.log("Download progress event:", progress); // DEBUG
                 updateProgress({
                     phase: "downloading",
                     transferredBytes: progress.transferred_bytes,

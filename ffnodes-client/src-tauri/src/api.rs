@@ -8,6 +8,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tokio_util::io::ReaderStream;
+use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HandshakeRequest {
@@ -333,6 +334,7 @@ impl ServerClient {
         &self,
         job_id: &str,
         output_path: &Path,
+        cancel_token: CancellationToken,
         mut progress_callback: F,
     ) -> Result<()>
     where
@@ -367,6 +369,12 @@ impl ServerClient {
         let start_time = std::time::Instant::now();
 
         while let Some(chunk) = stream.next().await {
+            // Check cancellation BEFORE processing chunk
+            if cancel_token.is_cancelled() {
+                log::info!("Download cancelled by user");
+                return Err(anyhow::anyhow!("Download cancelled"));
+            }
+
             let chunk = chunk?;
             let chunk_size = chunk.len() as u64;
 

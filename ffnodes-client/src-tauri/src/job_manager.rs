@@ -9,6 +9,7 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct JobManagerState {
@@ -47,6 +48,7 @@ pub struct JobManager {
     ws_task: Arc<Mutex<Option<JoinHandle<()>>>>,
     processing_task: Arc<Mutex<Option<JoinHandle<()>>>>,
     heartbeat_task: Arc<Mutex<Option<JoinHandle<()>>>>,
+    download_cancel_token: Arc<Mutex<Option<CancellationToken>>>,
 }
 
 impl JobManager {
@@ -66,6 +68,7 @@ impl JobManager {
             ws_task: Arc::new(Mutex::new(None)),
             processing_task: Arc::new(Mutex::new(None)),
             heartbeat_task: Arc::new(Mutex::new(None)),
+            download_cancel_token: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -271,6 +274,15 @@ impl JobManager {
         }
         drop(ws_task);
 
+        // Cancel active download if in progress
+        let mut download_token = self.download_cancel_token.lock().await;
+        if let Some(token) = download_token.take() {
+            log::info!("Cancelling active download");
+            token.cancel();
+            log::info!("✓ Download cancelled");
+        }
+        drop(download_token);
+
         // Kill any running FFmpeg process first
         log::info!("Attempting to kill any running FFmpeg process");
         self.encoder.abort_encoding().await;
@@ -399,6 +411,7 @@ impl JobManager {
             ws_task: Arc::clone(&self.ws_task),
             processing_task: Arc::clone(&self.processing_task),
             heartbeat_task: Arc::clone(&self.heartbeat_task),
+            download_cancel_token: Arc::clone(&self.download_cancel_token),
         }
     }
 
@@ -577,6 +590,11 @@ impl JobManager {
             // Track download start time
             let download_start = std::time::Instant::now();
 
+            // Create cancellation token for download
+            let cancel_token = CancellationToken::new();
+            *self.download_cancel_token.lock().await = Some(cancel_token.clone());
+            log::debug!("✓ Cancellation token created and stored");
+
             // Create progress callback for download
             // Use a simple bool that gets captured by the mutable closure
             let app_handle_clone = self.app_handle.clone();
@@ -602,10 +620,14 @@ impl JobManager {
                 let _ = app_handle_clone.emit("download-progress", &progress);
             };
 
-            // Download with progress tracking
+            // Download with progress tracking and cancellation support
             client
-                .download_input_file(&job_id, &input_path, progress_callback)
+                .download_input_file(&job_id, &input_path, cancel_token.clone(), progress_callback)
                 .await?;
+
+            // Clear cancellation token after successful download
+            *self.download_cancel_token.lock().await = None;
+            log::debug!("✓ Cancellation token cleared after successful download");
 
             // Emit download-completed event
             let download_duration = download_start.elapsed().as_secs_f64();

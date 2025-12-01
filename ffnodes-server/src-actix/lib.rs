@@ -1,3 +1,4 @@
+use actix_cors::Cors;
 use actix_web::{App, HttpResponse, HttpServer, web};
 use anyhow::Result;
 use serde_json::json;
@@ -148,6 +149,18 @@ pub async fn run() -> Result<()> {
     let _progress_broadcaster = media_files::progress::init_broadcaster(100);
     info!("Progress broadcaster initialized");
 
+    // Send test progress for debugging SSE
+    tokio::spawn(async {
+        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+        media_files::progress::send_progress(media_files::progress::ScanProgress {
+            total_files: 10,
+            completed_files: 3,
+            current_file: Some("test.mp4".to_string()),
+            operation: "Testing SSE".to_string(),
+        });
+        info!("Sent test SSE progress");
+    });
+
     // Create WebSocket registry
     let ws_registry = api::websocket::create_ws_registry();
 
@@ -202,6 +215,14 @@ pub async fn run() -> Result<()> {
 
     let server = HttpServer::new(move || {
         App::new()
+            .wrap(
+                Cors::default()
+                    .allow_any_origin()
+                    .allow_any_method()
+                    .allow_any_header()
+                    .supports_credentials()
+                    .max_age(3600)
+            )
             .wrap(actix_web::middleware::Logger::default())
             .app_data(config_data.clone())
             .app_data(actor_data.clone())

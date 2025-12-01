@@ -102,24 +102,6 @@ pub async fn download_input(
             Error::internal_server_error("Error reading file metadata")
         })?;
 
-    // Read file
-    let mut file = TokioFile::open(&validated_path)
-        .await
-        .context(format!("Failed to open file: path={:?}", validated_path))
-        .map_err(|e| {
-            error!("Error opening file: {:#}", e);
-            Error::internal_server_error("Error opening file")
-        })?;
-
-    let mut buffer = Vec::with_capacity(metadata.len() as usize);
-    file.read_to_end(&mut buffer)
-        .await
-        .context(format!("Failed to read file contents: path={:?}, size={}", validated_path, metadata.len()))
-        .map_err(|e| {
-            error!("Error reading file: {:#}", e);
-            Error::internal_server_error("Error reading file")
-        })?;
-
     // Get filename for Content-Disposition
     let filename = validated_path
         .file_name()
@@ -130,10 +112,44 @@ pub async fn download_input(
         })?;
 
     info!(
-        "Successfully prepared file download: size={} bytes, filename={}",
-        buffer.len(),
+        "Starting streaming file download: size={} bytes, filename={}",
+        metadata.len(),
         filename
     );
+
+    // Open file for streaming
+    let file = TokioFile::open(&validated_path)
+        .await
+        .context(format!("Failed to open file: path={:?}", validated_path))
+        .map_err(|e| {
+            error!("Error opening file: {:#}", e);
+            Error::internal_server_error("Error opening file")
+        })?;
+
+    // Create a streaming response
+    let stream = async_stream::stream! {
+        let mut file = file;
+        let mut buffer = vec![0u8; 8192]; // 8KB chunks
+
+        loop {
+            match file.read(&mut buffer).await {
+                Ok(0) => {
+                    debug!("File streaming completed");
+                    break;
+                },
+                Ok(n) => {
+                    yield Ok::<actix_web::web::Bytes, std::io::Error>(
+                        actix_web::web::Bytes::copy_from_slice(&buffer[..n])
+                    );
+                }
+                Err(e) => {
+                    error!("Error reading file chunk: {}", e);
+                    yield Err(e);
+                    break;
+                }
+            }
+        }
+    };
 
     Ok(HttpResponse::Ok()
         .content_type("application/octet-stream")
@@ -141,7 +157,8 @@ pub async fn download_input(
             "Content-Disposition",
             format!("attachment; filename=\"{}\"", filename),
         ))
-        .body(buffer))
+        .insert_header(("Content-Length", metadata.len().to_string()))
+        .streaming(Box::pin(stream)))
 }
 
 /// Upload output file for a job
