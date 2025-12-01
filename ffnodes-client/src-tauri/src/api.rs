@@ -496,99 +496,20 @@ impl ServerClient {
             e
         })?;
 
-        // For upload, we need to track progress differently since we're streaming the request body
-        // We'll create a simple byte counter that gets updated as chunks are yielded
-        let uploaded_bytes = std::sync::Arc::new(tokio::sync::Mutex::new(0u64));
-        let last_update = std::sync::Arc::new(tokio::sync::Mutex::new(std::time::Instant::now()));
-        let last_bytes = std::sync::Arc::new(tokio::sync::Mutex::new(0u64));
-        let speed_ema = std::sync::Arc::new(tokio::sync::Mutex::new(0.0f64));
-        let start_time = std::time::Instant::now();
-
-        // Wrap callback in Arc<Mutex> for thread-safe sharing
-        let callback = std::sync::Arc::new(tokio::sync::Mutex::new(progress_callback));
-
-        let uploaded_clone = uploaded_bytes.clone();
-        let last_update_clone = last_update.clone();
-        let last_bytes_clone = last_bytes.clone();
-        let speed_ema_clone = speed_ema.clone();
-        let callback_clone = callback.clone();
-
         // Create reader stream with 1MB buffer for efficient uploads
         let mut reader_stream = ReaderStream::with_capacity(file, 1024 * 1024);
 
+        // Use atomic counter for lock-free progress tracking
+        let uploaded_bytes = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let uploaded_clone = uploaded_bytes.clone();
+
+        // Simple stream without complex progress tracking in the hot path
         let stream = async_stream::stream! {
             while let Some(chunk) = reader_stream.next().await {
                 match chunk {
                     Ok(bytes) => {
-                        let chunk_size = bytes.len() as u64;
-
-                        // Update uploaded bytes
-                        let current_uploaded = {
-                            let mut uploaded = uploaded_clone.lock().await;
-                            *uploaded += chunk_size;
-                            *uploaded
-                        };
-
-                        // Check if we should emit progress
-                        let now = std::time::Instant::now();
-                        let should_update = {
-                            let last = last_update_clone.lock().await;
-                            let elapsed = now.duration_since(*last).as_secs_f64();
-                            elapsed >= 0.1 || current_uploaded >= total_bytes
-                        };
-
-                        if should_update {
-                            let elapsed_since_last = {
-                                let last = last_update_clone.lock().await;
-                                now.duration_since(*last).as_secs_f64()
-                            };
-
-                            let bytes_since_last = {
-                                let last_b = last_bytes_clone.lock().await;
-                                current_uploaded - *last_b
-                            };
-
-                            let current_speed = if elapsed_since_last > 0.0 {
-                                bytes_since_last as f64 / elapsed_since_last
-                            } else {
-                                // For very fast uploads, use total time
-                                let total_elapsed = now.duration_since(start_time).as_secs_f64();
-                                if total_elapsed > 0.0 {
-                                    current_uploaded as f64 / total_elapsed
-                                } else {
-                                    0.0
-                                }
-                            };
-
-                            // Smooth speed with exponential moving average
-                            let alpha = 0.3;
-                            let speed = {
-                                let mut ema = speed_ema_clone.lock().await;
-                                if *ema == 0.0 {
-                                    *ema = current_speed;
-                                } else {
-                                    *ema = alpha * current_speed + (1.0 - alpha) * *ema;
-                                }
-                                *ema
-                            };
-
-                            let percentage = (current_uploaded as f64 / total_bytes as f64) * 100.0;
-
-                            // Call progress callback (non-blocking)
-                            {
-                                let mut cb = callback_clone.lock().await;
-                                cb(TransferProgress {
-                                    transferred_bytes: current_uploaded,
-                                    total_bytes,
-                                    percentage,
-                                    bytes_per_second: speed,
-                                });
-                            }
-
-                            *last_update_clone.lock().await = now;
-                            *last_bytes_clone.lock().await = current_uploaded;
-                        }
-
+                        // Atomically increment uploaded bytes (lock-free)
+                        uploaded_clone.fetch_add(bytes.len() as u64, std::sync::atomic::Ordering::Relaxed);
                         yield Ok::<_, std::io::Error>(bytes);
                     }
                     Err(e) => {
@@ -600,14 +521,70 @@ impl ServerClient {
             }
         };
 
-        // Create multipart form with streaming body
+        // Create multipart form with streaming body and content-length
         log::trace!("Creating multipart form with streaming body...");
-        let file_part = multipart::Part::stream(reqwest::Body::wrap_stream(stream))
+        let body = reqwest::Body::wrap_stream(stream);
+        let file_part = multipart::Part::stream_with_length(body, total_bytes)
             .file_name(filename.clone())
             .mime_str("video/mp4")?;
 
         let form = multipart::Form::new().part("file", file_part);
-        log::debug!("✓ Multipart form created");
+        log::debug!("✓ Multipart form created with content-length: {}", total_bytes);
+
+        // Spawn background task for progress tracking (doesn't block the upload stream)
+        let uploaded_bytes_monitor = uploaded_bytes.clone();
+        let mut progress_callback = progress_callback; // Take ownership
+        let progress_task = tokio::spawn(async move {
+            let mut last_update = std::time::Instant::now();
+            let mut last_bytes = 0u64;
+            let mut speed_ema = 0.0f64;
+            let start_time = std::time::Instant::now();
+
+            loop {
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+                let current_uploaded = uploaded_bytes_monitor.load(std::sync::atomic::Ordering::Relaxed);
+                let now = std::time::Instant::now();
+                let elapsed_since_last = now.duration_since(last_update).as_secs_f64();
+
+                let bytes_since_last = current_uploaded.saturating_sub(last_bytes);
+                let current_speed = if elapsed_since_last > 0.0 {
+                    bytes_since_last as f64 / elapsed_since_last
+                } else {
+                    let total_elapsed = now.duration_since(start_time).as_secs_f64();
+                    if total_elapsed > 0.0 {
+                        current_uploaded as f64 / total_elapsed
+                    } else {
+                        0.0
+                    }
+                };
+
+                // Smooth speed with exponential moving average
+                let alpha = 0.3;
+                speed_ema = if speed_ema == 0.0 {
+                    current_speed
+                } else {
+                    alpha * current_speed + (1.0 - alpha) * speed_ema
+                };
+
+                let percentage = (current_uploaded as f64 / total_bytes as f64) * 100.0;
+
+                progress_callback(TransferProgress {
+                    transferred_bytes: current_uploaded,
+                    total_bytes,
+                    percentage,
+                    bytes_per_second: speed_ema,
+                });
+
+                last_update = now;
+                last_bytes = current_uploaded;
+
+                // Stop when upload is complete
+                if current_uploaded >= total_bytes {
+                    break;
+                }
+            }
+        });
 
         log::trace!("Sending POST request...");
         let response = self
@@ -616,8 +593,12 @@ impl ServerClient {
             .await
             .map_err(|e| {
                 log::error!("Upload request failed: {:#}", e);
+                progress_task.abort(); // Stop progress tracking on error
                 e
             })?;
+
+        // Wait for progress task to complete
+        progress_task.abort();
 
         let status = response.status();
         log::debug!("Response status: {}", status);
