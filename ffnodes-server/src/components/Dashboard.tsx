@@ -1,4 +1,4 @@
-import {useEffect} from "react";
+import {useEffect, useState} from "react";
 import {motion} from "framer-motion";
 import {BentoGrid, BentoCard, BentoCardHeader, BentoCardContent} from "./layout/BentoGrid";
 import {OverallStatsBento} from "./stats/OverallStatsBento";
@@ -18,9 +18,17 @@ export function Dashboard()
 {
     const {fetchAllData, systemStatus, updateScanProgress, addScanFile, setScanSSEConnected} = useDashboardStore();
     const {theme, toggleTheme} = useTheme();
+    const [version, setVersion] = useState("");
 
     useEffect(() =>
     {
+        fetch("/api/public/ping").then((response) => {
+            if (response.ok) {
+                response.json().then((data) => {
+                    setVersion(data.version);
+                });
+            }
+        })
         // Initial data fetch
         fetchAllData();
 
@@ -148,7 +156,7 @@ export function Dashboard()
                             </div>
                             <div className="flex justify-between items-center">
                                 <span className="text-body-md text-foreground/70">Dashboard Version</span>
-                                <span className="text-body-md text-foreground">v0.1.21-beta</span>
+                                <span className="text-body-md text-foreground">v{version}</span>
                             </div>
                             <div className="flex justify-between items-center">
                                 <span className="text-body-md text-foreground/70">Last Updated</span>

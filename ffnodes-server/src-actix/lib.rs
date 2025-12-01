@@ -250,6 +250,7 @@ pub async fn run() -> Result<()> {
                             .configure(api::monitoring::configure_public)
                             .configure(api::stats::configure_public)
                             .configure(api::jobs::configure_public)
+                            .configure(api::ping::configure)
                     )
                     // Protected endpoints (JWT required)
                     .service(
