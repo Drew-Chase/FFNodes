@@ -155,6 +155,22 @@ impl JobQueue {
     pub async fn start_job(&self, job_id: &str) -> Result<()> {
         let now = chrono::Utc::now().timestamp();
 
+        // Get current job status for logging
+        let current_status: Option<(String,)> = sqlx::query_as(
+            "SELECT status FROM encoding_jobs WHERE id = ?"
+        )
+        .bind(job_id)
+        .fetch_optional(&self.pool)
+        .await
+        .context(format!("Failed to query current job status: job_id={}", job_id))?;
+
+        if let Some((status,)) = &current_status {
+            info!("Starting job: job_id={}, current_status={}", job_id, status);
+        } else {
+            warn!("Cannot start job - job not found in database: job_id={}", job_id);
+            return Err(anyhow::anyhow!("Job not found: {}", job_id));
+        }
+
         let result = sqlx::query(
             r#"UPDATE encoding_jobs
             SET status = ?, started_at = ?
@@ -168,9 +184,27 @@ impl JobQueue {
         .context(format!("Failed to mark job as in progress: job_id={}", job_id))?;
 
         if result.rows_affected() == 0 {
-            warn!("Job start failed - job not found: job_id={}", job_id);
-        } else {
-            info!("Job started: job_id={}", job_id);
+            error!("Job start failed - no rows updated: job_id={}", job_id);
+            return Err(anyhow::anyhow!("Failed to start job - no rows updated: {}", job_id));
+        }
+
+        info!("✓ Job status updated to 'in_progress': job_id={}, rows_affected={}", job_id, result.rows_affected());
+
+        // Verify the update by reading back the status
+        let updated_status: Option<(String,)> = sqlx::query_as(
+            "SELECT status FROM encoding_jobs WHERE id = ?"
+        )
+        .bind(job_id)
+        .fetch_optional(&self.pool)
+        .await
+        .context(format!("Failed to verify job status: job_id={}", job_id))?;
+
+        if let Some((status,)) = updated_status {
+            info!("✓ Verified job status after update: job_id={}, status={}", job_id, status);
+            if status != JobStatus::InProgress.as_str() {
+                error!("Status verification failed! Expected 'in_progress' but got '{}'", status);
+                return Err(anyhow::anyhow!("Status verification failed: expected 'in_progress' but got '{}'", status));
+            }
         }
 
         Ok(())

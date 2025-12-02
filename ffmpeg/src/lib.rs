@@ -357,6 +357,14 @@ impl FFMpeg {
 		pid_storage: Option<Arc<Mutex<Option<u32>>>>,
 	) -> Result<()> {
 		let working_dir: PathBuf = working_dir.into();
+
+		// Build command string for error reporting
+		let binary_path = if ffmpeg { &self.ffmpeg_path } else { &self.ffprobe_path };
+		let cmd_string = format!("{} {}",
+			binary_path.display(),
+			args.join(" ")
+		);
+
 		let mut cmd = self.command(ffmpeg, args, &working_dir);
 		let mut child = cmd.spawn()?;
 
@@ -372,7 +380,12 @@ impl FFMpeg {
 		let stdout = child.stdout.take().ok_or_else(|| anyhow::anyhow!("Failed to capture stdout"))?;
 		let stderr = child.stderr.take().ok_or_else(|| anyhow::anyhow!("Failed to capture stderr"))?;
 
+		// Buffers to collect output for error reporting
+		let stdout_buffer = Arc::new(Mutex::new(Vec::new()));
+		let stderr_buffer = Arc::new(Mutex::new(Vec::new()));
+
 		let sender_clone = sender.clone();
+		let stdout_buf_clone = stdout_buffer.clone();
 		let stdout_reader = async move {
 			use tokio::io::AsyncReadExt;
 			let mut reader = BufReader::new(stdout);
@@ -389,10 +402,15 @@ impl FFMpeg {
 							if !line_buffer.is_empty() {
 								trace!("ffmpeg stdout: {}", line_buffer.trim());
 								let _ = sender_clone.send(line_buffer.clone()).await;
+								// Save to buffer for error reporting
+								stdout_buf_clone.lock().await.extend_from_slice(line_buffer.as_bytes());
 							}
 							break;
 						}
 						Ok(n) => {
+							// Save raw bytes to buffer for error reporting
+							stdout_buf_clone.lock().await.extend_from_slice(&chunk[..n]);
+
 							// Convert chunk to string and append to line buffer
 							let data = String::from_utf8_lossy(&chunk[..n]);
 							line_buffer.push_str(&data);
@@ -417,6 +435,9 @@ impl FFMpeg {
 
 				// Read entire output into buffer
 				if reader.read_to_end(&mut buffer).await.is_ok() && !buffer.is_empty() {
+					// Save to buffer for error reporting
+					stdout_buf_clone.lock().await.extend_from_slice(&buffer);
+
 					let output = String::from_utf8_lossy(&buffer);
 					trace!("ffprobe stdout: {}", output);
 					// Send the entire output as one message
@@ -425,6 +446,7 @@ impl FFMpeg {
 			}
 		};
 
+		let stderr_buf_clone = stderr_buffer.clone();
 		let stderr_reader = async move {
 			use tokio::io::AsyncReadExt;
 			let mut reader = BufReader::new(stderr);
@@ -441,10 +463,15 @@ impl FFMpeg {
 							if !line_buffer.is_empty() {
 								trace!("ffmpeg stderr: {}", line_buffer.trim());
 								let _ = sender.send(line_buffer.clone()).await;
+								// Save to buffer for error reporting
+								stderr_buf_clone.lock().await.extend_from_slice(line_buffer.as_bytes());
 							}
 							break;
 						}
 						Ok(n) => {
+							// Save raw bytes to buffer for error reporting
+							stderr_buf_clone.lock().await.extend_from_slice(&chunk[..n]);
+
 							// Convert chunk to string and append to line buffer
 							let data = String::from_utf8_lossy(&chunk[..n]);
 							line_buffer.push_str(&data);
@@ -469,6 +496,9 @@ impl FFMpeg {
 
 				// Read entire output into buffer
 				if reader.read_to_end(&mut buffer).await.is_ok() && !buffer.is_empty() {
+					// Save to buffer for error reporting
+					stderr_buf_clone.lock().await.extend_from_slice(&buffer);
+
 					let output = String::from_utf8_lossy(&buffer);
 					trace!("ffprobe stderr: {}", output);
 					// Send the entire output as one message
@@ -483,8 +513,47 @@ impl FFMpeg {
 		// CRITICAL FIX: Check exit status
 		if !status.success() {
 			let code = status.code().unwrap_or(-1);
-			log::error!("Process exited with code: {}", code);
-			return Err(anyhow::anyhow!("Process exited with code: {}", code));
+
+			// Collect captured output for error reporting
+			let stdout_bytes = stdout_buffer.lock().await;
+			let stderr_bytes = stderr_buffer.lock().await;
+
+			let stdout_str = String::from_utf8_lossy(&stdout_bytes);
+			let stderr_str = String::from_utf8_lossy(&stderr_bytes);
+
+			// Limit output to last 2000 chars to avoid excessive logs
+			let stdout_display = if stdout_str.len() > 2000 {
+				format!("...{}", &stdout_str[stdout_str.len() - 2000..])
+			} else {
+				stdout_str.to_string()
+			};
+
+			let stderr_display = if stderr_str.len() > 2000 {
+				format!("...{}", &stderr_str[stderr_str.len() - 2000..])
+			} else {
+				stderr_str.to_string()
+			};
+
+			// Log the full error details
+			log::error!("FFmpeg crashed with exit code: {}", code);
+			log::error!("Command: {}", cmd_string);
+			if !stdout_display.is_empty() {
+				log::error!("=== STDOUT ===\n{}", stdout_display);
+			}
+			if !stderr_display.is_empty() {
+				log::error!("=== STDERR ===\n{}", stderr_display);
+			}
+
+			// Create detailed error message
+			let mut error_msg = format!("Process exited with code: {}\nCommand: {}", code, cmd_string);
+			if !stderr_display.is_empty() {
+				error_msg.push_str(&format!("\n\nSTDERR:\n{}", stderr_display));
+			}
+			if !stdout_display.is_empty() {
+				error_msg.push_str(&format!("\n\nSTDOUT:\n{}", stdout_display));
+			}
+
+			return Err(anyhow::anyhow!("{}", error_msg));
 		}
 
 		Ok(())
