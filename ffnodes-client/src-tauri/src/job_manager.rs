@@ -556,11 +556,38 @@ impl JobManager {
             job_id
         );
         log::debug!("Calling POST /api/jobs/{}/start", job_id);
-        match client.start_job(&job_id).await {
-            Ok(_) => log::info!("✓ Job {} started successfully on server", job_id),
-            Err(e) => {
-                log::error!("✗ Failed to start job {} on server: {:#}", job_id, e);
-                return Err(e);
+
+        // Start job with retry logic (defense in depth)
+        let mut attempts = 0;
+        let max_attempts = 3;
+
+        loop {
+            match client.start_job(&job_id).await {
+                Ok(_) => {
+                    log::info!("✓ Job {} started successfully on server", job_id);
+                    break;
+                }
+                Err(e) => {
+                    attempts += 1;
+                    if attempts >= max_attempts {
+                        log::error!(
+                            "✗ Failed to start job {} after {} attempts: {:#}",
+                            job_id,
+                            max_attempts,
+                            e
+                        );
+                        return Err(e);
+                    }
+
+                    log::warn!(
+                        "Failed to start job {} (attempt {}/{}): {:#}. Retrying in 1s...",
+                        job_id,
+                        attempts,
+                        max_attempts,
+                        e
+                    );
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                }
             }
         }
 

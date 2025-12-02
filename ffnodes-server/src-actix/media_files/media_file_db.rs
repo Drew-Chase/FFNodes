@@ -1,7 +1,7 @@
 use crate::media_files::MediaFile;
 use anyhow::Result;
 use log::LevelFilter;
-use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode};
+use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use sqlx::{ConnectOptions, Executor, SqlitePool, Transaction};
 use std::path::Path;
 use std::time::UNIX_EPOCH;
@@ -205,5 +205,14 @@ pub async fn open_pool() -> Result<SqlitePool> {
         .filename("app.db")
         .log_statements(LevelFilter::Trace)
         .create_if_missing(true);
-    Ok(SqlitePool::connect_with(options).await?)
+
+    // Aggressive pool settings for high-traffic production
+    let pool_options = SqlitePoolOptions::new()
+        .max_connections(100)  // Increased from default 5 - handles many concurrent clients
+        .min_connections(10)   // Keep warm connections ready
+        .acquire_timeout(std::time::Duration::from_secs(30))
+        .idle_timeout(Some(std::time::Duration::from_secs(600)))
+        .max_lifetime(Some(std::time::Duration::from_secs(1800)));  // Recycle connections every 30 min
+
+    Ok(pool_options.connect_with(options).await?)
 }

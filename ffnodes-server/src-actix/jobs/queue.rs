@@ -155,58 +155,64 @@ impl JobQueue {
     pub async fn start_job(&self, job_id: &str) -> Result<()> {
         let now = chrono::Utc::now().timestamp();
 
-        // Get current job status for logging
+        // Use transaction for atomicity
+        let mut tx = self.pool.begin().await
+            .context(format!("Failed to begin transaction for start_job: job_id={}", job_id))?;
+
+        // Get current status within transaction
         let current_status: Option<(String,)> = sqlx::query_as(
             "SELECT status FROM encoding_jobs WHERE id = ?"
         )
         .bind(job_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *tx)
         .await
         .context(format!("Failed to query current job status: job_id={}", job_id))?;
 
-        if let Some((status,)) = &current_status {
-            info!("Starting job: job_id={}, current_status={}", job_id, status);
-        } else {
-            warn!("Cannot start job - job not found in database: job_id={}", job_id);
-            return Err(anyhow::anyhow!("Job not found: {}", job_id));
+        let status = match current_status {
+            Some((s,)) => {
+                info!("Starting job: job_id={}, current_status={}", job_id, s);
+                s
+            }
+            None => {
+                warn!("Cannot start job - not found: job_id={}", job_id);
+                return Err(anyhow::anyhow!("Job not found: {}", job_id));
+            }
+        };
+
+        // Validate status before updating
+        if status != "assigned" {
+            warn!("Cannot start job - invalid status: job_id={}, status={}", job_id, status);
+            return Err(anyhow::anyhow!(
+                "Job cannot be started from status '{}' (must be 'assigned')", status
+            ));
         }
 
+        // Update with status check in WHERE clause
         let result = sqlx::query(
             r#"UPDATE encoding_jobs
             SET status = ?, started_at = ?
-            WHERE id = ?"#,
+            WHERE id = ? AND status = 'assigned'"#,
         )
         .bind(JobStatus::InProgress.as_str())
         .bind(now)
         .bind(job_id)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await
         .context(format!("Failed to mark job as in progress: job_id={}", job_id))?;
 
         if result.rows_affected() == 0 {
-            error!("Job start failed - no rows updated: job_id={}", job_id);
-            return Err(anyhow::anyhow!("Failed to start job - no rows updated: {}", job_id));
+            error!("Job start failed - status changed during update: job_id={}", job_id);
+            tx.rollback().await?;
+            return Err(anyhow::anyhow!(
+                "Failed to start job - status changed (race condition detected)"
+            ));
         }
 
-        info!("✓ Job status updated to 'in_progress': job_id={}, rows_affected={}", job_id, result.rows_affected());
+        // Commit transaction
+        tx.commit().await
+            .context(format!("Failed to commit start_job transaction: job_id={}", job_id))?;
 
-        // Verify the update by reading back the status
-        let updated_status: Option<(String,)> = sqlx::query_as(
-            "SELECT status FROM encoding_jobs WHERE id = ?"
-        )
-        .bind(job_id)
-        .fetch_optional(&self.pool)
-        .await
-        .context(format!("Failed to verify job status: job_id={}", job_id))?;
-
-        if let Some((status,)) = updated_status {
-            info!("✓ Verified job status after update: job_id={}, status={}", job_id, status);
-            if status != JobStatus::InProgress.as_str() {
-                error!("Status verification failed! Expected 'in_progress' but got '{}'", status);
-                return Err(anyhow::anyhow!("Status verification failed: expected 'in_progress' but got '{}'", status));
-            }
-        }
-
+        info!("✓ Job status updated to 'in_progress': job_id={}", job_id);
         Ok(())
     }
 
@@ -323,6 +329,10 @@ impl JobQueue {
     pub async fn fail_job(&self, job_id: &str, error_message: String) -> Result<()> {
         let now = chrono::Utc::now().timestamp();
 
+        // Use transaction for atomicity
+        let mut tx = self.pool.begin().await
+            .context(format!("Failed to begin transaction for fail_job: job_id={}", job_id))?;
+
         // Increment retry count
         sqlx::query(
             r#"UPDATE media_files
@@ -330,10 +340,11 @@ impl JobQueue {
             WHERE path = (SELECT media_file_path FROM encoding_jobs WHERE id = ?)"#,
         )
         .bind(job_id)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await
         .context(format!("Failed to increment retry count for failed job: job_id={}", job_id))?;
 
+        // Update job status
         sqlx::query(
             r#"UPDATE encoding_jobs
             SET status = ?, completed_at = ?, error_message = ?
@@ -343,9 +354,13 @@ impl JobQueue {
         .bind(now)
         .bind(&error_message)
         .bind(job_id)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await
         .context(format!("Failed to mark job as failed: job_id={}, error={}", job_id, error_message))?;
+
+        // Commit transaction
+        tx.commit().await
+            .context(format!("Failed to commit fail_job transaction: job_id={}", job_id))?;
 
         warn!("Job failed: job_id={}, error={}", job_id, error_message);
         Ok(())
