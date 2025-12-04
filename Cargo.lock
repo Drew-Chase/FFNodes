@@ -1670,7 +1670,7 @@ dependencies = [
 
 [[package]]
 name = "ffmpeg"
-version = "0.1.40-beta"
+version = "0.1.41-beta"
 dependencies = [
  "anyhow",
  "encoding_rs",
@@ -1687,7 +1687,7 @@ dependencies = [
 
 [[package]]
 name = "ffnodes_client"
-version = "0.1.40-beta"
+version = "0.1.41-beta"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -1732,7 +1732,7 @@ dependencies = [
 
 [[package]]
 name = "ffnodes_server"
-version = "0.1.40-beta"
+version = "0.1.41-beta"
 dependencies = [
  "actix-cors",
  "actix-files",
