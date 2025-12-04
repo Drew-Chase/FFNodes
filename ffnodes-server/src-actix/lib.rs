@@ -242,7 +242,7 @@ pub async fn run() -> Result<()> {
             )
             .app_data(
                 web::PayloadConfig::default()
-                    .limit(10 * 1024 * 1024 * 1024) // 10GB limit for large video file uploads
+                    .limit(usize::MAX) // Infinite limit (as much as memory/system allows)
             )
             .service(
                 web::scope("api")
