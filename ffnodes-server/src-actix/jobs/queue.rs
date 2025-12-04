@@ -437,12 +437,20 @@ impl JobQueue {
         let cutoff = chrono::Utc::now().timestamp() - timeout_seconds;
 
         // Atomically update all stale jobs in a single query
+        // A job is stale if it was assigned before the cutoff AND
+        // (the assigned client is dead/missing OR the client hasn't sent a heartbeat since the cutoff)
         let result = sqlx::query(
             r#"UPDATE encoding_jobs
             SET status = 'pending', assigned_client = NULL, assigned_at = NULL, started_at = NULL, error_message = NULL
             WHERE status IN ('assigned', 'in_progress')
-            AND assigned_at < ?"#,
+            AND assigned_at < ?
+            AND (
+                assigned_client IS NULL
+                OR
+                assigned_client IN (SELECT id FROM clients WHERE last_heartbeat < ?)
+            )"#,
         )
+        .bind(cutoff)
         .bind(cutoff)
         .execute(&self.pool)
         .await
@@ -462,8 +470,14 @@ impl JobQueue {
         let jobs: Vec<EncodingJob> = sqlx::query_as(
             r#"SELECT * FROM encoding_jobs
             WHERE status IN ('assigned', 'in_progress')
-            AND assigned_at < ?"#,
+            AND assigned_at < ?
+            AND (
+                assigned_client IS NULL
+                OR
+                assigned_client IN (SELECT id FROM clients WHERE last_heartbeat < ?)
+            )"#,
         )
+        .bind(cutoff)
         .bind(cutoff)
         .fetch_all(&self.pool)
         .await
