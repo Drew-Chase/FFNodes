@@ -1,6 +1,6 @@
 [package]
 name = "ffmpeg"
-version = "0.1.39-beta"
+version = "0.1.40-beta"
 edition = "2024"
 
 [dependencies]
