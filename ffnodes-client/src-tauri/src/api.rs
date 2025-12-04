@@ -355,6 +355,7 @@ impl ServerClient {
 
         let response = self
             .add_auth_header(self.client.get(&url))
+            .timeout(std::time::Duration::from_secs(86400)) // 24 hours timeout for large downloads
             .send()
             .await?
             .error_for_status()?;
@@ -531,6 +532,10 @@ impl ServerClient {
         let form = multipart::Form::new().part("file", file_part);
         log::debug!("✓ Multipart form created with content-length: {}", total_bytes);
 
+        // Signal for completion
+        let is_done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let is_done_clone = is_done.clone();
+
         // Spawn background task for progress tracking (doesn't block the upload stream)
         let uploaded_bytes_monitor = uploaded_bytes.clone();
         let mut progress_callback = progress_callback; // Take ownership
@@ -542,6 +547,7 @@ impl ServerClient {
 
             loop {
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                let done = is_done_clone.load(std::sync::atomic::Ordering::Relaxed);
 
                 let current_uploaded = uploaded_bytes_monitor.load(std::sync::atomic::Ordering::Relaxed);
                 let now = std::time::Instant::now();
@@ -579,26 +585,39 @@ impl ServerClient {
                 last_update = now;
                 last_bytes = current_uploaded;
 
-                // Stop when upload is complete
-                if current_uploaded >= total_bytes {
+                // Stop when upload is complete or signaled done
+                if done || current_uploaded >= total_bytes {
+                    // Ensure 100% is sent if done
+                    if done {
+                         progress_callback(TransferProgress {
+                            transferred_bytes: total_bytes,
+                            total_bytes,
+                            percentage: 100.0,
+                            bytes_per_second: speed_ema,
+                        });
+                    }
                     break;
                 }
             }
         });
 
         log::trace!("Sending POST request...");
-        let response = self
+        let response_result = self
             .add_auth_header(self.client.post(&url).multipart(form))
+            .timeout(std::time::Duration::from_secs(86400)) // 24 hours timeout
             .send()
-            .await
-            .map_err(|e| {
-                log::error!("Upload request failed: {:#}", e);
-                progress_task.abort(); // Stop progress tracking on error
-                e
-            })?;
+            .await;
 
-        // Wait for progress task to complete
-        progress_task.abort();
+        // Signal task to finish
+        is_done.store(true, std::sync::atomic::Ordering::Relaxed);
+
+        // Wait for progress task to finish cleanly (max 100ms)
+        let _ = progress_task.await;
+
+        let response = response_result.map_err(|e| {
+            log::error!("Upload request failed: {:#}", e);
+            e
+        })?;
 
         let status = response.status();
         log::debug!("Response status: {}", status);
