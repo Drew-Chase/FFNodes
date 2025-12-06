@@ -104,9 +104,9 @@ impl JobManager {
 
         // Connect to WebSocket for real-time progress updates
         let config_lock = self.config.lock().await;
-        if let Some(config) = config_lock.as_ref() {
-            if let Some(client_id) = &config.client_id {
-                if let Some(auth_token) = &config.auth_token {
+        if let Some(config) = config_lock.as_ref()
+            && let Some(client_id) = &config.client_id
+                && let Some(auth_token) = &config.auth_token {
                     let client =
                         ServerClient::with_auth(config.server_url.clone(), auth_token.clone());
 
@@ -203,14 +203,12 @@ impl JobManager {
                         }
                     }
                 }
-            }
-        }
         drop(config_lock);
 
         // Start heartbeat task to send heartbeats every 5 seconds
         let config_lock = self.config.lock().await;
-        if let Some(config) = config_lock.as_ref() {
-            if let (Some(client_id), Some(auth_token)) = (&config.client_id, &config.auth_token) {
+        if let Some(config) = config_lock.as_ref()
+            && let (Some(client_id), Some(auth_token)) = (&config.client_id, &config.auth_token) {
                 let client = ServerClient::with_auth(config.server_url.clone(), auth_token.clone());
                 let client_id_clone = client_id.clone();
 
@@ -235,7 +233,6 @@ impl JobManager {
                 let mut heartbeat_task = self.heartbeat_task.lock().await;
                 *heartbeat_task = Some(heartbeat_handle);
             }
-        }
         drop(config_lock);
 
         // Start the processing loop in a background task
@@ -609,8 +606,8 @@ impl JobManager {
             let filename = job_resp
                 .input_path
                 .split('/')
-                .last()
-                .or_else(|| job_resp.input_path.split('\\').last())
+                .next_back()
+                .or_else(|| job_resp.input_path.split('\\').next_back())
                 .unwrap_or("input_file")
                 .to_string();
 
@@ -629,7 +626,7 @@ impl JobManager {
             let filename_clone = filename.clone();
             let mut first_progress = true;
 
-            let mut progress_callback = move |progress: TransferProgress| {
+            let progress_callback = move |progress: TransferProgress| {
                 // Emit download-started on first progress update
                 if first_progress {
                     let _ = app_handle_clone.emit(

@@ -116,8 +116,8 @@ pub async fn update_progress(
         })?;
 
     // Get job details for broadcasting
-    if let Ok(Some(job)) = actor.get_job(job_id.to_string()).await {
-        if let Some(assigned_client) = job.assigned_client {
+    if let Ok(Some(job)) = actor.get_job(job_id.to_string()).await
+        && let Some(assigned_client) = job.assigned_client {
             // Broadcast progress event to all connected clients
             let event = crate::api::websocket::WsEvent::Progress {
                 job_id: job_id.to_string(),
@@ -129,7 +129,6 @@ pub async fn update_progress(
 
             crate::api::websocket::broadcast_event(&ws_registry, event).await;
         }
-    }
 
     Ok(HttpResponse::Ok().finish())
 }

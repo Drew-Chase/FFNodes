@@ -48,7 +48,7 @@ pub async fn get_client_history(pool: &SqlitePool, client_id: &str) -> Result<Cl
         let average_speed = speed_opt.unwrap_or(0.0);
 
         // Extract filename from path
-        let filename = path.split(['/', '\\']).last().unwrap_or(&path).to_string();
+        let filename = path.split(['/', '\\']).next_back().unwrap_or(&path).to_string();
 
         history_entries.push(JobHistoryEntry {
             filename,
@@ -136,7 +136,7 @@ pub async fn get_remote_progress(pool: &SqlitePool, exclude_client_id: Option<&s
     let active_jobs: Vec<RemoteJobProgress> = jobs
         .into_iter()
         .map(|(client_name, path, frame_opt, total_frames, speed_opt, _fps)| {
-            let filename = path.split(['/', '\\']).last().unwrap_or(&path).to_string();
+            let filename = path.split(['/', '\\']).next_back().unwrap_or(&path).to_string();
             let frame = frame_opt.unwrap_or(0);
             let percentage = if total_frames > 0 {
                 (frame as f64 / total_frames as f64) * 100.0

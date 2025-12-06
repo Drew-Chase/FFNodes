@@ -57,7 +57,7 @@ impl Encoder {
             {
                 use std::os::windows::process::CommandExt;
                 let _ = std::process::Command::new("taskkill")
-                    .args(&["/F", "/PID", &pid.to_string()])
+                    .args(["/F", "/PID", &pid.to_string()])
                     .creation_flags(0x08000000) // CREATE_NO_WINDOW
                     .output();
             }

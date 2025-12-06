@@ -369,13 +369,12 @@ impl FFMpeg {
 		let mut child = cmd.spawn()?;
 
 		// Store the process ID if requested
-		if let Some(pid_storage) = pid_storage {
-			if let Some(pid) = child.id() {
+		if let Some(pid_storage) = pid_storage
+			&& let Some(pid) = child.id() {
 				let mut lock = pid_storage.lock().await;
 				*lock = Some(pid);
 				log::debug!("Stored FFmpeg process ID: {}", pid);
 			}
-		}
 
 		let stdout = child.stdout.take().ok_or_else(|| anyhow::anyhow!("Failed to capture stdout"))?;
 		let stderr = child.stderr.take().ok_or_else(|| anyhow::anyhow!("Failed to capture stderr"))?;

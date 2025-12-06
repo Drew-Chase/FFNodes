@@ -1,5 +1,3 @@
-use crate::clients::ClientManager;
-use crate::jobs::JobQueue;
 use actix_web::{get, web, HttpRequest, HttpResponse};
 use actix_ws::Message as WsMessage;
 use futures::StreamExt;
@@ -167,7 +165,7 @@ pub async fn broadcast_event(registry: &WsRegistry, event: WsEvent) {
     // Send event to all registered connections
     for (client_id, senders) in registry.iter() {
         for (idx, sender) in senders.iter().enumerate() {
-            if let Err(_) = sender.send(event.clone()) {
+            if sender.send(event.clone()).is_err() {
                 debug!("Failed to send event to client {}, sender {}", client_id, idx);
                 dead_senders.push((client_id.clone(), idx));
             }

@@ -99,8 +99,8 @@ pub fn run() {
                             let manager = job_manager.lock().await;
 
                             // Get config to send disconnect
-                            if let Some(config) = manager.get_config().await {
-                                if let (Some(client_id), Some(auth_token)) =
+                            if let Some(config) = manager.get_config().await
+                                && let (Some(client_id), Some(auth_token)) =
                                     (&config.client_id, &config.auth_token)
                                 {
                                     tracing::info!(
@@ -115,7 +115,6 @@ pub fn run() {
                                     // Fire and forget - don't wait for response
                                     let _ = client.disconnect(client_id).await;
                                 }
-                            }
                         });
 
                         app.exit(0);
