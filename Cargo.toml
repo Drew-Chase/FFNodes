@@ -6,4 +6,4 @@ members = [
     "ffnodes-client/src-tauri",
     "tools/update_version",
     "tools/publish_docker"
-]
+, "tools/package"]
