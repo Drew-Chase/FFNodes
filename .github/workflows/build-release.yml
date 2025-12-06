@@ -37,10 +37,9 @@ jobs:
         with:
           node-version: '20'
           cache: 'pnpm'
-          cache-dependency-path: 'ffnodes-client/pnpm-lock.yaml'
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Install frontend dependencies
-        working-directory: ffnodes-client
         run: pnpm install
 
       - name: Build packages
@@ -99,10 +98,9 @@ jobs:
         with:
           node-version: '20'
           cache: 'pnpm'
-          cache-dependency-path: 'ffnodes-client/pnpm-lock.yaml'
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Install frontend dependencies
-        working-directory: ffnodes-client
         run: pnpm install
 
       - name: Build packages
@@ -149,10 +147,9 @@ jobs:
         with:
           node-version: '20'
           cache: 'pnpm'
-          cache-dependency-path: 'ffnodes-client/pnpm-lock.yaml'
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Install frontend dependencies
-        working-directory: ffnodes-client
         run: pnpm install
 
       - name: Build packages
