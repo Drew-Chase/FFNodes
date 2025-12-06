@@ -2942,8 +2942,6 @@ checksum = "9375e112e4b463ec1b1c6c011953545c65a30164fbab5b581df32b3abf0dcb88"
 dependencies = [
  "console 0.16.1",
  "portable-atomic",
- "tokio",
- "unicode-segmentation",
  "unicode-width",
  "unit-prefix",
  "vt100",
@@ -4121,7 +4119,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
- "indicatif 0.18.3",
  "log",
  "pretty_env_logger",
  "regex",
