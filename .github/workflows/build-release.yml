@@ -48,6 +48,7 @@ jobs:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
 
       - name: Upload artifacts
+        if: ${{ !env.ACT }}
         uses: actions/upload-artifact@v4
         with:
           name: windows-${{ matrix.arch }}-artifacts
@@ -111,6 +112,7 @@ jobs:
           CXX_aarch64_unknown_linux_gnu: aarch64-linux-gnu-g++
 
       - name: Upload artifacts
+        if: ${{ !env.ACT }}
         uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.arch }}-artifacts
@@ -158,6 +160,7 @@ jobs:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
 
       - name: Upload artifacts
+        if: ${{ !env.ACT }}
         uses: actions/upload-artifact@v4
         with:
           name: macos-${{ matrix.arch }}-artifacts
@@ -168,6 +171,7 @@ jobs:
     name: Create Release
     needs: [build-windows, build-linux, build-macos]
     runs-on: ubuntu-latest
+    if: ${{ !env.ACT }}
     permissions:
       contents: write
     steps:
