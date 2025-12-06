@@ -47,13 +47,9 @@ jobs:
         env:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
 
-      - name: Upload artifacts
-        if: ${{ !env.ACT }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-${{ matrix.arch }}-artifacts
-          path: dist/*
-          if-no-files-found: error
+      - name: List built artifacts
+        run: ls -la dist/
+        shell: bash
 
   build-linux:
     name: Build Linux (${{ matrix.arch }})
@@ -111,13 +107,9 @@ jobs:
           CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
           CXX_aarch64_unknown_linux_gnu: aarch64-linux-gnu-g++
 
-      - name: Upload artifacts
-        if: ${{ !env.ACT }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-${{ matrix.arch }}-artifacts
-          path: dist/*
-          if-no-files-found: error
+      - name: List built artifacts
+        run: ls -la dist/
+        shell: bash
 
   build-macos:
     name: Build macOS (${{ matrix.arch }})
@@ -159,64 +151,6 @@ jobs:
         env:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
 
-      - name: Upload artifacts
-        if: ${{ !env.ACT }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-${{ matrix.arch }}-artifacts
-          path: dist/*
-          if-no-files-found: error
-
-  create-release:
-    name: Create Release
-    needs: [build-windows, build-linux, build-macos]
-    runs-on: ubuntu-latest
-    if: ${{ !env.ACT }}
-    permissions:
-      contents: write
-    steps:
-      - name: Download Windows x64 artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-x64-artifacts
-          path: dist/
-
-      - name: Download Windows ARM64 artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-arm64-artifacts
-          path: dist/
-
-      - name: Download Linux x64 artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: linux-x64-artifacts
-          path: dist/
-
-      - name: Download Linux ARM64 artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: linux-arm64-artifacts
-          path: dist/
-
-      - name: Download macOS x64 artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: macos-x64-artifacts
-          path: dist/
-
-      - name: Download macOS ARM64 artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: macos-arm64-artifacts
-          path: dist/
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: dist/*
-          draft: false
-          prerelease: ${{ contains(github.ref, '-') }}
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: List built artifacts
+        run: ls -la dist/
+        shell: bash

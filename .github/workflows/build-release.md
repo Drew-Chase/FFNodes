@@ -23,13 +23,15 @@ git push --tags
 
 ## Workflow Structure
 
-The workflow consists of four main jobs that run in sequence:
+The workflow consists of three main build jobs that run in parallel:
 
 ```
-build-windows (x64 + arm64)  ──┐
-build-linux (x64 + arm64)    ──┼──> create-release
-build-macos (x64 + arm64)    ──┘
+build-windows (x64 + arm64)
+build-linux (x64 + arm64)
+build-macos (x64 + arm64)
 ```
+
+All artifacts are output to the `./dist/` directory in the repository root.
 
 ---
 
@@ -59,13 +61,13 @@ build-macos (x64 + arm64)    ──┘
    - Builds both client (Tauri app) and server
    - Creates installers: MSI and NSIS for Windows
 
-7. **Upload artifacts** - Uploads everything from `dist/` directory
+7. **List built artifacts** - Lists all files created in `dist/` directory
    - Client ZIP: `ffnodes-client-{version}-windows-{arch}.zip`
    - MSI installer: `ffnodes_client_{version}_windows-{arch}_en-US.msi`
    - NSIS installer: `ffnodes_client_{version}_windows-{arch}_setup.exe`
    - Server ZIP: `ffnodes-server-{version}-windows-{arch}.zip`
 
-   **Note:** Windows builds create both MSI and NSIS installers for maximum compatibility.
+   **Note:** Windows builds create both MSI and NSIS installers for maximum compatibility. All artifacts remain in the `./dist/` directory for collection.
 
 ---
 
@@ -105,13 +107,13 @@ build-macos (x64 + arm64)    ──┘
    - For arm64: Sets cross-compilation C/C++ compilers
    - Package tool handles target-specific build paths
 
-9. **Upload artifacts** - Uploads Linux binaries and packages
+9. **List built artifacts** - Lists all files created in `dist/` directory
    - Client ZIP: `ffnodes-client-{version}-linux-{arch}.zip`
    - AppImage: `ffnodes_client_{version}_linux-{arch}.AppImage`
    - DEB package: `ffnodes_client_{version}_linux-{arch}.deb`
    - Server ZIP: `ffnodes-server-{version}-linux-{arch}.zip`
 
-   **Note:** Linux builds create both AppImage (portable) and DEB (Debian/Ubuntu) packages for maximum distribution compatibility.
+   **Note:** Linux builds create both AppImage (portable) and DEB (Debian/Ubuntu) packages for maximum distribution compatibility. All artifacts remain in the `./dist/` directory for collection.
 
 ---
 
@@ -139,41 +141,32 @@ build-macos (x64 + arm64)    ──┘
    - Sets `CARGO_BUILD_TARGET` environment variable
    - Tauri automatically handles macOS universal binary creation if needed
 
-7. **Upload artifacts** - Uploads macOS binaries and packages
+7. **List built artifacts** - Lists all files created in `dist/` directory
    - Client ZIP: `ffnodes-client-{version}-macos-{arch}.zip`
    - DMG installer: `ffnodes_client_{version}_macos-{arch}.dmg`
    - APP bundle (tar.gz): `ffnodes_client_{version}_macos-{arch}.app.tar.gz`
    - Server ZIP: `ffnodes-server-{version}-macos-{arch}.zip`
 
-   **Note:** macOS builds create both DMG (installer) and APP bundle (for manual installation) formats.
+   **Note:** macOS builds create both DMG (installer) and APP bundle (for manual installation) formats. All artifacts remain in the `./dist/` directory for collection.
 
 ---
 
-## Job 4: Create Release
+## Collecting Build Artifacts
 
-**Runs on:** `ubuntu-latest`
+After all build jobs complete, artifacts from all platforms and architectures will be located in the `./dist/` directory at the repository root:
 
-**Depends on:** All three build jobs must complete successfully
+- Windows artifacts (MSI, NSIS, ZIP)
+- Linux artifacts (AppImage, DEB, ZIP)
+- macOS artifacts (DMG, APP bundle, ZIP)
+- Server artifacts (ZIP for all platforms)
 
-**Permissions:** `contents: write` (allows creating releases)
+### Creating a GitHub Release
 
-### Steps
+To create a release with these artifacts, you can:
 
-1. **Download all artifacts** - Downloads artifacts from all 6 builds:
-   - `windows-x64-artifacts`
-   - `windows-arm64-artifacts`
-   - `linux-x64-artifacts`
-   - `linux-arm64-artifacts`
-   - `macos-x64-artifacts`
-   - `macos-arm64-artifacts`
-
-   All artifacts are merged into a single `dist/` directory.
-
-2. **Create Release** - Uses `softprops/action-gh-release@v1`
-   - **Files**: Uploads all files from `dist/*`
-   - **Draft**: `false` (publishes immediately)
-   - **Prerelease**: Auto-detected (tags containing `-` are marked as pre-release)
-   - **Release Notes**: Auto-generated from commit history since last tag
+1. **Manual Release**: Upload files from `./dist/` to a GitHub release manually
+2. **gh CLI**: Use `gh release create v1.0.0 ./dist/*`
+3. **Add release job**: Modify workflow to add a release creation step that uploads `./dist/*` files
 
 ---
 
