@@ -2,10 +2,16 @@ use super::models::*;
 use anyhow::Result;
 use sqlx::SqlitePool;
 
+// Type alias for job history query results
+type JobHistoryQueryRow = (String, i64, Option<i64>, i64, i64, Option<f64>);
+
+// Type alias for remote progress query results
+type RemoteProgressQueryRow = (String, String, Option<i64>, i64, Option<String>, Option<f64>);
+
 /// Get client history with completed jobs
 pub async fn get_client_history(pool: &SqlitePool, client_id: &str) -> Result<ClientHistoryResponse> {
     // Query all completed jobs for this client with necessary data
-    let jobs: Vec<(String, i64, Option<i64>, i64, i64, Option<f64>)> = sqlx::query_as(
+    let jobs: Vec<JobHistoryQueryRow> = sqlx::query_as(
         r#"
         SELECT
             ej.media_file_path,
@@ -110,7 +116,7 @@ pub async fn get_client_history(pool: &SqlitePool, client_id: &str) -> Result<Cl
 /// Get remote user progress for all active jobs
 pub async fn get_remote_progress(pool: &SqlitePool, exclude_client_id: Option<&str>) -> Result<RemoteProgressResponse> {
     // Query all in-progress jobs with their progress and client info
-    let jobs: Vec<(String, String, Option<i64>, i64, Option<String>, Option<f64>)> = sqlx::query_as(
+    let jobs: Vec<RemoteProgressQueryRow> = sqlx::query_as(
         r#"
         SELECT
             c.display_name,

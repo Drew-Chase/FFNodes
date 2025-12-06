@@ -43,6 +43,7 @@ impl JobQueue {
     }
 
     /// Get next pending job with highest priority, excluding already processed files
+    #[allow(dead_code)]
     pub async fn get_next_job(&self) -> Result<Option<EncodingJob>> {
         let job: Option<EncodingJob> = sqlx::query_as(
             r#"SELECT ej.* FROM encoding_jobs ej
@@ -126,6 +127,7 @@ impl JobQueue {
     }
 
     /// Assign job to a client (legacy method, prefer claim_next_job for atomic operations)
+    #[allow(dead_code)]
     pub async fn assign_job(&self, job_id: &str, client_id: &str) -> Result<()> {
         let now = chrono::Utc::now().timestamp();
 
@@ -464,6 +466,7 @@ impl JobQueue {
     }
 
     /// Get stale jobs (assigned but not started within timeout)
+    #[allow(dead_code)]
     pub async fn get_stale_jobs(&self, timeout_seconds: i64) -> Result<Vec<EncodingJob>> {
         let cutoff = chrono::Utc::now().timestamp() - timeout_seconds;
 

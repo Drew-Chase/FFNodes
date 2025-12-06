@@ -22,6 +22,7 @@ impl JobActorHandle {
     // ========== Job Operations ==========
 
     /// Create a new encoding job
+    #[allow(dead_code)]
     pub async fn create_job(
         &self,
         media_file_path: String,
@@ -322,6 +323,7 @@ impl JobActorHandle {
     }
 
     /// Disconnect a client
+    #[allow(dead_code)]
     pub async fn disconnect_client(&self, client_id: String) -> ActorResult<()> {
         let (tx, rx) = oneshot::channel();
 
@@ -360,6 +362,7 @@ impl JobActorHandle {
     }
 
     /// Get client by ID
+    #[allow(dead_code)]
     pub async fn get_client(&self, client_id: String) -> ActorResult<Option<Client>> {
         let (tx, rx) = oneshot::channel();
 
@@ -413,6 +416,7 @@ impl JobActorHandle {
     }
 
     /// Get client status with active job count
+    #[allow(dead_code)]
     pub async fn get_client_status(
         &self,
         client_id: String,

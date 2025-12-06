@@ -853,11 +853,3 @@ pub struct OverallSystemStats {
     pub total_jobs_completed: i64,
     pub total_jobs_failed: i64,
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScanProgress {
-    pub total_files: i64,
-    pub completed_files: i64,
-    pub current_file: Option<String>,
-    pub operation: String,
-}

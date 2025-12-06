@@ -90,6 +90,7 @@ pub fn validate_path_within_base(path: &Path, allowed_bases: &[PathBuf]) -> Resu
 
 /// Validates that a path is within an allowed base directory
 /// This version works for paths that don't exist yet
+#[allow(dead_code)]
 pub fn validate_path_within_base_non_existent(path: &Path, allowed_bases: &[PathBuf]) -> Result<PathBuf> {
     debug!("Validating non-existent path is within allowed bases: path={:?}, allowed_bases={:?}", path, allowed_bases);
 

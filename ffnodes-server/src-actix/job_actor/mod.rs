@@ -19,6 +19,7 @@ pub enum ActorError {
     /// Database operation failed
     DatabaseError(String),
     /// Resource not found
+    #[allow(dead_code)]
     NotFound,
     /// Invalid state or operation
     InvalidState(String),
@@ -43,6 +44,7 @@ pub enum InitializationStatus {
     /// Actor has not started initialization
     NotStarted,
     /// Actor is currently initializing
+    #[allow(dead_code)]
     InProgress { stage: String },
     /// Actor initialization is complete
     Complete,
@@ -54,6 +56,7 @@ pub enum InitializationStatus {
 #[derive(Debug)]
 pub enum JobCommand {
     /// Create a new encoding job
+    #[allow(dead_code)]
     CreateJob {
         media_file_path: String,
         priority: i64,
@@ -141,6 +144,7 @@ pub enum ClientCommand {
         respond_to: oneshot::Sender<ActorResult<()>>,
     },
     /// Disconnect a client
+    #[allow(dead_code)]
     DisconnectClient {
         client_id: String,
         respond_to: oneshot::Sender<ActorResult<()>>,
@@ -151,6 +155,7 @@ pub enum ClientCommand {
         respond_to: oneshot::Sender<ActorResult<()>>,
     },
     /// Get client by ID
+    #[allow(dead_code)]
     GetClient {
         client_id: String,
         respond_to: oneshot::Sender<ActorResult<Option<Client>>>,
@@ -165,6 +170,7 @@ pub enum ClientCommand {
         respond_to: oneshot::Sender<ActorResult<bool>>,
     },
     /// Get client status with active job count
+    #[allow(dead_code)]
     GetClientStatus {
         client_id: String,
         respond_to: oneshot::Sender<ActorResult<Option<ClientStatus>>>,
