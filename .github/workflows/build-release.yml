@@ -48,7 +48,12 @@ jobs:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
 
       - name: List built artifacts
-        run: ls -la dist/
+        run: |
+          echo "Working directory: $(pwd)"
+          echo "Workspace: $GITHUB_WORKSPACE"
+          echo "Built artifacts in dist/:"
+          ls -lah dist/ || echo "No artifacts found"
+          echo "Absolute path: $(pwd)/dist/"
         shell: bash
 
   build-linux:
@@ -108,7 +113,12 @@ jobs:
           CXX_aarch64_unknown_linux_gnu: aarch64-linux-gnu-g++
 
       - name: List built artifacts
-        run: ls -la dist/
+        run: |
+          echo "Working directory: $(pwd)"
+          echo "Workspace: $GITHUB_WORKSPACE"
+          echo "Built artifacts in dist/:"
+          ls -lah dist/ || echo "No artifacts found"
+          echo "Absolute path: $(pwd)/dist/"
         shell: bash
 
   build-macos:
@@ -152,5 +162,10 @@ jobs:
           CARGO_BUILD_TARGET: ${{ matrix.target }}
 
       - name: List built artifacts
-        run: ls -la dist/
+        run: |
+          echo "Working directory: $(pwd)"
+          echo "Workspace: $GITHUB_WORKSPACE"
+          echo "Built artifacts in dist/:"
+          ls -lah dist/ || echo "No artifacts found"
+          echo "Absolute path: $(pwd)/dist/"
         shell: bash
