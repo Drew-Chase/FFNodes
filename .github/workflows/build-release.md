@@ -287,6 +287,30 @@ git push --tags
 3. Click "Run workflow"
 4. Choose branch and click "Run"
 
+### Local Testing with `act`
+
+To test the workflow locally and have artifacts persist to your host machine:
+
+```bash
+# Create dist directory (if it doesn't exist)
+mkdir -p dist
+
+# Run with bind mount to ensure artifacts persist
+gh act -W .github/workflows/build-release.yml workflow_dispatch --matrix arch:x64 -j build-linux --bind
+
+# Check artifacts in ./dist/
+ls -lah dist/
+```
+
+**Note:** When using `act`, the workflow runs in a Docker container. The `--bind` flag ensures the repository directory (including `dist/`) is properly mounted from your host machine, allowing artifacts to persist after the container exits.
+
+**Alternative:** Use PowerShell to copy artifacts from container:
+```powershell
+# After build completes, find the container and copy artifacts
+docker ps -a  # Find the container ID
+docker cp <container-id>:/workspace/dist ./dist
+```
+
 ---
 
 ## Troubleshooting
