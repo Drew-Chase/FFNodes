@@ -53,6 +53,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-appender = { version = "0.2" }
 tracing-indicatif = { version = "0.3" }
 async-stream = { version = "0.3" }
-jsonwebtoken = { version = "9.3" }
+jsonwebtoken = { version = "10.3" }
 vite-actix = "0.2.6"
 include_dir = "0.7.4"
