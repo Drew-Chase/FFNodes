@@ -44,6 +44,12 @@ export function SettingsModal({isOpen, onClose}: SettingsModalProps)
     const [isSaving, setIsSaving] = useState(false);
     const [connectionStatus, setConnectionStatus] = useState<"idle" | "success" | "error">("idle");
     const [ffmpegCommand, setFfmpegCommand] = useState<string | null>(null);
+    const [skipIfOutputLarger, setSkipIfOutputLarger] = useState(
+        config?.skip_if_output_larger ?? false
+    );
+    const [outputSizeMargin, setOutputSizeMargin] = useState(
+        config?.output_size_margin_percent ?? 1.0
+    );
 
     useEffect(() =>
     {
@@ -98,6 +104,16 @@ export function SettingsModal({isOpen, onClose}: SettingsModalProps)
                 serverGuid: config.server_guid || "",
                 displayName: config.display_name || ""
             });
+        }
+    }, [config]);
+
+    // Sync size monitoring settings when config changes
+    useEffect(() =>
+    {
+        if (config)
+        {
+            setSkipIfOutputLarger(config.skip_if_output_larger ?? false);
+            setOutputSizeMargin(config.output_size_margin_percent ?? 1.0);
         }
     }, [config]);
 
@@ -177,7 +193,17 @@ export function SettingsModal({isOpen, onClose}: SettingsModalProps)
                 }
             });
 
-            setConfig(newConfig);
+            // Add size monitoring settings
+            const updatedConfig = {
+                ...newConfig,
+                skip_if_output_larger: skipIfOutputLarger,
+                output_size_margin_percent: outputSizeMargin,
+            };
+
+            // Save the updated config
+            await invoke("save_config", { config: updatedConfig });
+
+            setConfig(updatedConfig);
             addToast({
                 title: "Success",
                 description: "Settings saved successfully!",
@@ -427,6 +453,69 @@ export function SettingsModal({isOpen, onClose}: SettingsModalProps)
                                         ) : (
                                             <p className="text-body-sm text-foreground/70 mt-4">No active session</p>
                                         )}
+                                    </BentoCardContent>
+                                </BentoCard>
+
+                                {/* Encoding Settings */}
+                                <BentoCard
+                                    colSpan={6}
+                                    elevation={2}
+                                    background="glass"
+                                >
+                                    <BentoCardHeader
+                                        title="Encoding Settings"
+                                        subtitle="Configure encoding behavior"
+                                        icon={<iconify-icon icon="mdi:cog" class="text-2xl"/>}
+                                    />
+                                    <BentoCardContent>
+                                        <div className="mt-4 space-y-4">
+                                            <div className="flex items-start gap-3">
+                                                <input
+                                                    type="checkbox"
+                                                    id="skip-if-larger"
+                                                    checked={skipIfOutputLarger}
+                                                    onChange={(e) => setSkipIfOutputLarger(e.target.checked)}
+                                                    className="mt-1 w-4 h-4 rounded border-foreground/30 bg-content2 text-primary focus:ring-2 focus:ring-primary"
+                                                />
+                                                <div className="flex-1">
+                                                    <label htmlFor="skip-if-larger"
+                                                           className="text-body-md font-medium text-foreground cursor-pointer">
+                                                        Skip encoding if output file becomes larger than input
+                                                    </label>
+                                                    <p className="text-body-sm text-foreground/60 mt-1">
+                                                        Automatically abort encoding if the output file size exceeds the
+                                                        input file size. This prevents wasting resources on
+                                                        counterproductive encodes.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {skipIfOutputLarger && (
+                                                <div className="ml-7 pl-4 border-l-2 border-primary/30">
+                                                    <label htmlFor="size-margin"
+                                                           className="text-body-sm text-foreground/70 block mb-2">
+                                                        Safety Margin (%)
+                                                    </label>
+                                                    <div className="flex items-center gap-3">
+                                                        <input
+                                                            type="number"
+                                                            id="size-margin"
+                                                            min="0"
+                                                            max="100"
+                                                            step="0.1"
+                                                            value={outputSizeMargin}
+                                                            onChange={(e) => setOutputSizeMargin(parseFloat(e.target.value) || 0)}
+                                                            className="w-24 px-3 py-2 rounded-md-sm bg-content2 border border-foreground/20 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                                                        />
+                                                        <span className="text-body-sm text-foreground/60">%</span>
+                                                        <span className="text-body-xs text-foreground/50">
+                                                            Allows output to be up to {outputSizeMargin}% larger before
+                                                            aborting
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </BentoCardContent>
                                 </BentoCard>
 
