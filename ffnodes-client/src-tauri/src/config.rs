@@ -12,6 +12,8 @@ pub struct ClientConfig {
     pub client_id: Option<String>,
     pub auth_token: Option<String>,
     pub auto_start_processing: Option<bool>,
+    pub skip_if_output_larger: Option<bool>,
+    pub output_size_margin_percent: Option<f64>,
 }
 
 impl ClientConfig {
@@ -36,6 +38,8 @@ impl ClientConfig {
             client_id: None,
             auth_token: None,
             auto_start_processing: Some(false),
+            skip_if_output_larger: Some(false),
+            output_size_margin_percent: Some(1.0),
         }
     }
 
@@ -72,6 +76,8 @@ impl ClientConfig {
                     client_id: Option<String>,
                     auth_token: Option<String>,
                     auto_start_processing: Option<bool>,
+                    skip_if_output_larger: Option<bool>,
+                    output_size_margin_percent: Option<f64>,
                 }
 
                 let old_config: OldConfig = serde_json::from_str(&content)?;
@@ -94,6 +100,8 @@ impl ClientConfig {
                     client_id: old_config.client_id,
                     auth_token: old_config.auth_token,
                     auto_start_processing: old_config.auto_start_processing,
+                    skip_if_output_larger: old_config.skip_if_output_larger,
+                    output_size_margin_percent: old_config.output_size_margin_percent,
                 }
             }
         };
@@ -101,6 +109,14 @@ impl ClientConfig {
         // Provide default for auto_start_processing if not present
         if config.auto_start_processing.is_none() {
             config.auto_start_processing = Some(false);
+        }
+
+        // Provide defaults for size monitoring fields if not present
+        if config.skip_if_output_larger.is_none() {
+            config.skip_if_output_larger = Some(false);
+        }
+        if config.output_size_margin_percent.is_none() {
+            config.output_size_margin_percent = Some(1.0);
         }
 
         // Save migrated config if machine_id was just added

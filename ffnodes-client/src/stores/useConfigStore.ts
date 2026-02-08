@@ -9,6 +9,8 @@ export interface ClientConfig {
   auth_token: string | null;
   ffmpeg_template: string | null;
   auto_start_processing?: boolean;
+  skip_if_output_larger?: boolean;
+  output_size_margin_percent?: number;
 }
 
 interface ConfigStore {

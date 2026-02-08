@@ -729,6 +729,8 @@ impl JobManager {
             let gpu_info_clone = gpu_info.clone();
             let ffmpeg_template_clone = ffmpeg_template.clone();
             let total_frames = job_resp.total_frames;
+            let config_skip_larger = config.skip_if_output_larger.unwrap_or(false);
+            let config_margin = config.output_size_margin_percent.unwrap_or(1.0);
 
             let encoding_handle = tokio::spawn(async move {
                 encoder_clone
@@ -738,6 +740,8 @@ impl JobManager {
                         &gpu_info_clone,
                         &ffmpeg_template_clone,
                         total_frames,
+                        config_skip_larger,
+                        config_margin,
                         move |progress: EncodingProgress| {
                             // Emit progress event
                             let _ = app_handle.emit("encoding-progress", &progress);
@@ -888,19 +892,32 @@ impl JobManager {
                 log::error!("---------- Error Handling Phase ----------");
                 log::error!("✗✗✗ Job {} failed: {:#} ✗✗✗", job_id, e);
 
+                // Check if this is a size exceeded error
+                let error_str = e.to_string();
+                let is_size_exceeded = error_str.contains("exceeded input file size")
+                    || error_str.contains("output file exceeded input");
+
                 // Clean up temp files
                 log::debug!("Cleaning up temporary files after job failure...");
                 self.cleanup_job_files(&job_id).await;
 
-                // Fail the job on server
-                let error_message = format!("{:#}", e);
+                // Prepare error message for server
+                let error_message = if is_size_exceeded {
+                    format!(
+                        "Output file exceeded input file size - encoding aborted to prevent size increase. {}",
+                        error_str
+                    )
+                } else {
+                    format!("{:#}", e)
+                };
+
                 log::debug!(
                     "Calling POST /api/jobs/{}/fail with error: {}",
                     job_id,
                     error_message
                 );
 
-                if let Err(fail_err) = client.fail_job(&job_id, error_message).await {
+                if let Err(fail_err) = client.fail_job(&job_id, error_message.clone()).await {
                     log::error!("✗ Failed to report job failure to server: {:#}", fail_err);
                 } else {
                     log::info!("✓ Job failure reported to server successfully");
@@ -916,7 +933,11 @@ impl JobManager {
 
                 // Emit job error event
                 log::debug!("Emitting 'job-error' event to frontend...");
-                let error_msg = format!("Job failed: {:#}", e);
+                let error_msg = if is_size_exceeded {
+                    "Output file exceeded input size - encoding aborted".to_string()
+                } else {
+                    format!("Job failed: {:#}", e)
+                };
                 match self.app_handle.emit("job-error", &error_msg) {
                     Ok(_) => log::debug!("✓ 'job-error' event emitted successfully"),
                     Err(emit_err) => log::warn!("Failed to emit 'job-error' event: {}", emit_err),

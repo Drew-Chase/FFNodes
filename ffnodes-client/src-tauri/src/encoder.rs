@@ -4,8 +4,10 @@ use base64::{Engine as _, engine::general_purpose};
 use ffmpeg::FFMpeg;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::fs;
 use tokio::sync::Mutex;
+use tokio::time::Duration;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct EncodingProgress {
@@ -24,6 +26,7 @@ struct ProgressState {
     speed: f64,
 }
 
+#[derive(Clone)]
 pub struct Encoder {
     ffmpeg: FFMpeg,
     temp_dir: PathBuf,
@@ -175,6 +178,8 @@ impl Encoder {
         gpu_info: &GpuInfo,
         ffmpeg_template: &str,
         total_frames: Option<i64>,
+        skip_if_output_larger: bool,
+        size_margin_percent: f64,
         mut progress_callback: F,
     ) -> Result<(i64, i64, f64)>
     where
@@ -219,6 +224,15 @@ impl Encoder {
             }
         };
 
+        // Capture input file size for size monitoring
+        let input_metadata = tokio::fs::metadata(input_path).await?;
+        let input_size = input_metadata.len();
+        log::debug!("Input file size: {} bytes", input_size);
+
+        // Create shared abort flag for size monitoring
+        let size_exceeded = Arc::new(AtomicBool::new(false));
+        let size_exceeded_clone = size_exceeded.clone();
+
         // Create a channel to receive FFmpeg output
         let (tx, mut rx) = tokio::sync::mpsc::channel(100);
 
@@ -236,6 +250,64 @@ impl Encoder {
         let cmd = builder.build()?;
         log::info!("Starting FFmpeg encoding process");
         log::debug!("FFmpeg command: {}", cmd);
+
+        // Spawn size monitoring task if feature enabled
+        let size_monitor_handle = if skip_if_output_larger {
+            let output_path_clone = output_path.to_path_buf();
+            let encoder_ref = self.clone();
+            let threshold = (input_size as f64 * (1.0 + size_margin_percent / 100.0)) as u64;
+
+            log::info!(
+                "Size monitoring enabled: input={} bytes, threshold={} bytes ({}% margin)",
+                input_size,
+                threshold,
+                size_margin_percent
+            );
+
+            let size_monitor_task = async move {
+                let mut interval = tokio::time::interval(Duration::from_secs(2));
+
+                loop {
+                    interval.tick().await;
+
+                    // Check if output file exists and get size
+                    if let Ok(metadata) = tokio::fs::metadata(&output_path_clone).await {
+                        let output_size = metadata.len();
+                        log::trace!(
+                            "Size check: output {} bytes < threshold {} bytes",
+                            output_size,
+                            threshold
+                        );
+
+                        if output_size > threshold {
+                            log::warn!(
+                                "Output size ({} bytes) exceeded input size ({} bytes) with {}% margin",
+                                output_size,
+                                input_size,
+                                size_margin_percent
+                            );
+
+                            // Signal abort
+                            size_exceeded_clone.store(true, Ordering::SeqCst);
+
+                            // Abort encoding
+                            encoder_ref.abort_encoding().await;
+
+                            return Err::<(), _>(anyhow::anyhow!(
+                                "Output file size ({} bytes) exceeded input file size ({} bytes)",
+                                output_size,
+                                input_size
+                            ));
+                        }
+                    }
+                    // If file doesn't exist yet, continue waiting
+                }
+            };
+
+            Some(tokio::spawn(size_monitor_task))
+        } else {
+            None
+        };
 
         // Execute in background and process progress with PID storage
         let pid_storage = self.current_ffmpeg_pid.clone();
@@ -271,6 +343,30 @@ impl Encoder {
         handle
             .await?
             .map_err(|e| anyhow!("Encoding failed: {}", e))?;
+
+        // Check if size monitor aborted the encoding
+        if size_exceeded.load(Ordering::SeqCst) {
+            log::error!("Encoding was aborted due to output file size exceeding input");
+
+            // Clean up partial output file
+            if let Err(e) = tokio::fs::remove_file(output_path).await {
+                log::warn!("Failed to remove partial output file: {}", e);
+            }
+
+            // Wait for monitor task to finish and get its error
+            if let Some(handle) = size_monitor_handle {
+                if let Ok(Err(e)) = handle.await {
+                    return Err(e); // Propagate size exceeded error
+                }
+            }
+
+            return Err(anyhow!("Encoding aborted: output file exceeded input size"));
+        }
+
+        // Cancel size monitor on normal completion
+        if let Some(handle) = size_monitor_handle {
+            handle.abort();
+        }
 
         log::info!("Encoding completed successfully");
 
